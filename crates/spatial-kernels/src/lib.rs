@@ -148,7 +148,10 @@ pub struct UniformGridBroadPhase {
 impl UniformGridBroadPhase {
     #[must_use]
     pub fn new(cell_size: f32) -> Self {
-        assert!(cell_size.is_finite() && cell_size > 0.0, "cell size must be positive and finite");
+        assert!(
+            cell_size.is_finite() && cell_size > 0.0,
+            "cell size must be positive and finite"
+        );
         Self { cell_size }
     }
 
