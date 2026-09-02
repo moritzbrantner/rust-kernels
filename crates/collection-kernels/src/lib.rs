@@ -1,5 +1,6 @@
 //! Reusable collection and data-structure kernels.
 
+mod addressable_priority_queue;
 mod bit_set;
 mod fenwick_tree;
 mod generational_arena;
@@ -8,6 +9,9 @@ mod ring_buffer;
 mod sparse_set;
 mod union_find;
 
+pub use addressable_priority_queue::{
+    AddressablePriorityQueue, InvalidPriorityQueueHandle, PriorityQueueHandle,
+};
 pub use bit_set::{BitSet, BitSetIter};
 pub use fenwick_tree::FenwickTree;
 pub use generational_arena::{ArenaKey, GenerationalArena};
