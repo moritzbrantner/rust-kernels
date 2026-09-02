@@ -37,6 +37,7 @@ SAT, GJK/EPA, sweep-and-prune, dynamic AABB trees, rays, and CCD remain future k
 - `GenerationalArena`, O(1) slot storage with stale-handle rejection and deterministic live-entry iteration
 - `FenwickTree`, compact O(log n) additive point updates with half-open prefix/range-sum queries
 - `LruCache`, a fixed-capacity O(1)-expected least-recently-used cache with deterministic recency order
+- `AddressablePriorityQueue`, a stable deterministic indexed min-heap with opaque stale-handle rejection and O(log n) priority updates/removals
 
 The collection kernels deliberately stop before lock-free queues or a full ECS framework.
 
