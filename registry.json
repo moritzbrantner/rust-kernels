@@ -1,7 +1,7 @@
 {
   "$schema": "./registry.schema.json",
   "name": "rust-kernels",
-  "version": 2,
+  "version": 3,
   "description": "Reusable Rust algorithms and data structures that can be consumed as crates or integrated as source.",
   "source": {
     "repository": "https://github.com/moritzbrantner/rust-kernels",
@@ -550,7 +550,25 @@
             "MORTON_3D_MAX_COORD"
           ]
         }
-      ]
+      ],
+      "characteristics": {
+        "deterministic": true,
+        "operations": [
+          {
+            "operation": "2D/3D encode and decode",
+            "time": "O(1)",
+            "extraSpace": "O(1)",
+            "mutation": "none",
+            "allocation": "none"
+          }
+        ]
+      },
+      "verification": {
+        "tests": [
+          "crates/spatial-kernels/src/morton.rs"
+        ],
+        "benchmarks": []
+      }
     },
     {
       "name": "bit-set",
@@ -582,7 +600,53 @@
             "BitSetIter"
           ]
         }
-      ]
+      ],
+      "characteristics": {
+        "deterministic": true,
+        "operations": [
+          {
+            "operation": "construct fixed universe",
+            "time": "O(w), w = 64-bit word count",
+            "extraSpace": "O(w)",
+            "mutation": "none",
+            "allocation": "input-sized"
+          },
+          {
+            "operation": "set / clear",
+            "time": "O(1)",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "contains",
+            "time": "O(1)",
+            "extraSpace": "O(1)",
+            "mutation": "none",
+            "allocation": "none"
+          },
+          {
+            "operation": "clear all",
+            "time": "O(w), w = 64-bit word count",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "iterate set bits",
+            "time": "O(w + k), w = word count, k = yielded set bits",
+            "extraSpace": "O(1)",
+            "mutation": "none",
+            "allocation": "none"
+          }
+        ]
+      },
+      "verification": {
+        "tests": [
+          "crates/collection-kernels/src/bit_set.rs"
+        ],
+        "benchmarks": []
+      }
     },
     {
       "name": "fenwick-tree",
@@ -614,7 +678,46 @@
             "FenwickTree"
           ]
         }
-      ]
+      ],
+      "characteristics": {
+        "deterministic": true,
+        "operations": [
+          {
+            "operation": "construct empty tree",
+            "time": "O(n)",
+            "extraSpace": "O(n)",
+            "mutation": "none",
+            "allocation": "input-sized"
+          },
+          {
+            "operation": "build from slice",
+            "time": "O(n log n)",
+            "extraSpace": "O(n)",
+            "mutation": "none",
+            "allocation": "input-sized"
+          },
+          {
+            "operation": "add point delta",
+            "time": "O(log n)",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "prefix / range sum",
+            "time": "O(log n)",
+            "extraSpace": "O(1)",
+            "mutation": "none",
+            "allocation": "none"
+          }
+        ]
+      },
+      "verification": {
+        "tests": [
+          "crates/collection-kernels/src/fenwick_tree.rs"
+        ],
+        "benchmarks": []
+      }
     },
     {
       "name": "generational-arena",
@@ -647,7 +750,60 @@
             "GenerationalArena"
           ]
         }
-      ]
+      ],
+      "characteristics": {
+        "deterministic": true,
+        "operations": [
+          {
+            "operation": "insert",
+            "time": "O(1) amortized",
+            "extraSpace": "O(1) excluding retained arena storage",
+            "mutation": "internal-state",
+            "allocation": "may-grow"
+          },
+          {
+            "operation": "get",
+            "time": "O(1)",
+            "extraSpace": "O(1)",
+            "mutation": "none",
+            "allocation": "none"
+          },
+          {
+            "operation": "get mutable",
+            "time": "O(1)",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "remove",
+            "time": "O(1)",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "clear",
+            "time": "O(s), s = slot count",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "iterate live entries",
+            "time": "O(s), s = slot count",
+            "extraSpace": "O(1)",
+            "mutation": "none",
+            "allocation": "none"
+          }
+        ]
+      },
+      "verification": {
+        "tests": [
+          "crates/collection-kernels/src/generational_arena.rs"
+        ],
+        "benchmarks": []
+      }
     },
     {
       "name": "lru-cache",
@@ -679,7 +835,60 @@
             "LruCache"
           ]
         }
-      ]
+      ],
+      "characteristics": {
+        "deterministic": true,
+        "operations": [
+          {
+            "operation": "get",
+            "time": "O(1) expected",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "peek / contains",
+            "time": "O(1) expected",
+            "extraSpace": "O(1)",
+            "mutation": "none",
+            "allocation": "none"
+          },
+          {
+            "operation": "insert",
+            "time": "O(1) expected",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "capacity-bounded"
+          },
+          {
+            "operation": "remove",
+            "time": "O(1) expected",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "clear",
+            "time": "O(n)",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "iterate recency order",
+            "time": "O(n)",
+            "extraSpace": "O(1)",
+            "mutation": "none",
+            "allocation": "none"
+          }
+        ]
+      },
+      "verification": {
+        "tests": [
+          "crates/collection-kernels/src/lru_cache.rs"
+        ],
+        "benchmarks": []
+      }
     },
     {
       "name": "ring-buffer",
@@ -711,7 +920,53 @@
             "RingBuffer"
           ]
         }
-      ]
+      ],
+      "characteristics": {
+        "deterministic": true,
+        "operations": [
+          {
+            "operation": "construct",
+            "time": "O(c), c = capacity",
+            "extraSpace": "O(c)",
+            "mutation": "none",
+            "allocation": "input-sized"
+          },
+          {
+            "operation": "push / pop",
+            "time": "O(1)",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "peek",
+            "time": "O(1)",
+            "extraSpace": "O(1)",
+            "mutation": "none",
+            "allocation": "none"
+          },
+          {
+            "operation": "clear",
+            "time": "O(c), c = capacity",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "iterate",
+            "time": "O(n)",
+            "extraSpace": "O(1)",
+            "mutation": "none",
+            "allocation": "none"
+          }
+        ]
+      },
+      "verification": {
+        "tests": [
+          "crates/collection-kernels/src/ring_buffer.rs"
+        ],
+        "benchmarks": []
+      }
     },
     {
       "name": "sparse-set",
@@ -743,7 +998,53 @@
             "SparseSet"
           ]
         }
-      ]
+      ],
+      "characteristics": {
+        "deterministic": true,
+        "operations": [
+          {
+            "operation": "contains",
+            "time": "O(1)",
+            "extraSpace": "O(1)",
+            "mutation": "none",
+            "allocation": "none"
+          },
+          {
+            "operation": "insert",
+            "time": "O(1) amortized when the sparse slot exists; O(key - s) when growing sparse storage",
+            "extraSpace": "O(key - s) when growing, s = previous sparse length",
+            "mutation": "internal-state",
+            "allocation": "may-grow"
+          },
+          {
+            "operation": "remove",
+            "time": "O(1)",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "clear",
+            "time": "O(n), n = dense key count",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "iterate dense keys",
+            "time": "O(n)",
+            "extraSpace": "O(1)",
+            "mutation": "none",
+            "allocation": "none"
+          }
+        ]
+      },
+      "verification": {
+        "tests": [
+          "crates/collection-kernels/src/sparse_set.rs"
+        ],
+        "benchmarks": []
+      }
     },
     {
       "name": "union-find",
@@ -775,7 +1076,39 @@
             "UnionFind"
           ]
         }
-      ]
+      ],
+      "characteristics": {
+        "deterministic": true,
+        "operations": [
+          {
+            "operation": "construct",
+            "time": "O(n)",
+            "extraSpace": "O(n)",
+            "mutation": "none",
+            "allocation": "input-sized"
+          },
+          {
+            "operation": "find",
+            "time": "O(alpha(n)) amortized",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "union / connected / component size",
+            "time": "O(alpha(n)) amortized",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          }
+        ]
+      },
+      "verification": {
+        "tests": [
+          "crates/collection-kernels/src/union_find.rs"
+        ],
+        "benchmarks": []
+      }
     },
     {
       "name": "selection",
@@ -815,7 +1148,32 @@
             "top_k_smallest"
           ]
         }
-      ]
+      ],
+      "characteristics": {
+        "deterministic": true,
+        "operations": [
+          {
+            "operation": "quickselect",
+            "time": "O(n) average; O(n^2) worst",
+            "extraSpace": "O(1)",
+            "mutation": "input",
+            "allocation": "none"
+          },
+          {
+            "operation": "top-k smallest",
+            "time": "O(n + k log k) average; O(n^2 + k log k) worst",
+            "extraSpace": "O(n)",
+            "mutation": "none",
+            "allocation": "input-sized"
+          }
+        ]
+      },
+      "verification": {
+        "tests": [
+          "crates/search-kernels/src/selection.rs"
+        ],
+        "benchmarks": []
+      }
     },
     {
       "name": "radix-sort",
@@ -854,7 +1212,32 @@
             "radix_sort_u64"
           ]
         }
-      ]
+      ],
+      "characteristics": {
+        "deterministic": true,
+        "operations": [
+          {
+            "operation": "sort u32",
+            "time": "O(4 * (n + 256)) = O(n)",
+            "extraSpace": "O(n + 256) = O(n)",
+            "mutation": "input",
+            "allocation": "input-sized"
+          },
+          {
+            "operation": "sort u64",
+            "time": "O(8 * (n + 256)) = O(n)",
+            "extraSpace": "O(n + 256) = O(n)",
+            "mutation": "input",
+            "allocation": "input-sized"
+          }
+        ]
+      },
+      "verification": {
+        "tests": [
+          "crates/search-kernels/src/radix_sort.rs"
+        ],
+        "benchmarks": []
+      }
     },
     {
       "name": "running-statistics",
@@ -887,7 +1270,39 @@
             "RunningStats"
           ]
         }
-      ]
+      ],
+      "characteristics": {
+        "deterministic": true,
+        "operations": [
+          {
+            "operation": "push / merge",
+            "time": "O(1)",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "extend",
+            "time": "O(n)",
+            "extraSpace": "O(1)",
+            "mutation": "internal-state",
+            "allocation": "none"
+          },
+          {
+            "operation": "read statistics",
+            "time": "O(1)",
+            "extraSpace": "O(1)",
+            "mutation": "none",
+            "allocation": "none"
+          }
+        ]
+      },
+      "verification": {
+        "tests": [
+          "crates/statistics-kernels/src/running_stats.rs"
+        ],
+        "benchmarks": []
+      }
     }
   ]
 }
