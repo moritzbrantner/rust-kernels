@@ -122,6 +122,48 @@ mod tests {
     }
 
     #[test]
+    fn exhaustive_u32_byte_boundaries_match_standard_sort() {
+        const VALUES: [u32; 5] = [0, 1, 255, 256, u32::MAX];
+
+        for len in 0_usize..=5 {
+            for case in 0_usize..VALUES.len().pow(len as u32) {
+                let mut encoded = case;
+                let mut actual = Vec::with_capacity(len);
+                for _ in 0..len {
+                    actual.push(VALUES[encoded % VALUES.len()]);
+                    encoded /= VALUES.len();
+                }
+
+                let mut expected = actual.clone();
+                expected.sort();
+                radix_sort_u32(&mut actual);
+                assert_eq!(actual, expected, "len={len}, case={case}");
+            }
+        }
+    }
+
+    #[test]
+    fn exhaustive_u64_byte_boundaries_match_standard_sort() {
+        const VALUES: [u64; 6] = [0, 1, 255, 256, 1 << 32, u64::MAX];
+
+        for len in 0_usize..=4 {
+            for case in 0_usize..VALUES.len().pow(len as u32) {
+                let mut encoded = case;
+                let mut actual = Vec::with_capacity(len);
+                for _ in 0..len {
+                    actual.push(VALUES[encoded % VALUES.len()]);
+                    encoded /= VALUES.len();
+                }
+
+                let mut expected = actual.clone();
+                expected.sort();
+                radix_sort_u64(&mut actual);
+                assert_eq!(actual, expected, "len={len}, case={case}");
+            }
+        }
+    }
+
+    #[test]
     fn byte_passes_preserve_equal_key_order() {
         let mut values = [
             Tagged { key: 3, ordinal: 0 },
