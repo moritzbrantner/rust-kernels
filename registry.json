@@ -508,6 +508,386 @@
           ]
         }
       ]
+    },
+    {
+      "name": "morton-code",
+      "type": "registry:algorithm",
+      "title": "Morton / Z-order Encoding",
+      "description": "Standalone 2D and 3D Morton encode/decode kernels for compact integer spatial keys.",
+      "integration": {
+        "mode": "standalone-module",
+        "module": "morton"
+      },
+      "tags": [
+        "spatial",
+        "morton",
+        "z-order"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/spatial-kernels/src/morton.rs",
+          "target": "src/kernels/morton.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "morton-2d",
+          "type": "algorithm",
+          "symbols": [
+            "morton2_encode",
+            "morton2_decode"
+          ]
+        },
+        {
+          "name": "morton-3d",
+          "type": "algorithm",
+          "symbols": [
+            "morton3_encode",
+            "morton3_decode",
+            "MORTON_3D_BITS_PER_AXIS",
+            "MORTON_3D_MAX_COORD"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bit-set",
+      "type": "registry:data-structure",
+      "title": "Bit Set",
+      "description": "Standalone packed fixed-universe bit set with efficient set-bit iteration.",
+      "integration": {
+        "mode": "standalone-module",
+        "module": "bit_set"
+      },
+      "tags": [
+        "collections",
+        "bitset"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/collection-kernels/src/bit_set.rs",
+          "target": "src/kernels/bit_set.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "bit-set",
+          "type": "data-structure",
+          "symbols": [
+            "BitSet",
+            "BitSetIter"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "fenwick-tree",
+      "type": "registry:data-structure",
+      "title": "Fenwick Tree",
+      "description": "Standalone Fenwick tree for logarithmic additive updates and prefix/range sums.",
+      "integration": {
+        "mode": "standalone-module",
+        "module": "fenwick_tree"
+      },
+      "tags": [
+        "collections",
+        "fenwick-tree",
+        "prefix-sum"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/collection-kernels/src/fenwick_tree.rs",
+          "target": "src/kernels/fenwick_tree.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "fenwick-tree",
+          "type": "data-structure",
+          "symbols": [
+            "FenwickTree"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "generational-arena",
+      "type": "registry:data-structure",
+      "title": "Generational Arena",
+      "description": "Standalone generational arena with stale-handle rejection and deterministic live-entry iteration.",
+      "integration": {
+        "mode": "standalone-module",
+        "module": "generational_arena"
+      },
+      "tags": [
+        "collections",
+        "arena",
+        "generational-handles"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/collection-kernels/src/generational_arena.rs",
+          "target": "src/kernels/generational_arena.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "generational-arena",
+          "type": "data-structure",
+          "symbols": [
+            "ArenaKey",
+            "GenerationalArena"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lru-cache",
+      "type": "registry:data-structure",
+      "title": "LRU Cache",
+      "description": "Standalone fixed-capacity least-recently-used cache with deterministic recency order.",
+      "integration": {
+        "mode": "standalone-module",
+        "module": "lru_cache"
+      },
+      "tags": [
+        "collections",
+        "cache",
+        "lru"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/collection-kernels/src/lru_cache.rs",
+          "target": "src/kernels/lru_cache.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "lru-cache",
+          "type": "data-structure",
+          "symbols": [
+            "LruCache"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ring-buffer",
+      "type": "registry:data-structure",
+      "title": "Ring Buffer",
+      "description": "Standalone fixed-capacity FIFO ring buffer that does not reallocate after construction.",
+      "integration": {
+        "mode": "standalone-module",
+        "module": "ring_buffer"
+      },
+      "tags": [
+        "collections",
+        "streaming",
+        "ring-buffer"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/collection-kernels/src/ring_buffer.rs",
+          "target": "src/kernels/ring_buffer.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "ring-buffer",
+          "type": "data-structure",
+          "symbols": [
+            "RingBuffer"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sparse-set",
+      "type": "registry:data-structure",
+      "title": "Sparse Set",
+      "description": "Standalone sparse/dense integer-key set for fast membership and compact iteration.",
+      "integration": {
+        "mode": "standalone-module",
+        "module": "sparse_set"
+      },
+      "tags": [
+        "collections",
+        "sparse-set",
+        "ecs-primitives"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/collection-kernels/src/sparse_set.rs",
+          "target": "src/kernels/sparse_set.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "sparse-set",
+          "type": "data-structure",
+          "symbols": [
+            "SparseSet"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "union-find",
+      "type": "registry:data-structure",
+      "title": "Union Find",
+      "description": "Standalone disjoint-set union structure with path compression and union by size.",
+      "integration": {
+        "mode": "standalone-module",
+        "module": "union_find"
+      },
+      "tags": [
+        "collections",
+        "connectivity",
+        "union-find"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/collection-kernels/src/union_find.rs",
+          "target": "src/kernels/union_find.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "union-find",
+          "type": "data-structure",
+          "symbols": [
+            "UnionFind"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "selection",
+      "type": "registry:algorithm",
+      "title": "Selection Algorithms",
+      "description": "Standalone deterministic quickselect and top-k-smallest algorithms for ordered values.",
+      "integration": {
+        "mode": "standalone-module",
+        "module": "selection"
+      },
+      "tags": [
+        "search",
+        "selection",
+        "quickselect",
+        "top-k"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/search-kernels/src/selection.rs",
+          "target": "src/kernels/selection.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "quickselect",
+          "type": "algorithm",
+          "symbols": [
+            "quickselect"
+          ]
+        },
+        {
+          "name": "top-k-smallest",
+          "type": "algorithm",
+          "symbols": [
+            "top_k_smallest"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "radix-sort",
+      "type": "registry:algorithm",
+      "title": "Radix Sort",
+      "description": "Standalone stable LSD radix-sort kernels for unsigned 32-bit and 64-bit integers.",
+      "integration": {
+        "mode": "standalone-module",
+        "module": "radix_sort"
+      },
+      "tags": [
+        "search",
+        "sorting",
+        "radix-sort"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/search-kernels/src/radix_sort.rs",
+          "target": "src/kernels/radix_sort.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "radix-sort-u32",
+          "type": "algorithm",
+          "symbols": [
+            "radix_sort_u32"
+          ]
+        },
+        {
+          "name": "radix-sort-u64",
+          "type": "algorithm",
+          "symbols": [
+            "radix_sort_u64"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "running-statistics",
+      "type": "registry:data-structure",
+      "title": "Running Statistics",
+      "description": "Standalone numerically stable streaming statistics accumulator with merge support.",
+      "integration": {
+        "mode": "standalone-module",
+        "module": "running_stats"
+      },
+      "tags": [
+        "statistics",
+        "streaming",
+        "welford",
+        "variance"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/statistics-kernels/src/running_stats.rs",
+          "target": "src/kernels/running_stats.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "running-statistics",
+          "type": "data-structure",
+          "symbols": [
+            "RunningStats"
+          ]
+        }
+      ]
     }
   ]
 }
