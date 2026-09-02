@@ -159,24 +159,15 @@ mod tests {
     #[test]
     fn aabb_axis_overlap_exposes_penetration_touch_and_gap() {
         let base = Aabb::new([0.0, 0.0, 0.0], [2.0, 2.0, 2.0]);
-        let penetrating = aabb_aabb(
-            base,
-            Aabb::new([1.0, 0.5, -1.0], [3.0, 1.5, 1.0]),
-        );
+        let penetrating = aabb_aabb(base, Aabb::new([1.0, 0.5, -1.0], [3.0, 1.5, 1.0]));
         assert_eq!(penetrating.axis_overlap, [1.0, 1.0, 1.0]);
         assert!(penetrating.overlaps);
 
-        let touching = aabb_aabb(
-            base,
-            Aabb::new([2.0, 0.5, 0.5], [3.0, 1.5, 1.5]),
-        );
+        let touching = aabb_aabb(base, Aabb::new([2.0, 0.5, 0.5], [3.0, 1.5, 1.5]));
         assert_eq!(touching.axis_overlap[0], 0.0);
         assert!(touching.overlaps);
 
-        let separated = aabb_aabb(
-            base,
-            Aabb::new([2.25, 0.5, 0.5], [3.0, 1.5, 1.5]),
-        );
+        let separated = aabb_aabb(base, Aabb::new([2.25, 0.5, 0.5], [3.0, 1.5, 1.5]));
         assert_eq!(separated.axis_overlap[0], -0.25);
         assert!(!separated.overlaps);
     }
