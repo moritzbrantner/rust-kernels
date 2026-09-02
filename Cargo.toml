@@ -7,6 +7,7 @@ members = [
     "crates/graph-kernels",
     "crates/octree-kernels",
     "crates/search-kernels",
+    "crates/similarity-kernels",
     "crates/spatial-kernels",
     "crates/statistics-kernels",
 ]
