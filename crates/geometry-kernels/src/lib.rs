@@ -284,9 +284,18 @@ mod tests {
     #[test]
     fn zero_rotation_obb_matches_aabb_decision() {
         let fixtures = [
-            (Obb2::new([0.0, 0.0], [1.0, 2.0], 0.0), Obb2::new([1.5, 0.5], [1.0, 0.5], 0.0)),
-            (Obb2::new([0.0, 0.0], [1.0, 2.0], 0.0), Obb2::new([2.0, 0.0], [1.0, 0.5], 0.0)),
-            (Obb2::new([0.0, 0.0], [1.0, 2.0], 0.0), Obb2::new([2.1, 0.0], [1.0, 0.5], 0.0)),
+            (
+                Obb2::new([0.0, 0.0], [1.0, 2.0], 0.0),
+                Obb2::new([1.5, 0.5], [1.0, 0.5], 0.0),
+            ),
+            (
+                Obb2::new([0.0, 0.0], [1.0, 2.0], 0.0),
+                Obb2::new([2.0, 0.0], [1.0, 0.5], 0.0),
+            ),
+            (
+                Obb2::new([0.0, 0.0], [1.0, 2.0], 0.0),
+                Obb2::new([2.1, 0.0], [1.0, 0.5], 0.0),
+            ),
         ];
 
         for (left, right) in fixtures {
@@ -298,7 +307,10 @@ mod tests {
                 [right.center[0], right.center[1], 0.0],
                 [right.half_extents[0], right.half_extents[1], 0.5],
             );
-            assert_eq!(obb2_sat(left, right).overlaps, left_aabb.overlaps(right_aabb));
+            assert_eq!(
+                obb2_sat(left, right).overlaps,
+                left_aabb.overlaps(right_aabb)
+            );
         }
     }
 
@@ -328,14 +340,22 @@ mod tests {
         let right = Obb2::new([2.0, 0.0], [1.0, 0.5], 0.0);
         let relation = obb2_sat(left, right);
         assert!(relation.overlaps);
-        assert!(relation.axes.iter().any(|axis| axis.signed_overlap.abs() <= f64::EPSILON));
+        assert!(
+            relation
+                .axes
+                .iter()
+                .any(|axis| axis.signed_overlap.abs() <= f64::EPSILON)
+        );
     }
 
     #[test]
     fn obb_sat_decision_is_symmetric() {
         let left = Obb2::new([-0.5, 0.3], [1.3, 0.7], 0.42);
         let right = Obb2::new([1.2, -0.1], [0.8, 1.1], -0.73);
-        assert_eq!(obb2_sat(left, right).overlaps, obb2_sat(right, left).overlaps);
+        assert_eq!(
+            obb2_sat(left, right).overlaps,
+            obb2_sat(right, left).overlaps
+        );
     }
 
     #[test]
@@ -355,7 +375,12 @@ mod tests {
             Obb2::new([2.7, 0.2], [1.0, 0.7], -0.5),
         );
         let critical = relation.axes[relation.critical_axis].signed_overlap;
-        assert!(relation.axes.iter().all(|axis| critical <= axis.signed_overlap));
+        assert!(
+            relation
+                .axes
+                .iter()
+                .all(|axis| critical <= axis.signed_overlap)
+        );
     }
 
     #[test]
