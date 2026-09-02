@@ -11,8 +11,9 @@ The repository starts with spatial/collision kernels and expands into small gene
 `spatial-kernels` contains:
 
 - `Aabb` and stable `ColliderId`/`Pair` primitives
+- `SpatialHash3D` and `CellCoord3` for deterministic world-to-cell mapping and stable compact cell hashes
 - `NaiveBroadPhase`, an intentionally O(n²) correctness oracle
-- `UniformGridBroadPhase`, a sparse 3D grid that avoids testing objects which cannot share space
+- `UniformGridBroadPhase`, a sparse 3D grid built on the same public spatial-hash cell mapping
 - deterministic sorted pair output and instrumentation for AABB-test counts
 - differential tests proving the grid produces the same overlapping pairs as the naive oracle across several cell sizes
 
@@ -26,7 +27,13 @@ SAT, GJK/EPA, sweep-and-prune, dynamic AABB trees, rays, and CCD remain future k
 
 ### Collections
 
-`collection-kernels` currently contains `UnionFind`, using path compression and union by size with deterministic tie-breaking. Its connectivity results are tested against a trivial traversal oracle.
+`collection-kernels` contains:
+
+- `UnionFind`, using path compression and union by size with deterministic tie-breaking and connectivity checks against a traversal oracle
+- `RingBuffer`, a fixed-capacity FIFO buffer that does not reallocate after construction
+- `SparseSet`, the sparse/dense integer-key set primitive commonly used for fast membership and ECS-style storage
+
+The collection kernels deliberately stop before lock-free queues, generational arenas, or a full ECS framework.
 
 ### Graph search
 
