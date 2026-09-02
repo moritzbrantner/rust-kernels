@@ -113,11 +113,7 @@ mod tests {
 
     use super::RingBuffer;
 
-    fn assert_matches_model(
-        buffer: &RingBuffer<usize>,
-        model: &VecDeque<usize>,
-        capacity: usize,
-    ) {
+    fn assert_matches_model(buffer: &RingBuffer<usize>, model: &VecDeque<usize>, capacity: usize) {
         assert_eq!(buffer.capacity(), capacity);
         assert_eq!(buffer.len(), model.len());
         assert_eq!(buffer.is_empty(), model.is_empty());
