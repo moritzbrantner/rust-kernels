@@ -456,7 +456,11 @@ mod tests {
         let trace = trace_static_bvh(&bodies);
         assert_eq!(trace.nodes.iter().filter(|node| node.is_root).count(), 1);
         assert_eq!(
-            trace.nodes.iter().filter(|node| node.body.is_some()).count(),
+            trace
+                .nodes
+                .iter()
+                .filter(|node| node.body.is_some())
+                .count(),
             bodies.len()
         );
         assert_eq!(
