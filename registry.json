@@ -71,6 +71,141 @@
           ]
         }
       ]
+    },
+    {
+      "name": "collection-kernels",
+      "type": "registry:crate",
+      "title": "Collection Kernels",
+      "description": "Small deterministic collection and data-structure kernels.",
+      "crate": {
+        "package": "collection-kernels",
+        "manifest": "crates/collection-kernels/Cargo.toml"
+      },
+      "tags": [
+        "collections",
+        "connectivity",
+        "data-structures"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/collection-kernels/Cargo.toml",
+          "target": "crates/collection-kernels/Cargo.toml"
+        },
+        {
+          "path": "crates/collection-kernels/src/lib.rs",
+          "target": "crates/collection-kernels/src/lib.rs"
+        },
+        {
+          "path": "crates/collection-kernels/src/union_find.rs",
+          "target": "crates/collection-kernels/src/union_find.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "union-find",
+          "type": "data-structure",
+          "symbols": [
+            "UnionFind"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "graph-kernels",
+      "type": "registry:crate",
+      "title": "Graph Kernels",
+      "description": "Graph algorithms that accept caller-owned graph storage through callbacks.",
+      "crate": {
+        "package": "graph-kernels",
+        "manifest": "crates/graph-kernels/Cargo.toml"
+      },
+      "tags": [
+        "graph",
+        "pathfinding",
+        "search"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/graph-kernels/Cargo.toml",
+          "target": "crates/graph-kernels/Cargo.toml"
+        },
+        {
+          "path": "crates/graph-kernels/src/lib.rs",
+          "target": "crates/graph-kernels/src/lib.rs"
+        },
+        {
+          "path": "crates/graph-kernels/src/search.rs",
+          "target": "crates/graph-kernels/src/search.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "dijkstra",
+          "type": "algorithm",
+          "symbols": [
+            "dijkstra",
+            "Path"
+          ]
+        },
+        {
+          "name": "astar",
+          "type": "algorithm",
+          "symbols": [
+            "astar",
+            "Path"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bvh-kernels",
+      "type": "registry:crate",
+      "title": "BVH Kernels",
+      "description": "Deterministic bounding-volume hierarchy construction, queries, and broad-phase collision detection.",
+      "crate": {
+        "package": "bvh-kernels",
+        "manifest": "crates/bvh-kernels/Cargo.toml"
+      },
+      "tags": [
+        "spatial",
+        "collision",
+        "bvh",
+        "broad-phase"
+      ],
+      "dependencies": [],
+      "registryDependencies": [
+        "spatial-kernels"
+      ],
+      "files": [
+        {
+          "path": "crates/bvh-kernels/Cargo.toml",
+          "target": "crates/bvh-kernels/Cargo.toml"
+        },
+        {
+          "path": "crates/bvh-kernels/src/lib.rs",
+          "target": "crates/bvh-kernels/src/lib.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "static-bvh",
+          "type": "data-structure",
+          "symbols": [
+            "StaticBvh"
+          ]
+        },
+        {
+          "name": "static-bvh-broad-phase",
+          "type": "algorithm",
+          "symbols": [
+            "StaticBvhBroadPhase"
+          ]
+        }
+      ]
     }
   ]
 }

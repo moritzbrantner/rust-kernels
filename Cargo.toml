@@ -1,5 +1,10 @@
 [workspace]
-members = ["crates/spatial-kernels"]
+members = [
+    "crates/bvh-kernels",
+    "crates/collection-kernels",
+    "crates/graph-kernels",
+    "crates/spatial-kernels",
+]
 resolver = "2"
 
 [workspace.package]
