@@ -1,8 +1,16 @@
 {
   "$schema": "./registry.schema.json",
   "name": "rust-kernels",
-  "version": 1,
+  "version": 2,
   "description": "Reusable Rust algorithms and data structures that can be consumed as crates or integrated as source.",
+  "source": {
+    "repository": "https://github.com/moritzbrantner/rust-kernels",
+    "revisionType": "git-commit"
+  },
+  "provenance": {
+    "schema": "https://raw.githubusercontent.com/moritzbrantner/rust-kernels/main/provenance.schema.json",
+    "lockFile": ".rust-kernels.lock.json"
+  },
   "items": [
     {
       "name": "spatial-kernels",

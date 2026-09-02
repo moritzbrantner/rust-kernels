@@ -8,6 +8,8 @@
     "$schema",
     "name",
     "version",
+    "source",
+    "provenance",
     "items"
   ],
   "properties": {
@@ -19,10 +21,16 @@
       "minLength": 1
     },
     "version": {
-      "const": 1
+      "const": 2
     },
     "description": {
       "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
     },
     "items": {
       "type": "array",
@@ -32,6 +40,39 @@
     }
   },
   "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "revisionType"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revisionType": {
+          "const": "git-commit"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "lockFile"
+      ],
+      "properties": {
+        "schema": {
+          "const": "https://raw.githubusercontent.com/moritzbrantner/rust-kernels/main/provenance.schema.json"
+        },
+        "lockFile": {
+          "const": ".rust-kernels.lock.json"
+        }
+      }
+    },
     "item": {
       "type": "object",
       "additionalProperties": false,
