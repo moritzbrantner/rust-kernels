@@ -1,0 +1,9 @@
+schema_version = 1
+id = "moritzbrantner/rust-kernels"
+kind = "library"
+status = "active"
+summary = "Reusable deterministic Rust algorithms and data structures with measurable performance characteristics."
+depends_on = ["moritzbrantner/runtime-profiler", "moritzbrantner/moonlight"]
+consumed_by = ["moritzbrantner/collision-lab"]
+supersedes = []
+replaced_by = []
