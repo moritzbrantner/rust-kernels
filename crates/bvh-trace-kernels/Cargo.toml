@@ -1,0 +1,13 @@
+[package]
+name = "bvh-trace-kernels"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Deterministic debug traces for static bounding-volume hierarchies"
+
+[dependencies]
+spatial-kernels = { path = "../spatial-kernels" }
+
+[dev-dependencies]
+bvh-kernels = { path = "../bvh-kernels" }
