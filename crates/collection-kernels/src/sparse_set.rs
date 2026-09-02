@@ -110,6 +110,27 @@ mod tests {
 
     use super::SparseSet;
 
+    fn assert_matches_model(set: &SparseSet, model: &BTreeSet<usize>) {
+        assert_eq!(set.len(), model.len());
+        assert_eq!(set.is_empty(), model.is_empty());
+
+        let dense = set.iter().collect::<Vec<_>>();
+        let mut sorted_dense = dense.clone();
+        sorted_dense.sort_unstable();
+        assert_eq!(
+            sorted_dense,
+            model.iter().copied().collect::<Vec<_>>()
+        );
+
+        for key in 0_usize..=4 {
+            assert_eq!(set.contains(key), model.contains(&key));
+            assert_eq!(
+                set.dense_index(key),
+                dense.iter().position(|candidate| *candidate == key)
+            );
+        }
+    }
+
     #[test]
     fn insert_contains_and_remove_are_constant_shape_operations() {
         let mut set = SparseSet::new();
@@ -178,6 +199,35 @@ mod tests {
                     oracle.contains(&candidate),
                     "membership mismatch for key {candidate}"
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn exhaustive_short_sequences_match_standard_set_model() {
+        for case in 0_usize..9_usize.pow(5) {
+            let mut encoded = case;
+            let mut sparse = SparseSet::new();
+            let mut model = BTreeSet::new();
+
+            for _ in 0..5 {
+                let action = encoded % 9;
+                encoded /= 9;
+
+                match action {
+                    0..=3 => assert_eq!(sparse.insert(action), model.insert(action)),
+                    4..=7 => {
+                        let key = action - 4;
+                        assert_eq!(sparse.remove(key), model.remove(&key));
+                    }
+                    8 => {
+                        sparse.clear();
+                        model.clear();
+                    }
+                    _ => unreachable!(),
+                }
+
+                assert_matches_model(&sparse, &model);
             }
         }
     }
