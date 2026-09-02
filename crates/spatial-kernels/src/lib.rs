@@ -17,6 +17,10 @@ impl Aabb {
     #[must_use]
     pub fn new(min: [f32; 3], max: [f32; 3]) -> Self {
         assert!(
+            min.iter().chain(max.iter()).all(|bound| bound.is_finite()),
+            "AABB bounds must be finite"
+        );
+        assert!(
             min.iter().zip(max).all(|(min, max)| *min <= max),
             "AABB minimum must not exceed maximum"
         );
@@ -235,6 +239,15 @@ mod tests {
 
         assert!(left.overlaps(touching));
         assert!(!left.overlaps(separated));
+    }
+
+    #[test]
+    #[should_panic(expected = "AABB bounds must be finite")]
+    fn aabb_rejects_non_finite_bounds() {
+        Aabb::new(
+            [f32::NEG_INFINITY, 0.0, 0.0],
+            [f32::INFINITY, 0.0, 0.0],
+        );
     }
 
     #[test]
