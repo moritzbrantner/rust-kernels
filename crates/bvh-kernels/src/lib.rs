@@ -312,9 +312,10 @@ impl DynamicAabbTree {
             return false;
         }
 
+        let fat_bounds = body.aabb.expanded(self.fat_margin);
         self.remove_leaf(leaf);
         let node = self.node_mut(leaf);
-        node.bounds = body.aabb.expanded(self.fat_margin);
+        node.bounds = fat_bounds;
         node.body = Some(body);
         node.parent = None;
         node.height = 0;
