@@ -56,17 +56,9 @@ pub struct OctreeTrace {
     pub occupied_leaf_count: usize,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct OctreeBroadPhase {
     config: OctreeConfig,
-}
-
-impl Default for OctreeBroadPhase {
-    fn default() -> Self {
-        Self {
-            config: OctreeConfig::default(),
-        }
-    }
 }
 
 impl OctreeBroadPhase {
