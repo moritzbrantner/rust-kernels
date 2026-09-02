@@ -172,6 +172,43 @@ mod tests {
     }
 
     #[test]
+    fn all_small_subsets_match_a_standard_set_oracle() {
+        for len in 0_usize..=8 {
+            for mask in 0_usize..(1_usize << len) {
+                let mut bit_set = BitSet::new(len);
+                let mut oracle = BTreeSet::new();
+
+                for index in 0..len {
+                    if mask & (1_usize << index) != 0 {
+                        assert!(bit_set.insert(index));
+                        assert!(oracle.insert(index));
+                    }
+                }
+
+                assert_eq!(bit_set.len(), len);
+                assert_eq!(bit_set.is_empty(), oracle.is_empty());
+                assert_eq!(bit_set.count_ones(), oracle.len());
+                assert_eq!(
+                    bit_set.iter_ones().collect::<Vec<_>>(),
+                    oracle.iter().copied().collect::<Vec<_>>()
+                );
+                for index in 0..=len {
+                    assert_eq!(bit_set.contains(index), oracle.contains(&index));
+                }
+
+                for index in (0..len).rev() {
+                    assert_eq!(bit_set.remove(index), oracle.remove(&index));
+                    assert_eq!(bit_set.count_ones(), oracle.len());
+                    assert_eq!(
+                        bit_set.iter_ones().collect::<Vec<_>>(),
+                        oracle.iter().copied().collect::<Vec<_>>()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn clear_keeps_capacity_semantics_and_removes_all_members() {
         let mut set = BitSet::new(80);
         assert!(set.insert(1));
