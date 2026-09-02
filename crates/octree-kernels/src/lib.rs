@@ -1,6 +1,8 @@
 use std::collections::{BTreeSet, HashSet};
 
-use spatial_kernels::{Aabb, Body, BroadPhase, BroadPhaseResult, BroadPhaseStats, ColliderId, Pair};
+use spatial_kernels::{
+    Aabb, Body, BroadPhase, BroadPhaseResult, BroadPhaseStats, ColliderId, Pair,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct OctreeConfig {
@@ -100,12 +102,6 @@ struct Node {
     children: Vec<usize>,
 }
 
-struct OctreeRun {
-    result: BroadPhaseResult,
-    root: Option<usize>,
-    nodes: Vec<Node>,
-}
-
 fn run_octree(config: OctreeConfig, bodies: &[Body], trace: bool) -> OctreeTrace {
     validate_unique_ids(bodies);
 
@@ -172,7 +168,11 @@ fn run_octree(config: OctreeConfig, bodies: &[Body], trace: bool) -> OctreeTrace
                 index,
                 bounds: node.bounds,
                 depth: node.depth,
-                members: node.members.iter().map(|&member| bodies[member].id).collect(),
+                members: node
+                    .members
+                    .iter()
+                    .map(|&member| bodies[member].id)
+                    .collect(),
                 children: node.children.clone(),
             })
             .collect()
@@ -207,7 +207,10 @@ fn subdivide(index: usize, config: OctreeConfig, bodies: &[Body], nodes: &mut Ve
         })
         .collect();
 
-    let non_empty: Vec<_> = child_members.iter().filter(|members| !members.is_empty()).collect();
+    let non_empty: Vec<_> = child_members
+        .iter()
+        .filter(|members| !members.is_empty())
+        .collect();
     if non_empty.is_empty()
         || non_empty
             .iter()
@@ -315,7 +318,10 @@ mod tests {
     fn octree_matches_naive_oracle() {
         let bodies = fixture();
         let octree = OctreeBroadPhase::new(5, 2);
-        assert_eq!(octree.detect(&bodies).pairs, NaiveBroadPhase.detect(&bodies).pairs);
+        assert_eq!(
+            octree.detect(&bodies).pairs,
+            NaiveBroadPhase.detect(&bodies).pairs
+        );
     }
 
     #[test]
@@ -326,7 +332,12 @@ mod tests {
         assert_eq!(trace.result, octree.detect(&bodies));
         assert_eq!(trace.root, Some(0));
         assert_eq!(trace.nodes[0].children.len(), 8);
-        assert!(trace.nodes[0].children.iter().all(|&index| trace.nodes[index].depth == 1));
+        assert!(
+            trace.nodes[0]
+                .children
+                .iter()
+                .all(|&index| trace.nodes[index].depth == 1)
+        );
     }
 
     #[test]
@@ -363,7 +374,10 @@ mod tests {
             body(4, [15.0, 0.0, 0.0], 0.5),
         ];
         let octree = OctreeBroadPhase::new(6, 1);
-        assert_eq!(octree.detect(&bodies).pairs, NaiveBroadPhase.detect(&bodies).pairs);
+        assert_eq!(
+            octree.detect(&bodies).pairs,
+            NaiveBroadPhase.detect(&bodies).pairs
+        );
     }
 
     #[test]
