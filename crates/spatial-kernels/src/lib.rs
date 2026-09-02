@@ -503,7 +503,8 @@ fn run_sweep_and_prune(axis: Axis3, bodies: &[Body], trace: bool) -> SweepAndPru
             keep
         });
 
-        let active_before_tests = trace.then(|| active.iter().map(|&index| bodies[index].id).collect());
+        let active_before_tests =
+            trace.then(|| active.iter().map(|&index| bodies[index].id).collect());
         let mut tested_pairs = trace.then(Vec::new);
         let mut overlapping_pairs = trace.then(Vec::new);
 
@@ -631,7 +632,12 @@ mod tests {
         let grid = UniformGridBroadPhase::new(1.0);
         let trace = grid.trace(&bodies);
         assert_eq!(trace.result, grid.detect(&bodies));
-        assert!(trace.cells.windows(2).all(|cells| cells[0].cell < cells[1].cell));
+        assert!(
+            trace
+                .cells
+                .windows(2)
+                .all(|cells| cells[0].cell < cells[1].cell)
+        );
 
         let tested: Vec<_> = trace
             .cells
@@ -726,7 +732,10 @@ mod tests {
         let expected = SweepAndPruneBroadPhase::default().trace(&bodies);
         let mut reversed = bodies.clone();
         reversed.reverse();
-        assert_eq!(SweepAndPruneBroadPhase::default().trace(&reversed), expected);
+        assert_eq!(
+            SweepAndPruneBroadPhase::default().trace(&reversed),
+            expected
+        );
     }
 
     #[test]
