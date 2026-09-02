@@ -128,6 +128,47 @@ mod tests {
         WeightedEdge::new(a, b, weight)
     }
 
+    fn prim_forest_oracle(vertex_count: usize, edges: &[WeightedEdge<u8>]) -> (u128, usize) {
+        let mut visited = vec![false; vertex_count];
+        let mut total_weight = 0_u128;
+        let mut component_count = 0_usize;
+
+        for start in 0..vertex_count {
+            if visited[start] {
+                continue;
+            }
+
+            component_count += 1;
+            visited[start] = true;
+
+            loop {
+                let mut best: Option<(u64, usize, usize)> = None;
+
+                for (order, candidate) in edges.iter().enumerate() {
+                    let a = usize::from(candidate.a);
+                    let b = usize::from(candidate.b);
+                    if visited[a] == visited[b] {
+                        continue;
+                    }
+
+                    let next = if visited[a] { b } else { a };
+                    let choice = (candidate.weight, order, next);
+                    if best.is_none_or(|current| choice < current) {
+                        best = Some(choice);
+                    }
+                }
+
+                let Some((weight, _, next)) = best else {
+                    break;
+                };
+                visited[next] = true;
+                total_weight += u128::from(weight);
+            }
+        }
+
+        (total_weight, component_count)
+    }
+
     #[test]
     fn finds_the_minimum_spanning_tree_for_a_connected_graph() {
         let forest = kruskal_minimum_spanning_forest(
@@ -200,5 +241,37 @@ mod tests {
         assert_eq!(forest.edges.len(), 2);
         assert_eq!(forest.total_weight, 2);
         assert_eq!(forest.component_count, 1);
+    }
+
+    #[test]
+    fn kruskal_matches_independent_prim_oracle_for_all_small_graphs() {
+        const PAIRS: [(u8, u8); 6] = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)];
+
+        for case in 0..3_usize.pow(PAIRS.len() as u32) {
+            let mut encoded = case;
+            let mut edges = Vec::new();
+
+            for &(a, b) in &PAIRS {
+                let state = encoded % 3;
+                encoded /= 3;
+                if state != 0 {
+                    edges.push(WeightedEdge::new(a, b, (state - 1) as u64));
+                }
+            }
+
+            let expected = prim_forest_oracle(4, &edges);
+            let actual = kruskal_minimum_spanning_forest([0_u8, 1, 2, 3], edges);
+
+            assert_eq!(
+                (actual.total_weight, actual.component_count),
+                expected,
+                "case={case}"
+            );
+            assert_eq!(
+                actual.edges.len(),
+                4 - actual.component_count,
+                "case={case}"
+            );
+        }
     }
 }
