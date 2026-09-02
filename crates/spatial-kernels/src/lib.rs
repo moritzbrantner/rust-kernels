@@ -320,7 +320,7 @@ impl BroadPhase for SweepAndPruneBroadPhase {
                 .then_with(|| bodies[left].id.cmp(&bodies[right].id))
         });
 
-        let mut active = Vec::new();
+        let mut active: Vec<usize> = Vec::new();
         let mut pairs = Vec::new();
         let mut aabb_tests = 0_u64;
 
