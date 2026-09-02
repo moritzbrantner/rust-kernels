@@ -1,0 +1,10 @@
+[package]
+name = "octree-kernels"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Deterministic octree broad-phase and spatial partition kernels"
+
+[dependencies]
+spatial-kernels = { path = "../spatial-kernels" }
