@@ -76,6 +76,8 @@ The registry has two first-class source lanes:
 
 Standalone status is verified, not assumed: CI invokes `rustc` directly on every registered standalone source file. Modules with hidden crate or external dependencies therefore stay crate-level until a dependency-aware source-set contract exists.
 
+Registry v3 also gives granular items machine-readable operational characteristics. Agents can inspect determinism, operation-specific time and extra-space complexity, mutation, allocation behavior, and explicit test/benchmark evidence before deciding what to copy. Complexity stays operation-specific so important distinctions are not flattened—for example, `quickselect` has average and worst-case bounds, `LruCache::get` mutates recency while `peek` does not, and `SparseSet::insert` can grow with a large new key.
+
 For example, consumers can choose the integration boundary they actually want:
 
 ```bash
@@ -87,7 +89,7 @@ python3 scripts/source_registry.py install radix-sort --root ../consumer
 python3 scripts/source_registry.py install selection --root ../consumer
 ```
 
-The granular install lands source under `src/kernels/`; the consumer remains responsible for wiring that module into its own `lib.rs`, `main.rs`, or public API. See [`docs/granular-registry.md`](docs/granular-registry.md) for the standalone-module contract and the initial granular catalog.
+The granular install lands source under `src/kernels/`; the consumer remains responsible for wiring that module into its own `lib.rs`, `main.rs`, or public API. See [`docs/granular-registry.md`](docs/granular-registry.md) for the standalone-module contract and the initial granular catalog, and [`docs/kernel-characteristics.md`](docs/kernel-characteristics.md) for the v3 operational metadata contract.
 
 Each registry item also describes tags and the algorithms or data structures it provides. Agents or external tooling can use that metadata to discover and copy a kernel while Cargo consumers can continue depending on the workspace crates normally.
 
@@ -125,6 +127,7 @@ See [`docs/provenance.md`](docs/provenance.md) for the lock and update contract 
 
 ```bash
 python3 scripts/validate_registry.py
+python3 scripts/test_registry_metadata.py
 python3 scripts/test_standalone_registry.py
 python3 scripts/test_source_registry.py
 python3 scripts/test_source_update.py
