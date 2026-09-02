@@ -117,10 +117,7 @@ mod tests {
         let dense = set.iter().collect::<Vec<_>>();
         let mut sorted_dense = dense.clone();
         sorted_dense.sort_unstable();
-        assert_eq!(
-            sorted_dense,
-            model.iter().copied().collect::<Vec<_>>()
-        );
+        assert_eq!(sorted_dense, model.iter().copied().collect::<Vec<_>>());
 
         for key in 0_usize..=4 {
             assert_eq!(set.contains(key), model.contains(&key));
