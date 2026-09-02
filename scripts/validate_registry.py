@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import re
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +16,7 @@ ALLOWED_ITEM_TYPES = {
     "registry:file",
 }
 ALLOWED_PROVIDED_TYPES = {"algorithm", "data-structure", "interface"}
+MODULE_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 
 def fail(message: str) -> None:
@@ -36,6 +38,16 @@ def load_json(path: Path) -> dict:
 def require_string(value: object, context: str) -> str:
     if not isinstance(value, str) or not value:
         fail(f"{context} must be a non-empty string")
+    return value
+
+
+def require_string_array(value: object, context: str) -> list[str]:
+    if not isinstance(value, list) or not all(
+        isinstance(entry, str) and entry for entry in value
+    ):
+        fail(f"{context} must be an array of non-empty strings")
+    if len(value) != len(set(value)):
+        fail(f"{context} contains duplicates")
     return value
 
 
@@ -78,6 +90,7 @@ if not isinstance(items, list) or not items:
 
 item_names: set[str] = set()
 registry_dependencies: dict[str, set[str]] = {}
+standalone_count = 0
 
 for index, item in enumerate(items):
     context = f"items[{index}]"
@@ -121,29 +134,59 @@ for index, item in enumerate(items):
         if not (ROOT / source_path).is_file():
             fail(f"{context} references missing source file {source_path}")
 
+    dependencies = require_string_array(item.get("dependencies", []), f"{context}.dependencies")
+    registry_dependency_values = require_string_array(
+        item.get("registryDependencies", []), f"{context}.registryDependencies"
+    )
+    registry_dependencies[name] = set(registry_dependency_values)
+
     crate = item.get("crate")
-    if crate is not None:
+    integration = item.get("integration")
+
+    if item_type == "registry:crate":
         if not isinstance(crate, dict):
-            fail(f"{context}.crate must be an object")
+            fail(f"{context}.crate is required for registry:crate items")
+        if integration is not None:
+            fail(f"{context}.integration is reserved for non-crate source items")
         require_string(crate.get("package"), f"{context}.crate.package")
         manifest = require_relative_path(
             crate.get("manifest"), f"{context}.crate.manifest"
         )
         if manifest not in source_paths:
             fail(f"{context}.crate.manifest must also be listed in files")
-
-    dependencies = item.get("registryDependencies", [])
-    if not isinstance(dependencies, list) or not all(
-        isinstance(dependency, str) and dependency for dependency in dependencies
-    ):
-        fail(f"{context}.registryDependencies must be an array of non-empty strings")
-    if len(dependencies) != len(set(dependencies)):
-        fail(f"{context}.registryDependencies contains duplicates")
-    registry_dependencies[name] = set(dependencies)
+    else:
+        if crate is not None:
+            fail(f"{context}.crate is not allowed for non-crate items")
+        if not isinstance(integration, dict):
+            fail(f"{context}.integration is required for non-crate items")
+        if integration.get("mode") != "standalone-module":
+            fail(f"{context}.integration.mode must be standalone-module")
+        module = require_string(integration.get("module"), f"{context}.integration.module")
+        if MODULE_RE.fullmatch(module) is None:
+            fail(f"{context}.integration.module is not a valid Rust module identifier")
+        if len(files) != 1:
+            fail(f"{context} standalone modules must contain exactly one source file")
+        only_source = next(iter(source_paths))
+        only_target = next(iter(target_paths))
+        if only_source.suffix != ".rs":
+            fail(f"{context} standalone module source must be a .rs file")
+        expected_target = PurePosixPath("src") / "kernels" / f"{module}.rs"
+        if only_target != expected_target:
+            fail(
+                f"{context} standalone module target must be {expected_target}, "
+                f"got {only_target}"
+            )
+        if dependencies:
+            fail(f"{context} standalone modules cannot declare external dependencies")
+        if registry_dependency_values:
+            fail(f"{context} standalone modules cannot declare registry dependencies")
+        standalone_count += 1
 
     provided = item.get("provides", [])
     if not isinstance(provided, list):
         fail(f"{context}.provides must be an array")
+    if item_type != "registry:crate" and not provided:
+        fail(f"{context}.provides must describe the standalone kernel")
     provided_names: set[str] = set()
     for provided_index, entry in enumerate(provided):
         provided_context = f"{context}.provides[{provided_index}]"
@@ -171,4 +214,4 @@ for item_name, dependencies in registry_dependencies.items():
     if item_name in dependencies:
         fail(f"{item_name!r} cannot depend on itself")
 
-print(f"registry ok: {len(items)} item(s)")
+print(f"registry ok: {len(items)} item(s), {standalone_count} standalone module(s)")
