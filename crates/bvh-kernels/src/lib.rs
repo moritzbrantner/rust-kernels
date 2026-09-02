@@ -206,13 +206,7 @@ impl DynamicNode {
         }
     }
 
-    fn branch(
-        bounds: Aabb,
-        parent: Option<usize>,
-        left: usize,
-        right: usize,
-        height: i32,
-    ) -> Self {
+    fn branch(bounds: Aabb, parent: Option<usize>, left: usize, right: usize, height: i32) -> Self {
         Self {
             bounds,
             parent,
