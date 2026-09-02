@@ -99,7 +99,8 @@
         "connectivity",
         "data-structures",
         "streaming",
-        "ecs-primitives"
+        "ecs-primitives",
+        "bitset"
       ],
       "dependencies": [],
       "registryDependencies": [],
@@ -111,6 +112,10 @@
         {
           "path": "crates/collection-kernels/src/lib.rs",
           "target": "crates/collection-kernels/src/lib.rs"
+        },
+        {
+          "path": "crates/collection-kernels/src/bit_set.rs",
+          "target": "crates/collection-kernels/src/bit_set.rs"
         },
         {
           "path": "crates/collection-kernels/src/ring_buffer.rs",
@@ -146,6 +151,14 @@
           "symbols": [
             "SparseSet"
           ]
+        },
+        {
+          "name": "bit-set",
+          "type": "data-structure",
+          "symbols": [
+            "BitSet",
+            "BitSetIter"
+          ]
         }
       ]
     },
@@ -161,7 +174,9 @@
       "tags": [
         "graph",
         "pathfinding",
-        "search"
+        "search",
+        "traversal",
+        "topology"
       ],
       "dependencies": [],
       "registryDependencies": [],
@@ -177,6 +192,14 @@
         {
           "path": "crates/graph-kernels/src/search.rs",
           "target": "crates/graph-kernels/src/search.rs"
+        },
+        {
+          "path": "crates/graph-kernels/src/topology.rs",
+          "target": "crates/graph-kernels/src/topology.rs"
+        },
+        {
+          "path": "crates/graph-kernels/src/traversal.rs",
+          "target": "crates/graph-kernels/src/traversal.rs"
         }
       ],
       "provides": [
@@ -194,6 +217,83 @@
           "symbols": [
             "astar",
             "Path"
+          ]
+        },
+        {
+          "name": "breadth-first-search",
+          "type": "algorithm",
+          "symbols": [
+            "breadth_first"
+          ]
+        },
+        {
+          "name": "depth-first-search",
+          "type": "algorithm",
+          "symbols": [
+            "depth_first"
+          ]
+        },
+        {
+          "name": "topological-sort",
+          "type": "algorithm",
+          "symbols": [
+            "topological_sort",
+            "CycleDetected"
+          ]
+        },
+        {
+          "name": "strongly-connected-components",
+          "type": "algorithm",
+          "symbols": [
+            "strongly_connected_components"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "search-kernels",
+      "type": "registry:crate",
+      "title": "Search and Selection Kernels",
+      "description": "In-place selection and top-k algorithms for ordered data.",
+      "crate": {
+        "package": "search-kernels",
+        "manifest": "crates/search-kernels/Cargo.toml"
+      },
+      "tags": [
+        "search",
+        "selection",
+        "quickselect",
+        "top-k"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/search-kernels/Cargo.toml",
+          "target": "crates/search-kernels/Cargo.toml"
+        },
+        {
+          "path": "crates/search-kernels/src/lib.rs",
+          "target": "crates/search-kernels/src/lib.rs"
+        },
+        {
+          "path": "crates/search-kernels/src/selection.rs",
+          "target": "crates/search-kernels/src/selection.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "quickselect",
+          "type": "algorithm",
+          "symbols": [
+            "quickselect"
+          ]
+        },
+        {
+          "name": "top-k-smallest",
+          "type": "algorithm",
+          "symbols": [
+            "top_k_smallest"
           ]
         }
       ]
