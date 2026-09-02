@@ -222,6 +222,35 @@ impl DynamicNode {
     }
 }
 
+/// Stable-by-snapshot view of one internal dynamic-tree node. Node indices are
+/// debug identifiers for one tree instance, not persistent external handles.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DynamicAabbNodeSnapshot {
+    pub index: usize,
+    pub bounds: Aabb,
+    pub exact_bounds: Option<Aabb>,
+    pub height: i32,
+    pub body: Option<ColliderId>,
+    pub parent: Option<usize>,
+    pub left: Option<usize>,
+    pub right: Option<usize>,
+    pub is_root: bool,
+}
+
+/// Optional debug trace for one dynamic-tree body update.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DynamicAabbUpdateTrace {
+    pub id: ColliderId,
+    pub reinserted: bool,
+    pub previous_fat_bounds: Aabb,
+    pub current_fat_bounds: Aabb,
+    pub height_before: usize,
+    pub height_after: usize,
+    pub changed_nodes: Vec<usize>,
+    pub before_nodes: Vec<DynamicAabbNodeSnapshot>,
+    pub after_nodes: Vec<DynamicAabbNodeSnapshot>,
+}
+
 /// Incrementally updatable AABB tree. Leaves use a configurable fat margin so
 /// small movements can update the exact body without restructuring the tree.
 #[derive(Clone, Debug)]
@@ -282,6 +311,30 @@ impl DynamicAabbTree {
         })
     }
 
+    /// Returns a deterministic node-index-ordered snapshot for debug and
+    /// visualization tooling. Normal broad-phase consumers do not need this.
+    #[must_use]
+    pub fn debug_nodes(&self) -> Vec<DynamicAabbNodeSnapshot> {
+        self.nodes
+            .iter()
+            .enumerate()
+            .filter_map(|(index, node)| {
+                let node = (*node)?;
+                Some(DynamicAabbNodeSnapshot {
+                    index,
+                    bounds: node.bounds,
+                    exact_bounds: node.body.map(|body| body.aabb),
+                    height: node.height,
+                    body: node.body.map(|body| body.id),
+                    parent: node.parent,
+                    left: node.left,
+                    right: node.right,
+                    is_root: self.root == Some(index),
+                })
+            })
+            .collect()
+    }
+
     pub fn insert(&mut self, body: Body) {
         assert!(
             !self.leaves.contains_key(&body.id),
@@ -321,6 +374,37 @@ impl DynamicAabbTree {
         node.height = 0;
         self.insert_leaf(leaf);
         true
+    }
+
+    /// Runs the same update as [`Self::update`] while capturing before/after
+    /// structural snapshots. This path intentionally allocates; normal updates
+    /// remain allocation-free with respect to tracing.
+    #[must_use]
+    pub fn update_with_trace(&mut self, body: Body) -> DynamicAabbUpdateTrace {
+        let previous_fat_bounds = self
+            .fat_bounds(body.id)
+            .expect("updated collider must already exist");
+        let height_before = self.height();
+        let before_nodes = self.debug_nodes();
+        let reinserted = self.update(body);
+        let current_fat_bounds = self
+            .fat_bounds(body.id)
+            .expect("updated collider must still exist");
+        let height_after = self.height();
+        let after_nodes = self.debug_nodes();
+        let changed_nodes = changed_node_indices(&before_nodes, &after_nodes);
+
+        DynamicAabbUpdateTrace {
+            id: body.id,
+            reinserted,
+            previous_fat_bounds,
+            current_fat_bounds,
+            height_before,
+            height_after,
+            changed_nodes,
+            before_nodes,
+            after_nodes,
+        }
     }
 
     #[must_use]
@@ -633,6 +717,22 @@ impl DynamicAabbTree {
     }
 }
 
+fn changed_node_indices(
+    before: &[DynamicAabbNodeSnapshot],
+    after: &[DynamicAabbNodeSnapshot],
+) -> Vec<usize> {
+    let before_by_index: HashMap<_, _> = before.iter().map(|node| (node.index, *node)).collect();
+    let after_by_index: HashMap<_, _> = after.iter().map(|node| (node.index, *node)).collect();
+    let mut indices: HashSet<_> = before_by_index.keys().copied().collect();
+    indices.extend(after_by_index.keys().copied());
+    let mut changed: Vec<_> = indices
+        .into_iter()
+        .filter(|index| before_by_index.get(index) != after_by_index.get(index))
+        .collect();
+    changed.sort_unstable();
+    changed
+}
+
 fn descend_cost(node: DynamicNode, leaf_bounds: Aabb, inheritance: f64) -> f64 {
     let combined = node.bounds.union(leaf_bounds).surface_area();
     if node.is_leaf() {
@@ -859,6 +959,55 @@ mod tests {
     }
 
     #[test]
+    fn contained_update_trace_keeps_fat_bounds_and_changes_leaf_snapshot() {
+        let mut tree = DynamicAabbTree::new(1.0);
+        tree.insert(body(1, [0.0; 3], 0.5));
+        let trace = tree.update_with_trace(body(1, [0.25, 0.0, 0.0], 0.5));
+
+        assert!(!trace.reinserted);
+        assert_eq!(trace.previous_fat_bounds, trace.current_fat_bounds);
+        assert_eq!(trace.height_before, trace.height_after);
+        assert_eq!(trace.changed_nodes, vec![0]);
+        assert_eq!(trace.before_nodes.len(), 1);
+        assert_eq!(trace.after_nodes.len(), 1);
+        assert_ne!(
+            trace.before_nodes[0].exact_bounds,
+            trace.after_nodes[0].exact_bounds
+        );
+    }
+
+    #[test]
+    fn reinsertion_trace_exposes_structural_diff() {
+        let mut tree = DynamicAabbTree::new(0.25);
+        for body in fixture() {
+            tree.insert(body);
+        }
+        let before_pairs = tree.overlapping_pairs();
+        let trace = tree.update_with_trace(body(20, [8.0, 0.0, 0.0], 0.6));
+
+        assert!(trace.reinserted);
+        assert_ne!(trace.previous_fat_bounds, trace.current_fat_bounds);
+        assert!(!trace.changed_nodes.is_empty());
+        assert_eq!(trace.after_nodes.len(), tree.node_count());
+        assert_ne!(tree.overlapping_pairs(), before_pairs);
+    }
+
+    #[test]
+    fn debug_snapshot_has_one_root_and_matches_node_count() {
+        let mut tree = DynamicAabbTree::new(0.5);
+        for body in fixture() {
+            tree.insert(body);
+        }
+        let nodes = tree.debug_nodes();
+        assert_eq!(nodes.len(), tree.node_count());
+        assert_eq!(nodes.iter().filter(|node| node.is_root).count(), 1);
+        assert_eq!(
+            nodes.iter().filter(|node| node.body.is_some()).count(),
+            tree.len()
+        );
+    }
+
+    #[test]
     fn dynamic_pairs_remain_exact_during_incremental_motion() {
         let mut bodies = fixture();
         let mut tree = DynamicAabbTree::new(0.75);
@@ -869,6 +1018,25 @@ mod tests {
         for step in 0..20 {
             bodies[1] = body(20, [0.9 + step as f32 * 0.15, 0.0, 0.0], 0.6);
             tree.update(bodies[1]);
+            assert_eq!(
+                tree.overlapping_pairs(),
+                NaiveBroadPhase.detect(&bodies).pairs,
+                "step {step}"
+            );
+        }
+    }
+
+    #[test]
+    fn traced_updates_preserve_exact_pair_parity() {
+        let mut bodies = fixture();
+        let mut tree = DynamicAabbTree::new(0.5);
+        for body in &bodies {
+            tree.insert(*body);
+        }
+
+        for step in 0..30 {
+            bodies[1] = body(20, [0.9 + step as f32 * 0.2, 0.0, 0.0], 0.6);
+            let _ = tree.update_with_trace(bodies[1]);
             assert_eq!(
                 tree.overlapping_pairs(),
                 NaiveBroadPhase.detect(&bodies).pairs,
