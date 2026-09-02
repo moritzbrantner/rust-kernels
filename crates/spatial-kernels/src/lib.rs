@@ -244,7 +244,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "AABB bounds must be finite")]
     fn aabb_rejects_non_finite_bounds() {
-        Aabb::new([f32::NEG_INFINITY, 0.0, 0.0], [f32::INFINITY, 0.0, 0.0]);
+        let _ = Aabb::new([f32::NEG_INFINITY, 0.0, 0.0], [f32::INFINITY, 0.0, 0.0]);
     }
 
     #[test]
