@@ -183,7 +183,40 @@ impl<T> GenerationalArena<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::GenerationalArena;
+    use super::{ArenaKey, GenerationalArena};
+
+    #[derive(Clone, Copy)]
+    struct Tracked {
+        key: ArenaKey,
+        value: i32,
+        active: bool,
+    }
+
+    fn assert_matches_model(arena: &GenerationalArena<i32>, tracked: &[Tracked]) {
+        let expected_len = tracked.iter().filter(|entry| entry.active).count();
+        assert_eq!(arena.len(), expected_len);
+        assert_eq!(arena.is_empty(), expected_len == 0);
+
+        for entry in tracked {
+            assert_eq!(arena.contains(entry.key), entry.active);
+            assert_eq!(
+                arena.get(entry.key).copied(),
+                entry.active.then_some(entry.value)
+            );
+        }
+
+        let mut expected = tracked
+            .iter()
+            .filter(|entry| entry.active)
+            .map(|entry| (entry.key.index(), entry.key.generation(), entry.value))
+            .collect::<Vec<_>>();
+        expected.sort_by_key(|entry| entry.0);
+        let actual = arena
+            .iter()
+            .map(|(key, value)| (key.index(), key.generation(), *value))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected);
+    }
 
     #[test]
     fn removed_slots_are_reused_without_reviving_stale_keys() {
@@ -226,6 +259,52 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![(first.index(), 'a'), (middle.index(), 'd'), (2, 'c')]
         );
+    }
+
+    #[test]
+    fn exhaustive_short_sequences_keep_stale_handles_invalid() {
+        for case in 0_usize..4_usize.pow(6) {
+            let mut arena = GenerationalArena::new();
+            let mut tracked = Vec::new();
+            let mut encoded = case;
+
+            for step in 0_usize..6 {
+                match encoded % 4 {
+                    0 => {
+                        let value = (case * 8 + step) as i32;
+                        let key = arena.insert(value);
+                        tracked.push(Tracked {
+                            key,
+                            value,
+                            active: true,
+                        });
+                    }
+                    1 => {
+                        if let Some(entry) = tracked.first_mut() {
+                            let expected = entry.active.then_some(entry.value);
+                            assert_eq!(arena.remove(entry.key), expected);
+                            entry.active = false;
+                        }
+                    }
+                    2 => {
+                        if let Some(entry) = tracked.last_mut() {
+                            let expected = entry.active.then_some(entry.value);
+                            assert_eq!(arena.remove(entry.key), expected);
+                            entry.active = false;
+                        }
+                    }
+                    3 => {
+                        arena.clear();
+                        for entry in &mut tracked {
+                            entry.active = false;
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+                encoded /= 4;
+                assert_matches_model(&arena, &tracked);
+            }
+        }
     }
 
     #[test]
