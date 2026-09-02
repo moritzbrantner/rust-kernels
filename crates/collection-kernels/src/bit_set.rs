@@ -132,7 +132,10 @@ mod tests {
         }
 
         assert_eq!(set.count_ones(), 5);
-        assert_eq!(set.iter_ones().collect::<Vec<_>>(), vec![0, 63, 64, 65, 129]);
+        assert_eq!(
+            set.iter_ones().collect::<Vec<_>>(),
+            vec![0, 63, 64, 65, 129]
+        );
         assert!(set.contains(64));
         assert!(!set.contains(130));
         assert!(set.remove(64));
