@@ -220,7 +220,10 @@ mod tests {
         assert_eq!(reused.index(), middle.index());
 
         assert_eq!(
-            arena.iter().map(|(key, value)| (key.index(), *value)).collect::<Vec<_>>(),
+            arena
+                .iter()
+                .map(|(key, value)| (key.index(), *value))
+                .collect::<Vec<_>>(),
             vec![(first.index(), 'a'), (middle.index(), 'd'), (2, 'c')]
         );
     }

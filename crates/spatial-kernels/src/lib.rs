@@ -10,8 +10,8 @@ mod spatial_hash;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 pub use morton::{
-    MORTON_3D_BITS_PER_AXIS, MORTON_3D_MAX_COORD, morton2_decode, morton2_encode,
-    morton3_decode, morton3_encode,
+    MORTON_3D_BITS_PER_AXIS, MORTON_3D_MAX_COORD, morton2_decode, morton2_encode, morton3_decode,
+    morton3_encode,
 };
 pub use spatial_hash::{CellCoord3, SpatialHash3D};
 
