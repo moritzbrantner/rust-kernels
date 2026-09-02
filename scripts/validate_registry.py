@@ -16,6 +16,8 @@ ALLOWED_ITEM_TYPES = {
     "registry:file",
 }
 ALLOWED_PROVIDED_TYPES = {"algorithm", "data-structure", "interface"}
+ALLOWED_MUTATIONS = {"none", "input", "internal-state"}
+ALLOWED_ALLOCATIONS = {"none", "fixed", "input-sized", "capacity-bounded", "may-grow"}
 MODULE_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 
@@ -58,6 +60,51 @@ def require_relative_path(value: object, context: str) -> PurePosixPath:
     return path
 
 
+def validate_characteristics(value: object, context: str) -> None:
+    if not isinstance(value, dict):
+        fail(f"{context} must be an object")
+    deterministic = value.get("deterministic")
+    if not isinstance(deterministic, bool):
+        fail(f"{context}.deterministic must be a boolean")
+
+    operations = value.get("operations")
+    if not isinstance(operations, list) or not operations:
+        fail(f"{context}.operations must be a non-empty array")
+
+    operation_names: set[str] = set()
+    for index, operation in enumerate(operations):
+        operation_context = f"{context}.operations[{index}]"
+        if not isinstance(operation, dict):
+            fail(f"{operation_context} must be an object")
+        name = require_string(operation.get("operation"), f"{operation_context}.operation")
+        if name in operation_names:
+            fail(f"{context} describes operation {name!r} more than once")
+        operation_names.add(name)
+        require_string(operation.get("time"), f"{operation_context}.time")
+        require_string(operation.get("extraSpace"), f"{operation_context}.extraSpace")
+        mutation = operation.get("mutation")
+        if mutation not in ALLOWED_MUTATIONS:
+            fail(f"{operation_context}.mutation has unsupported value {mutation!r}")
+        allocation = operation.get("allocation")
+        if allocation not in ALLOWED_ALLOCATIONS:
+            fail(f"{operation_context}.allocation has unsupported value {allocation!r}")
+
+
+def validate_verification(value: object, context: str) -> None:
+    if not isinstance(value, dict):
+        fail(f"{context} must be an object")
+    tests = require_string_array(value.get("tests"), f"{context}.tests")
+    if not tests:
+        fail(f"{context}.tests must list at least one verification source")
+    benchmarks = require_string_array(value.get("benchmarks"), f"{context}.benchmarks")
+
+    for kind, paths in (("tests", tests), ("benchmarks", benchmarks)):
+        for index, path_value in enumerate(paths):
+            path = require_relative_path(path_value, f"{context}.{kind}[{index}]")
+            if not (ROOT / path).is_file():
+                fail(f"{context}.{kind}[{index}] references missing file {path}")
+
+
 registry = load_json(REGISTRY_PATH)
 load_json(SCHEMA_PATH)
 load_json(PROVENANCE_SCHEMA_PATH)
@@ -66,8 +113,8 @@ if registry.get("$schema") != "./registry.schema.json":
     fail("$schema must point to ./registry.schema.json")
 if registry.get("name") != "rust-kernels":
     fail("name must be rust-kernels")
-if registry.get("version") != 2:
-    fail("version must be 2")
+if registry.get("version") != 3:
+    fail("version must be 3")
 
 source = registry.get("source")
 if not isinstance(source, dict):
@@ -142,18 +189,24 @@ for index, item in enumerate(items):
 
     crate = item.get("crate")
     integration = item.get("integration")
+    characteristics = item.get("characteristics")
+    verification = item.get("verification")
 
     if item_type == "registry:crate":
         if not isinstance(crate, dict):
             fail(f"{context}.crate is required for registry:crate items")
         if integration is not None:
             fail(f"{context}.integration is reserved for non-crate source items")
+        if characteristics is not None:
+            fail(f"{context}.characteristics is reserved for granular source items")
         require_string(crate.get("package"), f"{context}.crate.package")
         manifest = require_relative_path(
             crate.get("manifest"), f"{context}.crate.manifest"
         )
         if manifest not in source_paths:
             fail(f"{context}.crate.manifest must also be listed in files")
+        if verification is not None:
+            validate_verification(verification, f"{context}.verification")
     else:
         if crate is not None:
             fail(f"{context}.crate is not allowed for non-crate items")
@@ -180,6 +233,8 @@ for index, item in enumerate(items):
             fail(f"{context} standalone modules cannot declare external dependencies")
         if registry_dependency_values:
             fail(f"{context} standalone modules cannot declare registry dependencies")
+        validate_characteristics(characteristics, f"{context}.characteristics")
+        validate_verification(verification, f"{context}.verification")
         standalone_count += 1
 
     provided = item.get("provides", [])
@@ -214,4 +269,4 @@ for item_name, dependencies in registry_dependencies.items():
     if item_name in dependencies:
         fail(f"{item_name!r} cannot depend on itself")
 
-print(f"registry ok: {len(items)} item(s), {standalone_count} standalone module(s)")
+print(f"registry ok: {len(items)} item(s), {standalone_count} characterized standalone module(s)")
