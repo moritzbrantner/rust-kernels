@@ -190,13 +190,21 @@ mod tests {
                     (0..node).all(|earlier| !oracle_connected(LEN, &selected, node, earlier))
                 })
                 .count();
-            assert_eq!(union_find.component_count(), expected_components, "mask={mask}");
+            assert_eq!(
+                union_find.component_count(),
+                expected_components,
+                "mask={mask}"
+            );
 
             for left in 0..LEN {
                 let expected_size = (0..LEN)
                     .filter(|&right| oracle_connected(LEN, &selected, left, right))
                     .count();
-                assert_eq!(union_find.component_size(left), expected_size, "mask={mask}");
+                assert_eq!(
+                    union_find.component_size(left),
+                    expected_size,
+                    "mask={mask}"
+                );
 
                 for right in 0..LEN {
                     assert_eq!(
