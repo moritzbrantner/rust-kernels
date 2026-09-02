@@ -125,19 +125,59 @@ This behavior is intentionally conservative. Re-install is not an update mechani
 
 ## Safe update protocol
 
-An updater can use the provenance contract without hidden state. For each locked file it has three inputs:
+An updater uses three real inputs for every copied file:
 
-- **base**: source at the recorded `revision`;
-- **ours**: the current consumer target;
-- **theirs**: source at the candidate new upstream revision.
+- **base**: the upstream source reconstructed with `git show` at the recorded item revision;
+- **ours**: the current consumer-owned target file;
+- **theirs**: the source from the candidate `rust-kernels` checkout.
 
-That enables deterministic update behavior:
+`scripts/source_update.py` is the reference implementation of that comparison:
 
-1. If `ours == base`, replace it with `theirs`.
-2. If `theirs == base`, keep the local file unchanged.
-3. If both changed, perform or propose a three-way merge.
-4. Run the consumer's tests and benchmarks.
-5. Update the item lock only after the new upstream base has been accepted.
+```bash
+python3 scripts/source_update.py plan --root ../consumer
+```
+
+The planner does not infer ancestry from filenames or from the current registry. Before comparing source it verifies the recorded `registrySha256`, reconstructs the historical registry, checks that the lock's source/target mapping matches that historical registry, and verifies each recorded `sourceSha256` against the reconstructed base bytes.
+
+### File states
+
+| State | Base / ours / theirs relationship | Automatic action |
+| --- | --- | --- |
+| `unchanged` | all three are identical | keep file; provenance may advance |
+| `upstream-only` | ours = base, theirs changed | replace ours with theirs |
+| `local-only` | theirs = base, ours changed | keep the local specialization |
+| `converged` | ours = theirs, both differ from base | keep file and adopt new upstream base |
+| `both-changed` | ours and theirs both diverged differently | manual or agent three-way merge |
+| `missing` | consumer target is absent | manual decision |
+| `base-mismatch` | reconstructed base does not match recorded source hash | stop; provenance is inconsistent |
+| `registry-mismatch` | historical registry bytes do not match recorded registry hash | stop; provenance is inconsistent |
+| `lock-mismatch` | lock mapping does not match its recorded historical registry | stop; provenance is inconsistent |
+| `layout-changed` | candidate source/target mapping changed | manual migration |
+| `dependencies-changed` | registry dependency set changed | manual dependency migration |
+| `item-removed` | candidate registry no longer contains the item | manual decision |
+
+`plan --require-safe` exits non-zero when any selected item has a state outside the first four.
+
+### Applying a safe plan
+
+```bash
+python3 scripts/source_update.py apply --root ../consumer
+```
+
+`apply` first computes the complete selected plan. If any file or item needs manual resolution, it refuses the whole selected update before changing consumer files. If the complete plan is safe, it:
+
+1. copies only `upstream-only` files;
+2. preserves `local-only` specializations;
+3. leaves `unchanged` and `converged` bytes alone;
+4. advances the selected item lock entries to the candidate Git revision and candidate source hashes.
+
+This means a local specialization can remain locally modified while its upstream base advances through revisions where upstream did not touch that file. If a later upstream revision changes the same file, the recorded newer base still provides the correct three-way merge ancestor.
+
+The default is to plan or apply all locked items. Supplying item names narrows the operation. Updating the complete lock is preferable when related registry items evolve together; consumer tests and benchmarks remain the final compatibility gate.
+
+### Deliberate conflict boundary
+
+The reference helper does not yet auto-merge `both-changed` files. That is intentional. The provenance layer's job is to establish deterministic evidence first. A later coding-agent integration can receive the exact `base`, `ours`, and `theirs` inputs, propose a merge, run focused tests and benchmarks, and only then advance the lock.
 
 The lock should continue to describe the original upstream base while unresolved local/upstream conflicts exist. Do not rewrite `sourceSha256` to the consumer's modified hash; doing that would destroy the information required for a future three-way merge.
 
