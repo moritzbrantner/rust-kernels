@@ -8,7 +8,7 @@
       "name": "spatial-kernels",
       "type": "registry:crate",
       "title": "Spatial Kernels",
-      "description": "Deterministic spatial primitives and collision broad-phase algorithms.",
+      "description": "Deterministic spatial primitives, spatial hashing, and collision broad-phase algorithms.",
       "crate": {
         "package": "spatial-kernels",
         "manifest": "crates/spatial-kernels/Cargo.toml"
@@ -16,7 +16,8 @@
       "tags": [
         "spatial",
         "collision",
-        "broad-phase"
+        "broad-phase",
+        "spatial-hash"
       ],
       "dependencies": [],
       "registryDependencies": [],
@@ -28,6 +29,10 @@
         {
           "path": "crates/spatial-kernels/src/lib.rs",
           "target": "crates/spatial-kernels/src/lib.rs"
+        },
+        {
+          "path": "crates/spatial-kernels/src/spatial_hash.rs",
+          "target": "crates/spatial-kernels/src/spatial_hash.rs"
         }
       ],
       "provides": [
@@ -45,6 +50,14 @@
           "type": "data-structure",
           "symbols": [
             "Pair"
+          ]
+        },
+        {
+          "name": "spatial-hash-3d",
+          "type": "data-structure",
+          "symbols": [
+            "CellCoord3",
+            "SpatialHash3D"
           ]
         },
         {
@@ -84,7 +97,9 @@
       "tags": [
         "collections",
         "connectivity",
-        "data-structures"
+        "data-structures",
+        "streaming",
+        "ecs-primitives"
       ],
       "dependencies": [],
       "registryDependencies": [],
@@ -98,6 +113,14 @@
           "target": "crates/collection-kernels/src/lib.rs"
         },
         {
+          "path": "crates/collection-kernels/src/ring_buffer.rs",
+          "target": "crates/collection-kernels/src/ring_buffer.rs"
+        },
+        {
+          "path": "crates/collection-kernels/src/sparse_set.rs",
+          "target": "crates/collection-kernels/src/sparse_set.rs"
+        },
+        {
           "path": "crates/collection-kernels/src/union_find.rs",
           "target": "crates/collection-kernels/src/union_find.rs"
         }
@@ -108,6 +131,20 @@
           "type": "data-structure",
           "symbols": [
             "UnionFind"
+          ]
+        },
+        {
+          "name": "ring-buffer",
+          "type": "data-structure",
+          "symbols": [
+            "RingBuffer"
+          ]
+        },
+        {
+          "name": "sparse-set",
+          "type": "data-structure",
+          "symbols": [
+            "SparseSet"
           ]
         }
       ]

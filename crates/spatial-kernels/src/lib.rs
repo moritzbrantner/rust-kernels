@@ -1,9 +1,13 @@
 //! Reusable spatial kernels with deterministic outputs.
 //!
-//! The MVP deliberately keeps the representation small: axis-aligned bounding
-//! boxes, a brute-force reference broad phase, and a uniform-grid broad phase.
+//! The representation stays small: axis-aligned bounding boxes, spatial cell
+//! hashing, a brute-force reference broad phase, and a uniform-grid broad phase.
+
+mod spatial_hash;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
+
+pub use spatial_hash::{CellCoord3, SpatialHash3D};
 
 pub type ColliderId = u32;
 
@@ -47,14 +51,6 @@ impl Aabb {
     #[must_use]
     pub fn overlaps(self, other: Self) -> bool {
         (0..3).all(|axis| self.min[axis] <= other.max[axis] && self.max[axis] >= other.min[axis])
-    }
-
-    fn cell_bounds(self, cell_size: f32) -> (Cell, Cell) {
-        let cell = |value: f32| (value / cell_size).floor() as i32;
-        (
-            Cell([cell(self.min[0]), cell(self.min[1]), cell(self.min[2])]),
-            Cell([cell(self.max[0]), cell(self.max[1]), cell(self.max[2])]),
-        )
     }
 }
 
@@ -139,11 +135,8 @@ impl BroadPhase for NaiveBroadPhase {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-struct Cell([i32; 3]);
-
-/// Uniform 3D grid. Bodies are inserted into every cell touched by their AABB;
-/// only bodies sharing a cell can become candidate pairs.
+/// Uniform 3D grid. Bodies are inserted into every spatial-hash cell touched by
+/// their AABB; only bodies sharing a cell can become candidate pairs.
 #[derive(Clone, Copy, Debug)]
 pub struct UniformGridBroadPhase {
     cell_size: f32,
@@ -152,10 +145,7 @@ pub struct UniformGridBroadPhase {
 impl UniformGridBroadPhase {
     #[must_use]
     pub fn new(cell_size: f32) -> Self {
-        assert!(
-            cell_size.is_finite() && cell_size > 0.0,
-            "cell size must be positive and finite"
-        );
+        let _ = SpatialHash3D::new(cell_size);
         Self { cell_size }
     }
 
@@ -168,14 +158,18 @@ impl UniformGridBroadPhase {
 impl BroadPhase for UniformGridBroadPhase {
     fn detect(&self, bodies: &[Body]) -> BroadPhaseResult {
         validate_unique_ids(bodies);
-        let mut cells: HashMap<Cell, Vec<usize>> = HashMap::new();
+        let spatial_hash = SpatialHash3D::new(self.cell_size);
+        let mut cells: HashMap<CellCoord3, Vec<usize>> = HashMap::new();
 
         for (body_index, body) in bodies.iter().enumerate() {
-            let (min, max) = body.aabb.cell_bounds(self.cell_size);
-            for x in min.0[0]..=max.0[0] {
-                for y in min.0[1]..=max.0[1] {
-                    for z in min.0[2]..=max.0[2] {
-                        cells.entry(Cell([x, y, z])).or_default().push(body_index);
+            let (min, max) = spatial_hash.cell_bounds(body.aabb);
+            for x in min.x..=max.x {
+                for y in min.y..=max.y {
+                    for z in min.z..=max.z {
+                        cells
+                            .entry(CellCoord3::new(x, y, z))
+                            .or_default()
+                            .push(body_index);
                     }
                 }
             }
@@ -281,5 +275,15 @@ mod tests {
         assert_eq!(grid.pairs, naive.pairs);
         assert_eq!(grid.stats.aabb_tests, 0);
         assert_eq!(naive.stats.aabb_tests, 4_950);
+    }
+
+    #[test]
+    fn uniform_grid_and_public_spatial_hash_share_cell_semantics() {
+        let hash = SpatialHash3D::new(2.0);
+        let bounds = Aabb::new([-0.1, 0.0, 0.0], [2.0, 0.5, 0.5]);
+        assert_eq!(
+            hash.cell_bounds(bounds),
+            (CellCoord3::new(-1, 0, 0), CellCoord3::new(1, 0, 0))
+        );
     }
 }
