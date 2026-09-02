@@ -77,9 +77,118 @@ pub fn aabb_aabb(left: Aabb, right: Aabb) -> AabbAabbRelation {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Obb2 {
+    pub center: [f32; 2],
+    pub half_extents: [f32; 2],
+    pub rotation_radians: f32,
+}
+
+impl Obb2 {
+    #[must_use]
+    pub fn new(center: [f32; 2], half_extents: [f32; 2], rotation_radians: f32) -> Self {
+        assert!(
+            center.iter().all(|coordinate| coordinate.is_finite()),
+            "OBB center must be finite"
+        );
+        assert!(
+            half_extents
+                .iter()
+                .all(|extent| extent.is_finite() && *extent >= 0.0),
+            "OBB half extents must be non-negative and finite"
+        );
+        assert!(rotation_radians.is_finite(), "OBB rotation must be finite");
+        Self {
+            center,
+            half_extents,
+            rotation_radians,
+        }
+    }
+
+    #[must_use]
+    pub fn axes(self) -> [[f64; 2]; 2] {
+        let rotation = f64::from(self.rotation_radians);
+        let cosine = rotation.cos();
+        let sine = rotation.sin();
+        [[cosine, sine], [-sine, cosine]]
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SatAxis2 {
+    /// Unit candidate axis used for the projection test.
+    pub axis: [f64; 2],
+    pub left_radius: f64,
+    pub right_radius: f64,
+    pub center_distance: f64,
+    /// Positive means projected intervals overlap, zero means touching, and
+    /// negative means this axis separates the rectangles.
+    pub signed_overlap: f64,
+    pub separating: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Obb2SatRelation {
+    /// SAT axes in deterministic order: left X/Y followed by right X/Y.
+    pub axes: [SatAxis2; 4],
+    pub overlaps: bool,
+    /// Index of the axis with the smallest signed overlap. When separated, this
+    /// identifies a separating axis; when overlapping, it is the shallowest
+    /// penetration/touch axis.
+    pub critical_axis: usize,
+}
+
+#[must_use]
+pub fn obb2_sat(left: Obb2, right: Obb2) -> Obb2SatRelation {
+    let left_axes = left.axes();
+    let right_axes = right.axes();
+    let candidate_axes = [left_axes[0], left_axes[1], right_axes[0], right_axes[1]];
+    let center_delta = [
+        f64::from(right.center[0]) - f64::from(left.center[0]),
+        f64::from(right.center[1]) - f64::from(left.center[1]),
+    ];
+
+    let axes = candidate_axes.map(|axis| {
+        let left_radius = projection_radius(left, axis);
+        let right_radius = projection_radius(right, axis);
+        let center_distance = dot(center_delta, axis).abs();
+        let signed_overlap = left_radius + right_radius - center_distance;
+        SatAxis2 {
+            axis,
+            left_radius,
+            right_radius,
+            center_distance,
+            signed_overlap,
+            separating: signed_overlap < 0.0,
+        }
+    });
+
+    let critical_axis = axes
+        .iter()
+        .enumerate()
+        .min_by(|(_, left), (_, right)| left.signed_overlap.total_cmp(&right.signed_overlap))
+        .map_or(0, |(index, _)| index);
+
+    Obb2SatRelation {
+        overlaps: axes.iter().all(|axis| !axis.separating),
+        axes,
+        critical_axis,
+    }
+}
+
+fn projection_radius(obb: Obb2, axis: [f64; 2]) -> f64 {
+    let local_axes = obb.axes();
+    f64::from(obb.half_extents[0]) * dot(local_axes[0], axis).abs()
+        + f64::from(obb.half_extents[1]) * dot(local_axes[1], axis).abs()
+}
+
+fn dot(left: [f64; 2], right: [f64; 2]) -> f64 {
+    left[0] * right[0] + left[1] * right[1]
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Sphere, aabb_aabb, sphere_sphere};
+    use super::{Obb2, Sphere, aabb_aabb, obb2_sat, sphere_sphere};
     use spatial_kernels::Aabb;
 
     #[test]
@@ -170,5 +279,119 @@ mod tests {
         let separated = aabb_aabb(base, Aabb::new([2.25, 0.5, 0.5], [3.0, 1.5, 1.5]));
         assert_eq!(separated.axis_overlap[0], -0.25);
         assert!(!separated.overlaps);
+    }
+
+    #[test]
+    fn zero_rotation_obb_matches_aabb_decision() {
+        let fixtures = [
+            (
+                Obb2::new([0.0, 0.0], [1.0, 2.0], 0.0),
+                Obb2::new([1.5, 0.5], [1.0, 0.5], 0.0),
+            ),
+            (
+                Obb2::new([0.0, 0.0], [1.0, 2.0], 0.0),
+                Obb2::new([2.0, 0.0], [1.0, 0.5], 0.0),
+            ),
+            (
+                Obb2::new([0.0, 0.0], [1.0, 2.0], 0.0),
+                Obb2::new([2.1, 0.0], [1.0, 0.5], 0.0),
+            ),
+        ];
+
+        for (left, right) in fixtures {
+            let left_aabb = Aabb::from_center_half_extents(
+                [left.center[0], left.center[1], 0.0],
+                [left.half_extents[0], left.half_extents[1], 0.5],
+            );
+            let right_aabb = Aabb::from_center_half_extents(
+                [right.center[0], right.center[1], 0.0],
+                [right.half_extents[0], right.half_extents[1], 0.5],
+            );
+            assert_eq!(
+                obb2_sat(left, right).overlaps,
+                left_aabb.overlaps(right_aabb)
+            );
+        }
+    }
+
+    #[test]
+    fn rotated_overlap_has_no_separating_axis() {
+        let left = Obb2::new([0.0, 0.0], [1.4, 0.8], 0.35);
+        let right = Obb2::new([1.3, 0.25], [1.0, 0.7], -0.6);
+        let relation = obb2_sat(left, right);
+        assert!(relation.overlaps);
+        assert!(relation.axes.iter().all(|axis| !axis.separating));
+        assert!(relation.axes.iter().all(|axis| axis.signed_overlap >= 0.0));
+    }
+
+    #[test]
+    fn rotated_separation_finds_at_least_one_axis() {
+        let left = Obb2::new([0.0, 0.0], [1.4, 0.8], 0.35);
+        let right = Obb2::new([4.0, 0.4], [1.0, 0.7], -0.6);
+        let relation = obb2_sat(left, right);
+        assert!(!relation.overlaps);
+        assert!(relation.axes.iter().any(|axis| axis.separating));
+        assert!(relation.axes[relation.critical_axis].separating);
+    }
+
+    #[test]
+    fn touching_obb_counts_as_overlap() {
+        let left = Obb2::new([0.0, 0.0], [1.0, 1.0], 0.0);
+        let right = Obb2::new([2.0, 0.0], [1.0, 0.5], 0.0);
+        let relation = obb2_sat(left, right);
+        assert!(relation.overlaps);
+        assert!(
+            relation
+                .axes
+                .iter()
+                .any(|axis| axis.signed_overlap.abs() <= f64::EPSILON)
+        );
+    }
+
+    #[test]
+    fn obb_sat_decision_is_symmetric() {
+        let left = Obb2::new([-0.5, 0.3], [1.3, 0.7], 0.42);
+        let right = Obb2::new([1.2, -0.1], [0.8, 1.1], -0.73);
+        assert_eq!(
+            obb2_sat(left, right).overlaps,
+            obb2_sat(right, left).overlaps
+        );
+    }
+
+    #[test]
+    fn sat_candidate_axes_are_unit_length() {
+        let left = Obb2::new([0.0, 0.0], [1.0, 1.0], 0.77);
+        let right = Obb2::new([1.0, 0.0], [1.0, 1.0], -0.31);
+        for axis in obb2_sat(left, right).axes {
+            let length = (axis.axis[0] * axis.axis[0] + axis.axis[1] * axis.axis[1]).sqrt();
+            assert!((length - 1.0).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn critical_axis_has_the_smallest_signed_overlap() {
+        let relation = obb2_sat(
+            Obb2::new([0.0, 0.0], [1.4, 0.8], 0.2),
+            Obb2::new([2.7, 0.2], [1.0, 0.7], -0.5),
+        );
+        let critical = relation.axes[relation.critical_axis].signed_overlap;
+        assert!(
+            relation
+                .axes
+                .iter()
+                .all(|axis| critical <= axis.signed_overlap)
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "OBB half extents must be non-negative and finite")]
+    fn obb_rejects_invalid_half_extents() {
+        let _ = Obb2::new([0.0, 0.0], [-1.0, 1.0], 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "OBB rotation must be finite")]
+    fn obb_rejects_non_finite_rotation() {
+        let _ = Obb2::new([0.0, 0.0], [1.0, 1.0], f32::NAN);
     }
 }
