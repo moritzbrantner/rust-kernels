@@ -285,6 +285,23 @@ mod tests {
         cache.iter().map(|(key, value)| (*key, *value)).collect()
     }
 
+    fn assert_matches_model(cache: &LruCache<u8, i32>, model: &Model) {
+        assert_eq!(snapshot(cache), model.entries);
+        assert_eq!(cache.len(), model.entries.len());
+        assert_eq!(cache.is_empty(), model.entries.is_empty());
+        assert_eq!(cache.capacity(), model.capacity);
+
+        for key in 0_u8..=1 {
+            let expected = model
+                .entries
+                .iter()
+                .find(|entry| entry.0 == key)
+                .map(|entry| entry.1);
+            assert_eq!(cache.contains_key(&key), expected.is_some());
+            assert_eq!(cache.peek(&key).copied(), expected);
+        }
+    }
+
     #[test]
     fn eviction_and_promotion_follow_lru_order() {
         let mut cache = LruCache::new(3);
@@ -337,6 +354,35 @@ mod tests {
             }
             assert_eq!(snapshot(&cache), model.entries);
             assert_eq!(cache.len(), model.entries.len());
+        }
+    }
+
+    #[test]
+    fn exhaustive_short_sequences_match_reference_model() {
+        for capacity in 0_usize..=3 {
+            for case in 0_usize..6_usize.pow(5) {
+                let mut cache = LruCache::new(capacity);
+                let mut model = Model::new(capacity);
+                let mut encoded = case;
+
+                for step in 0_usize..5 {
+                    let action = encoded % 6;
+                    encoded /= 6;
+                    let key = (action % 2) as u8;
+
+                    match action / 2 {
+                        0 => {
+                            let value = (case * 7 + step) as i32;
+                            assert_eq!(cache.insert(key, value), model.insert(key, value));
+                        }
+                        1 => assert_eq!(cache.get(&key).copied(), model.get(key)),
+                        2 => assert_eq!(cache.remove(&key), model.remove(key)),
+                        _ => unreachable!(),
+                    }
+
+                    assert_matches_model(&cache, &model);
+                }
+            }
         }
     }
 
