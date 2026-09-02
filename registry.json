@@ -134,7 +134,10 @@
         "ecs-primitives",
         "bitset",
         "arena",
-        "generational-handles"
+        "generational-handles",
+        "fenwick-tree",
+        "prefix-sum",
+        "lru-cache"
       ],
       "dependencies": [],
       "registryDependencies": [],
@@ -152,8 +155,16 @@
           "target": "crates/collection-kernels/src/bit_set.rs"
         },
         {
+          "path": "crates/collection-kernels/src/fenwick_tree.rs",
+          "target": "crates/collection-kernels/src/fenwick_tree.rs"
+        },
+        {
           "path": "crates/collection-kernels/src/generational_arena.rs",
           "target": "crates/collection-kernels/src/generational_arena.rs"
+        },
+        {
+          "path": "crates/collection-kernels/src/lru_cache.rs",
+          "target": "crates/collection-kernels/src/lru_cache.rs"
         },
         {
           "path": "crates/collection-kernels/src/ring_buffer.rs",
@@ -204,6 +215,20 @@
           "symbols": [
             "ArenaKey",
             "GenerationalArena"
+          ]
+        },
+        {
+          "name": "fenwick-tree",
+          "type": "data-structure",
+          "symbols": [
+            "FenwickTree"
+          ]
+        },
+        {
+          "name": "lru-cache",
+          "type": "data-structure",
+          "symbols": [
+            "LruCache"
           ]
         }
       ]
@@ -316,8 +341,8 @@
     {
       "name": "search-kernels",
       "type": "registry:crate",
-      "title": "Search and Selection Kernels",
-      "description": "Selection, top-k, and probabilistic membership algorithms.",
+      "title": "Search, Selection, and Sorting Kernels",
+      "description": "Selection, top-k, probabilistic membership, and integer sorting algorithms.",
       "crate": {
         "package": "search-kernels",
         "manifest": "crates/search-kernels/Cargo.toml"
@@ -328,7 +353,9 @@
         "quickselect",
         "top-k",
         "probabilistic",
-        "bloom-filter"
+        "bloom-filter",
+        "sorting",
+        "radix-sort"
       ],
       "dependencies": [],
       "registryDependencies": [
@@ -346,6 +373,10 @@
         {
           "path": "crates/search-kernels/src/bloom_filter.rs",
           "target": "crates/search-kernels/src/bloom_filter.rs"
+        },
+        {
+          "path": "crates/search-kernels/src/radix_sort.rs",
+          "target": "crates/search-kernels/src/radix_sort.rs"
         },
         {
           "path": "crates/search-kernels/src/selection.rs",
@@ -372,6 +403,62 @@
           "type": "data-structure",
           "symbols": [
             "BloomFilter"
+          ]
+        },
+        {
+          "name": "radix-sort-u32",
+          "type": "algorithm",
+          "symbols": [
+            "radix_sort_u32"
+          ]
+        },
+        {
+          "name": "radix-sort-u64",
+          "type": "algorithm",
+          "symbols": [
+            "radix_sort_u64"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "statistics-kernels",
+      "type": "registry:crate",
+      "title": "Statistics Kernels",
+      "description": "Numerically stable streaming statistics and mergeable accumulators.",
+      "crate": {
+        "package": "statistics-kernels",
+        "manifest": "crates/statistics-kernels/Cargo.toml"
+      },
+      "tags": [
+        "statistics",
+        "streaming",
+        "welford",
+        "variance",
+        "telemetry"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/statistics-kernels/Cargo.toml",
+          "target": "crates/statistics-kernels/Cargo.toml"
+        },
+        {
+          "path": "crates/statistics-kernels/src/lib.rs",
+          "target": "crates/statistics-kernels/src/lib.rs"
+        },
+        {
+          "path": "crates/statistics-kernels/src/running_stats.rs",
+          "target": "crates/statistics-kernels/src/running_stats.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "running-statistics",
+          "type": "data-structure",
+          "symbols": [
+            "RunningStats"
           ]
         }
       ]

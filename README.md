@@ -35,6 +35,8 @@ SAT, GJK/EPA, sweep-and-prune, dynamic AABB trees, rays, and CCD remain future k
 - `SparseSet`, the sparse/dense integer-key set primitive commonly used for fast membership and ECS-style storage
 - `BitSet`, a packed fixed-universe set with efficient set-bit iteration
 - `GenerationalArena`, O(1) slot storage with stale-handle rejection and deterministic live-entry iteration
+- `FenwickTree`, compact O(log n) additive point updates with half-open prefix/range-sum queries
+- `LruCache`, a fixed-capacity O(1)-expected least-recently-used cache with deterministic recency order
 
 The collection kernels deliberately stop before lock-free queues or a full ECS framework.
 
@@ -48,15 +50,20 @@ The collection kernels deliberately stop before lock-free queues or a full ECS f
 - Tarjan strongly connected components with deterministic normalized output
 - Kruskal minimum spanning forests, reusing `UnionFind` for connectivity
 
-### Search and selection
+### Search, selection, and sorting
 
 `search-kernels` contains:
 
 - `quickselect`, an in-place deterministic three-way selection algorithm
 - `top_k_smallest`, which combines selection with sorting only the requested result set
 - `BloomFilter`, deterministic probabilistic membership over byte-oriented keys using the shared `BitSet` primitive
+- stable LSD radix-sort kernels for `u32` and `u64`, checked against Rust's stable sort
 
-Selection results are checked against fully sorted reference outputs. Bloom-filter tests enforce the no-false-negative contract while keeping false-positive behavior explicit.
+Selection and sorting results are checked against simple standard-library oracles. Bloom-filter tests enforce the no-false-negative contract while keeping false-positive behavior explicit.
+
+### Statistics
+
+`statistics-kernels` contains `RunningStats`, a Welford-style streaming accumulator for count, mean, population/sample variance, and standard deviation. Accumulators can be merged without replaying observations, with tests against batch calculations and large-offset fixtures.
 
 ## Registry
 
