@@ -107,6 +107,9 @@
         "crate": {
           "$ref": "#/$defs/crate"
         },
+        "integration": {
+          "$ref": "#/$defs/integration"
+        },
         "tags": {
           "type": "array",
           "items": {
@@ -144,7 +147,62 @@
             "$ref": "#/$defs/providedKernel"
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "registry:crate"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "crate"
+            ]
+          },
+          "else": {
+            "required": [
+              "integration"
+            ],
+            "not": {
+              "required": [
+                "crate"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "integration": {
+                "properties": {
+                  "mode": {
+                    "const": "standalone-module"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              }
+            },
+            "required": [
+              "integration"
+            ]
+          },
+          "then": {
+            "properties": {
+              "files": {
+                "maxItems": 1
+              }
+            }
+          }
+        }
+      ]
     },
     "crate": {
       "type": "object",
@@ -161,6 +219,23 @@
         "manifest": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "integration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "module"
+      ],
+      "properties": {
+        "mode": {
+          "const": "standalone-module"
+        },
+        "module": {
+          "type": "string",
+          "pattern": "^[a-z_][a-z0-9_]*$"
         }
       }
     },
