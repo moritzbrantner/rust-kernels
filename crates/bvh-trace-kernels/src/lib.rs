@@ -1,9 +1,6 @@
 use std::collections::HashSet;
 
-use bvh_kernels::StaticBvhBroadPhase;
-use spatial_kernels::{
-    Aabb, Body, BroadPhase, BroadPhaseResult, BroadPhaseStats, ColliderId, Pair,
-};
+use spatial_kernels::{Aabb, Body, BroadPhaseResult, BroadPhaseStats, ColliderId, Pair};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StaticBvhVisitKind {
