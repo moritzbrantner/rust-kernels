@@ -135,11 +135,11 @@ mod tests {
                 let mut sorted = input.clone();
                 sorted.sort_unstable();
 
-                for nth in 0..len {
+                for (nth, expected) in sorted.iter().enumerate() {
                     let mut candidate = input.clone();
                     assert_eq!(
                         quickselect(&mut candidate, nth),
-                        Some(&sorted[nth]),
+                        Some(expected),
                         "len={len}, case={case}, nth={nth}, input={input:?}"
                     );
                 }
