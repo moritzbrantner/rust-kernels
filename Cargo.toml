@@ -5,6 +5,7 @@ members = [
     "crates/graph-kernels",
     "crates/search-kernels",
     "crates/spatial-kernels",
+    "crates/statistics-kernels",
 ]
 resolver = "2"
 
