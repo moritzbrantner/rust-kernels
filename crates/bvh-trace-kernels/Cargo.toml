@@ -7,5 +7,7 @@ rust-version.workspace = true
 description = "Deterministic debug traces for static bounding-volume hierarchies"
 
 [dependencies]
-bvh-kernels = { path = "../bvh-kernels" }
 spatial-kernels = { path = "../spatial-kernels" }
+
+[dev-dependencies]
+bvh-kernels = { path = "../bvh-kernels" }
