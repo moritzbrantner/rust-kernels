@@ -859,9 +859,7 @@ fn validate_unique_ids(bodies: &[Body]) {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        DynamicAabbTree, DynamicAabbTreeBroadPhase, StaticBvh, StaticBvhBroadPhase,
-    };
+    use super::{DynamicAabbTree, DynamicAabbTreeBroadPhase, StaticBvh, StaticBvhBroadPhase};
     use spatial_kernels::{Aabb, Body, BroadPhase, ColliderId, NaiveBroadPhase};
 
     fn body(id: ColliderId, center: [f32; 3], half: f32) -> Body {
