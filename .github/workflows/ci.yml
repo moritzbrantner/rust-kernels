@@ -13,6 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/validate_registry.py
+      - run: python3 scripts/test_standalone_registry.py
       - run: python3 scripts/test_source_registry.py
       - run: python3 scripts/test_source_update.py
       - run: python3 scripts/test_source_resolution.py
