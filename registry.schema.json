@@ -21,7 +21,7 @@
       "minLength": 1
     },
     "version": {
-      "const": 2
+      "const": 3
     },
     "description": {
       "type": "string"
@@ -110,6 +110,12 @@
         "integration": {
           "$ref": "#/$defs/integration"
         },
+        "characteristics": {
+          "$ref": "#/$defs/characteristics"
+        },
+        "verification": {
+          "$ref": "#/$defs/verification"
+        },
         "tags": {
           "type": "array",
           "items": {
@@ -163,11 +169,27 @@
           "then": {
             "required": [
               "crate"
-            ]
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "integration"
+                  ]
+                },
+                {
+                  "required": [
+                    "characteristics"
+                  ]
+                }
+              ]
+            }
           },
           "else": {
             "required": [
-              "integration"
+              "integration",
+              "characteristics",
+              "verification"
             ],
             "not": {
               "required": [
@@ -237,6 +259,99 @@
           "type": "string",
           "pattern": "^[a-z_][a-z0-9_]*$"
         }
+      }
+    },
+    "characteristics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deterministic",
+        "operations"
+      ],
+      "properties": {
+        "deterministic": {
+          "type": "boolean"
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/operationCharacteristics"
+          }
+        }
+      }
+    },
+    "operationCharacteristics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "time",
+        "extraSpace",
+        "mutation",
+        "allocation"
+      ],
+      "properties": {
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "time": {
+          "type": "string",
+          "minLength": 1
+        },
+        "extraSpace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mutation": {
+          "enum": [
+            "none",
+            "input",
+            "internal-state"
+          ]
+        },
+        "allocation": {
+          "enum": [
+            "none",
+            "fixed",
+            "input-sized",
+            "capacity-bounded",
+            "may-grow"
+          ]
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tests",
+        "benchmarks"
+      ],
+      "properties": {
+        "tests": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/relativePathString"
+          }
+        },
+        "benchmarks": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/relativePathString"
+          }
+        }
+      }
+    },
+    "relativePathString": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "(^/|(^|/)\\.\\.(/|$))"
       }
     },
     "file": {
