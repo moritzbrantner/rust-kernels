@@ -206,7 +206,13 @@ impl DynamicNode {
         }
     }
 
-    fn branch(bounds: Aabb, parent: Option<usize>, left: usize, right: usize, height: i32) -> Self {
+    fn branch(
+        bounds: Aabb,
+        parent: Option<usize>,
+        left: usize,
+        right: usize,
+        height: i32,
+    ) -> Self {
         Self {
             bounds,
             parent,
@@ -277,8 +283,9 @@ impl DynamicAabbTree {
 
     #[must_use]
     pub fn height(&self) -> usize {
-        self.root
-            .map_or(0, |root| usize::try_from(self.node(root).height + 1).unwrap_or(0))
+        self.root.map_or(0, |root| {
+            usize::try_from(self.node(root).height + 1).unwrap_or(0)
+        })
     }
 
     pub fn insert(&mut self, body: Body) {
@@ -468,7 +475,10 @@ impl DynamicAabbTree {
             return;
         }
 
-        let parent = self.node(leaf).parent.expect("non-root leaf must have parent");
+        let parent = self
+            .node(leaf)
+            .parent
+            .expect("non-root leaf must have parent");
         let parent_node = self.node(parent);
         let sibling = if parent_node.left == Some(leaf) {
             parent_node.right.expect("branch must have right child")
@@ -496,7 +506,11 @@ impl DynamicAabbTree {
         if node.left == Some(old_child) {
             node.left = Some(new_child);
         } else {
-            assert_eq!(node.right, Some(old_child), "parent must reference old child");
+            assert_eq!(
+                node.right,
+                Some(old_child),
+                "parent must reference old child"
+            );
             node.right = Some(new_child);
         }
     }
@@ -608,7 +622,10 @@ impl DynamicAabbTree {
     }
 
     fn release(&mut self, index: usize) {
-        assert!(self.nodes[index].take().is_some(), "released node must exist");
+        assert!(
+            self.nodes[index].take().is_some(),
+            "released node must exist"
+        );
         self.free.push(index);
     }
 
@@ -747,9 +764,7 @@ fn validate_unique_ids(bodies: &[Body]) {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        DynamicAabbTree, DynamicAabbTreeBroadPhase, StaticBvh, StaticBvhBroadPhase,
-    };
+    use super::{DynamicAabbTree, DynamicAabbTreeBroadPhase, StaticBvh, StaticBvhBroadPhase};
     use spatial_kernels::{Aabb, Body, BroadPhase, ColliderId, NaiveBroadPhase};
 
     fn body(id: ColliderId, center: [f32; 3], half: f32) -> Body {
