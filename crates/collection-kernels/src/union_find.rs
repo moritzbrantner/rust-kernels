@@ -151,6 +151,64 @@ mod tests {
         }
     }
 
+    #[test]
+    fn exhaustive_small_graphs_match_connectivity_and_size_oracle() {
+        const LEN: usize = 5;
+        const EDGES: [(usize, usize); 10] = [
+            (0, 1),
+            (0, 2),
+            (0, 3),
+            (0, 4),
+            (1, 2),
+            (1, 3),
+            (1, 4),
+            (2, 3),
+            (2, 4),
+            (3, 4),
+        ];
+
+        for mask in 0_usize..(1_usize << EDGES.len()) {
+            let mut union_find = UnionFind::new(LEN);
+            let mut selected = Vec::new();
+
+            for (edge_index, &(left, right)) in EDGES.iter().enumerate() {
+                if mask & (1_usize << edge_index) == 0 {
+                    continue;
+                }
+
+                let expected_change = !oracle_connected(LEN, &selected, left, right);
+                assert_eq!(
+                    union_find.union(left, right),
+                    expected_change,
+                    "mask={mask}, edge=({left}, {right})"
+                );
+                selected.push((left, right));
+            }
+
+            let expected_components = (0..LEN)
+                .filter(|&node| {
+                    (0..node).all(|earlier| !oracle_connected(LEN, &selected, node, earlier))
+                })
+                .count();
+            assert_eq!(union_find.component_count(), expected_components, "mask={mask}");
+
+            for left in 0..LEN {
+                let expected_size = (0..LEN)
+                    .filter(|&right| oracle_connected(LEN, &selected, left, right))
+                    .count();
+                assert_eq!(union_find.component_size(left), expected_size, "mask={mask}");
+
+                for right in 0..LEN {
+                    assert_eq!(
+                        union_find.connected(left, right),
+                        oracle_connected(LEN, &selected, left, right),
+                        "mask={mask}, pair=({left}, {right})"
+                    );
+                }
+            }
+        }
+    }
+
     fn oracle_connected(len: usize, edges: &[(usize, usize)], start: usize, goal: usize) -> bool {
         let mut seen = vec![false; len];
         let mut stack = vec![start];
