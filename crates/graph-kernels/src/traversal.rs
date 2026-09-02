@@ -72,6 +72,63 @@ mod tests {
         }
     }
 
+    fn graph_from_mask(mut mask: usize) -> [Vec<u8>; 4] {
+        let mut graph = std::array::from_fn(|_| Vec::new());
+        for (from, outgoing) in graph.iter_mut().enumerate() {
+            for to in 0_usize..4 {
+                if from == to {
+                    continue;
+                }
+                if mask & 1 != 0 {
+                    outgoing.push(to as u8);
+                }
+                mask >>= 1;
+            }
+        }
+        graph
+    }
+
+    fn breadth_first_oracle(graph: &[Vec<u8>; 4], start: u8) -> Vec<u8> {
+        let mut seen = [false; 4];
+        seen[usize::from(start)] = true;
+        let mut frontier = vec![start];
+        let mut order = Vec::new();
+
+        while !frontier.is_empty() {
+            let mut next_frontier = Vec::new();
+            for node in frontier {
+                order.push(node);
+                for &next in &graph[usize::from(node)] {
+                    if !seen[usize::from(next)] {
+                        seen[usize::from(next)] = true;
+                        next_frontier.push(next);
+                    }
+                }
+            }
+            frontier = next_frontier;
+        }
+
+        order
+    }
+
+    fn depth_first_oracle(graph: &[Vec<u8>; 4], start: u8) -> Vec<u8> {
+        fn visit(graph: &[Vec<u8>; 4], node: u8, seen: &mut [bool; 4], order: &mut Vec<u8>) {
+            if seen[usize::from(node)] {
+                return;
+            }
+            seen[usize::from(node)] = true;
+            order.push(node);
+            for &next in &graph[usize::from(node)] {
+                visit(graph, next, seen, order);
+            }
+        }
+
+        let mut seen = [false; 4];
+        let mut order = Vec::new();
+        visit(graph, start, &mut seen, &mut order);
+        order
+    }
+
     #[test]
     fn breadth_first_preserves_layer_and_neighbor_order() {
         assert_eq!(
@@ -99,5 +156,19 @@ mod tests {
 
         assert_eq!(breadth_first(0, cyclic), vec![0, 1, 2]);
         assert_eq!(depth_first(0, cyclic), vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn exhaustive_four_node_graphs_match_independent_oracles() {
+        for mask in 0_usize..(1_usize << 12) {
+            let graph = graph_from_mask(mask);
+
+            for start in 0_u8..4 {
+                let bfs = breadth_first(start, |node| graph[usize::from(*node)].clone());
+                let dfs = depth_first(start, |node| graph[usize::from(*node)].clone());
+                assert_eq!(bfs, breadth_first_oracle(&graph, start), "mask={mask}");
+                assert_eq!(dfs, depth_first_oracle(&graph, start), "mask={mask}");
+            }
+        }
     }
 }
