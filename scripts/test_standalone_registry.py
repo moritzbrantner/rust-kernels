@@ -5,8 +5,11 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from source_registry import LOCK_FILE_NAME, install_items, load_json, provenance_status
+
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = ROOT / "registry.json"
+FIXTURE_REVISION = "a" * 40
 
 
 def fail(message: str) -> None:
@@ -34,12 +37,15 @@ if not standalone:
 
 with tempfile.TemporaryDirectory() as temporary:
     output_root = Path(temporary)
+    names: list[str] = []
+
     for item in standalone:
         name = item.get("name")
         integration = item.get("integration")
         files = item.get("files")
         if not isinstance(name, str) or not name:
             fail("standalone item must have a name")
+        names.append(name)
         if not isinstance(integration, dict):
             fail(f"{name!r} integration must be an object")
         if not isinstance(files, list) or len(files) != 1 or not isinstance(files[0], dict):
@@ -79,4 +85,34 @@ with tempfile.TemporaryDirectory() as temporary:
             detail = result.stderr.strip() or result.stdout.strip()
             fail(f"{name!r} does not compile as an independent module:\n{detail}")
 
-print(f"standalone registry ok: {len(standalone)} module(s) compile independently")
+    consumer = output_root / "consumer"
+    installed = install_items(
+        ROOT,
+        REGISTRY_PATH,
+        registry,
+        names,
+        consumer,
+        FIXTURE_REVISION,
+    )
+    if installed != names:
+        fail(f"standalone install order changed: expected {names}, got {installed}")
+
+    for item in standalone:
+        name = item["name"]
+        file_entry = item["files"][0]
+        source = ROOT / file_entry["path"]
+        target = consumer / file_entry["target"]
+        if not target.is_file():
+            fail(f"{name!r} did not create {file_entry['target']}")
+        if target.read_bytes() != source.read_bytes():
+            fail(f"{name!r} copied bytes differ from the registered source")
+
+    lock = load_json(consumer / LOCK_FILE_NAME)
+    statuses = provenance_status(consumer, lock)
+    dirty = [status for status in statuses if status[2] != "clean"]
+    if dirty:
+        fail(f"fresh standalone install is not provenance-clean: {dirty}")
+
+print(
+    f"standalone registry ok: {len(standalone)} module(s) compile and install independently"
+)
