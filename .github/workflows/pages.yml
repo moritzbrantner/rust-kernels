@@ -1,0 +1,35 @@
+name: Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-pages:
+    permissions:
+      actions: read
+      contents: read
+      pages: write
+      id-token: write
+      packages: read
+    uses: moritzbrantner/reusable-workflows/.github/workflows/deploy-pages.yml@workflow-standard-v1.3
+    with:
+      node_version: ""
+      bun_version: ""
+      install_command: ""
+      pre_command: rustup target add wasm32-unknown-unknown
+      build_command: bash scripts/build-pages.sh
+      artifact_path: pages-dist
+      cache_bun: false
+      cache_node: false
+      concurrency_group: rust-kernels-pages
+      cancel_in_progress: false
