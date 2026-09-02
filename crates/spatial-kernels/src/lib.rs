@@ -316,9 +316,7 @@ impl BroadPhase for SweepAndPruneBroadPhase {
         order.sort_unstable_by(|&left, &right| {
             bodies[left].aabb.min[axis]
                 .total_cmp(&bodies[right].aabb.min[axis])
-                .then_with(|| {
-                    bodies[left].aabb.max[axis].total_cmp(&bodies[right].aabb.max[axis])
-                })
+                .then_with(|| bodies[left].aabb.max[axis].total_cmp(&bodies[right].aabb.max[axis]))
                 .then_with(|| bodies[left].id.cmp(&bodies[right].id))
         });
 
@@ -388,10 +386,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "AABB bounds must be finite")]
     fn aabb_rejects_non_finite_bounds() {
-        let _ = Aabb::new(
-            [f32::NEG_INFINITY, 0.0, 0.0],
-            [f32::INFINITY, 0.0, 0.0],
-        );
+        let _ = Aabb::new([f32::NEG_INFINITY, 0.0, 0.0], [f32::INFINITY, 0.0, 0.0]);
     }
 
     #[test]
@@ -423,6 +418,20 @@ mod tests {
             let actual = UniformGridBroadPhase::new(cell_size).detect(&bodies);
             assert_eq!(actual.pairs, expected, "cell size {cell_size}");
         }
+    }
+
+    #[test]
+    fn sparse_grid_avoids_most_pair_tests() {
+        let bodies: Vec<_> = (0..100)
+            .map(|id| body(id, [id as f32 * 10.0, 0.0, 0.0], 0.25))
+            .collect();
+
+        let naive = NaiveBroadPhase.detect(&bodies);
+        let grid = UniformGridBroadPhase::new(2.0).detect(&bodies);
+
+        assert_eq!(grid.pairs, naive.pairs);
+        assert_eq!(grid.stats.aabb_tests, 0);
+        assert_eq!(naive.stats.aabb_tests, 4_950);
     }
 
     #[test]
