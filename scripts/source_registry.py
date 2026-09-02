@@ -15,7 +15,10 @@ from typing import Iterable
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = ROOT / "registry.json"
 LOCK_FILE_NAME = ".rust-kernels.lock.json"
-LOCK_SCHEMA = "https://raw.githubusercontent.com/moritzbrantner/rust-kernels/main/provenance.schema.json"
+LOCK_SCHEMA_RE = re.compile(
+    r"^https://raw\.githubusercontent\.com/moritzbrantner/rust-kernels/"
+    r"[0-9a-f]{40}/provenance\.schema\.json$"
+)
 REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -134,6 +137,14 @@ def validate_revision(revision: str) -> None:
         )
 
 
+def provenance_schema_uri(revision: str) -> str:
+    validate_revision(revision)
+    return (
+        "https://raw.githubusercontent.com/moritzbrantner/rust-kernels/"
+        f"{revision}/provenance.schema.json"
+    )
+
+
 def current_git_revision(root: Path) -> str:
     try:
         result = subprocess.run(
@@ -186,22 +197,27 @@ def lock_path(destination: Path) -> Path:
     return destination / LOCK_FILE_NAME
 
 
-def new_lock(registry: dict) -> dict:
+def new_lock(registry: dict, revision: str) -> dict:
     return {
-        "$schema": LOCK_SCHEMA,
+        "$schema": provenance_schema_uri(revision),
         "version": 1,
         "registry": registry_identity(registry),
         "items": [],
     }
 
 
-def load_existing_lock(destination: Path, registry: dict) -> dict:
+def load_existing_lock(destination: Path, registry: dict, revision: str) -> dict:
     path = lock_path(destination)
     if not path.exists():
-        return new_lock(registry)
+        return new_lock(registry, revision)
 
     lock = load_json(path)
-    if lock.get("$schema") != LOCK_SCHEMA or lock.get("version") != 1:
+    schema = lock.get("$schema")
+    if (
+        not isinstance(schema, str)
+        or LOCK_SCHEMA_RE.fullmatch(schema) is None
+        or lock.get("version") != 1
+    ):
         raise SourceRegistryError(f"{path} uses an unsupported provenance format")
     if lock.get("registry") != registry_identity(registry):
         raise SourceRegistryError(
@@ -288,7 +304,7 @@ def install_items(
     registry_sha256 = sha256_file(registry_path)
     destination.mkdir(parents=True, exist_ok=True)
     destination = destination.resolve()
-    lock = load_existing_lock(destination, registry)
+    lock = load_existing_lock(destination, registry, revision)
 
     snapshots: list[tuple[dict, list[tuple[Path, PurePosixPath, str]]]] = []
     all_targets: dict[PurePosixPath, str] = {}

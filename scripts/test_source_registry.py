@@ -42,7 +42,7 @@ class SourceRegistryTests(unittest.TestCase):
                 "revisionType": "git-commit",
             },
             "provenance": {
-                "schema": "./provenance.schema.json",
+                "schema": "https://raw.githubusercontent.com/moritzbrantner/rust-kernels/main/provenance.schema.json",
                 "lockFile": ".rust-kernels.lock.json",
             },
             "items": [
@@ -98,6 +98,11 @@ class SourceRegistryTests(unittest.TestCase):
 
         self.assertEqual(installed, ["base", "leaf"])
         lock = load_json(self.consumer / LOCK_FILE_NAME)
+        self.assertEqual(
+            lock["$schema"],
+            "https://raw.githubusercontent.com/moritzbrantner/rust-kernels/"
+            f"{REVISION}/provenance.schema.json",
+        )
         self.assertEqual(lock["registry"]["name"], "rust-kernels")
         self.assertEqual([item["name"] for item in lock["items"]], ["base", "leaf"])
         self.assertTrue(all(item["revision"] == REVISION for item in lock["items"]))

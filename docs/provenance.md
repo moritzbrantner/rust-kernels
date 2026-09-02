@@ -38,13 +38,13 @@ The registry does not contain its own current commit SHA. Doing so would make ev
 
 ## Consumer lock format
 
-The normative schema lives in this repository as [`provenance.schema.json`](../provenance.schema.json) and is published at `https://raw.githubusercontent.com/moritzbrantner/rust-kernels/main/provenance.schema.json`. Consumer locks use that published URI, so validation does not depend on copying a schema file into every consumer repository.
+The normative schema lives in this repository as [`provenance.schema.json`](../provenance.schema.json). `registry.json` exposes the current published schema location for discovery, but a newly created consumer lock points to the schema file at the exact Git revision used for the install. That makes the schema reference immutable as well as self-describing.
 
-A consumer should commit `.rust-kernels.lock.json` alongside the copied source. A lock entry is per registry item, not global, so different items may advance independently:
+For example, an install from revision `0123456789abcdef0123456789abcdef01234567` records:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/moritzbrantner/rust-kernels/main/provenance.schema.json",
+  "$schema": "https://raw.githubusercontent.com/moritzbrantner/rust-kernels/0123456789abcdef0123456789abcdef01234567/provenance.schema.json",
   "version": 1,
   "registry": {
     "name": "rust-kernels",
@@ -67,9 +67,12 @@ A consumer should commit `.rust-kernels.lock.json` alongside the copied source. 
 }
 ```
 
+A consumer should commit `.rust-kernels.lock.json` alongside the copied source. A lock entry is per registry item, not global, so different items may advance independently. The lock-level schema URI does not need to move when another item advances as long as the lock remains on provenance format version 1.
+
 The important fields are:
 
-- `revision`: the exact 40-character Git commit used as the upstream source snapshot.
+- `$schema`: an immutable Git-revision URL for the provenance schema used when the lock was created.
+- `revision`: the exact 40-character Git commit used as the upstream source snapshot for an item.
 - `registrySha256`: the SHA-256 of `registry.json` at that revision.
 - `source`: the path in `rust-kernels`.
 - `target`: the path chosen by the registry item for the consumer.
@@ -112,10 +115,11 @@ The helper:
 1. resolves `registryDependencies`;
 2. resolves the current full Git commit SHA;
 3. rejects a dirty upstream snapshot;
-4. hashes `registry.json` and every copied source file;
-5. refuses to overwrite an existing target whose bytes have diverged;
-6. copies the source; and
-7. writes or updates `.rust-kernels.lock.json`.
+4. pins the consumer lock's schema URI to that Git revision;
+5. hashes `registry.json` and every copied source file;
+6. refuses to overwrite an existing target whose bytes have diverged;
+7. copies the source; and
+8. writes or updates `.rust-kernels.lock.json`.
 
 This behavior is intentionally conservative. Re-install is not an update mechanism.
 
@@ -133,7 +137,7 @@ That enables deterministic update behavior:
 2. If `theirs == base`, keep the local file unchanged.
 3. If both changed, perform or propose a three-way merge.
 4. Run the consumer's tests and benchmarks.
-5. Update the lock only after the new upstream base has been accepted.
+5. Update the item lock only after the new upstream base has been accepted.
 
 The lock should continue to describe the original upstream base while unresolved local/upstream conflicts exist. Do not rewrite `sourceSha256` to the consumer's modified hash; doing that would destroy the information required for a future three-way merge.
 
@@ -142,8 +146,6 @@ The lock should continue to describe the original upstream base while unresolved
 Consumer repositories are expected to be proving grounds. A project may copy a kernel, specialize it, benchmark the result, and keep the specialization local.
 
 If the change becomes broadly useful, the implementation can be proposed back to `rust-kernels`. Once accepted, other consumers can advance their provenance lock to the new upstream revision.
-
-This creates an explicit cycle:
 
 ```text
 rust-kernels registry

@@ -48,7 +48,7 @@ def require_relative_path(value: object, context: str) -> PurePosixPath:
 
 registry = load_json(REGISTRY_PATH)
 load_json(SCHEMA_PATH)
-provenance_schema = load_json(PROVENANCE_SCHEMA_PATH)
+load_json(PROVENANCE_SCHEMA_PATH)
 
 if registry.get("$schema") != "./registry.schema.json":
     fail("$schema must point to ./registry.schema.json")
@@ -71,8 +71,6 @@ if provenance.get("schema") != PROVENANCE_SCHEMA_URI:
     fail("provenance.schema must point to the published provenance schema")
 if provenance.get("lockFile") != ".rust-kernels.lock.json":
     fail("provenance.lockFile must be .rust-kernels.lock.json")
-if provenance_schema.get("$id") != PROVENANCE_SCHEMA_URI:
-    fail("provenance.schema.json $id must match the published provenance schema URI")
 
 items = registry.get("items")
 if not isinstance(items, list) or not items:

@@ -1,6 +1,5 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/moritzbrantner/rust-kernels/main/provenance.schema.json",
   "title": "rust-kernels source provenance lock",
   "description": "Records the immutable upstream revision and source hashes for registry items copied into a consumer repository.",
   "type": "object",
@@ -13,7 +12,8 @@
   ],
   "properties": {
     "$schema": {
-      "const": "https://raw.githubusercontent.com/moritzbrantner/rust-kernels/main/provenance.schema.json"
+      "type": "string",
+      "pattern": "^https://raw\\.githubusercontent\\.com/moritzbrantner/rust-kernels/[0-9a-f]{40}/provenance\\.schema\\.json$"
     },
     "version": {
       "const": 1
