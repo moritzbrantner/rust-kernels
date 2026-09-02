@@ -1,0 +1,76 @@
+{
+  "$schema": "./registry.schema.json",
+  "name": "rust-kernels",
+  "version": 1,
+  "description": "Reusable Rust algorithms and data structures that can be consumed as crates or integrated as source.",
+  "items": [
+    {
+      "name": "spatial-kernels",
+      "type": "registry:crate",
+      "title": "Spatial Kernels",
+      "description": "Deterministic spatial primitives and collision broad-phase algorithms.",
+      "crate": {
+        "package": "spatial-kernels",
+        "manifest": "crates/spatial-kernels/Cargo.toml"
+      },
+      "tags": [
+        "spatial",
+        "collision",
+        "broad-phase"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/spatial-kernels/Cargo.toml",
+          "target": "crates/spatial-kernels/Cargo.toml"
+        },
+        {
+          "path": "crates/spatial-kernels/src/lib.rs",
+          "target": "crates/spatial-kernels/src/lib.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "aabb",
+          "type": "data-structure",
+          "symbols": [
+            "Aabb",
+            "Body",
+            "ColliderId"
+          ]
+        },
+        {
+          "name": "pair",
+          "type": "data-structure",
+          "symbols": [
+            "Pair"
+          ]
+        },
+        {
+          "name": "broad-phase",
+          "type": "interface",
+          "symbols": [
+            "BroadPhase",
+            "BroadPhaseResult",
+            "BroadPhaseStats"
+          ]
+        },
+        {
+          "name": "naive-broad-phase",
+          "type": "algorithm",
+          "symbols": [
+            "NaiveBroadPhase"
+          ]
+        },
+        {
+          "name": "uniform-grid-broad-phase",
+          "type": "algorithm",
+          "symbols": [
+            "UniformGridBroadPhase"
+          ]
+        }
+      ]
+    }
+  ]
+}

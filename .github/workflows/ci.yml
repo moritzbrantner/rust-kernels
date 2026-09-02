@@ -8,6 +8,12 @@ permissions:
   contents: read
 
 jobs:
+  registry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/validate_registry.py
+
   rust:
     runs-on: ubuntu-latest
     steps:
