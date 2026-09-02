@@ -123,6 +123,45 @@ mod tests {
     }
 
     #[test]
+    fn construction_and_ranges_match_naive_oracle_for_all_small_ternary_inputs() {
+        for len in 0_usize..=6 {
+            for case in 0..3_usize.pow(len as u32) {
+                let mut encoded = case;
+                let mut values = Vec::with_capacity(len);
+                for _ in 0..len {
+                    values.push((encoded % 3) as i64 - 1);
+                    encoded /= 3;
+                }
+
+                let tree = FenwickTree::from_slice(&values);
+                assert_eq!(tree.len(), len, "len={len}, case={case}");
+
+                for end in 0..=len {
+                    let expected_prefix = values.iter().take(end).sum::<i64>();
+                    assert_eq!(
+                        tree.prefix_sum(end),
+                        expected_prefix,
+                        "prefix len={len}, case={case}, end={end}, values={values:?}"
+                    );
+
+                    for start in 0..=end {
+                        let expected_range = values
+                            .iter()
+                            .skip(start)
+                            .take(end - start)
+                            .sum::<i64>();
+                        assert_eq!(
+                            tree.range_sum(start..end),
+                            expected_range,
+                            "range len={len}, case={case}, start={start}, end={end}, values={values:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn empty_tree_supports_empty_queries() {
         let tree = FenwickTree::<i64>::new(0);
         assert!(tree.is_empty());
