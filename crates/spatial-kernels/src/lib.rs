@@ -198,6 +198,27 @@ impl BroadPhase for NaiveBroadPhase {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UniformGridCellTrace {
+    /// Cell being processed. Trace cells are sorted lexicographically.
+    pub cell: CellCoord3,
+    /// Collider IDs occupying this cell, sorted by ID.
+    pub members: Vec<ColliderId>,
+    /// Every conceptual pair produced by this cell. A pair may also occur in
+    /// another cell when large AABBs span multiple cells.
+    pub candidate_pairs: Vec<Pair>,
+    /// Candidate pairs first encountered globally while processing this cell.
+    pub tested_pairs: Vec<Pair>,
+    /// Exact overlaps discovered among `tested_pairs`.
+    pub overlapping_pairs: Vec<Pair>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UniformGridTrace {
+    pub result: BroadPhaseResult,
+    pub cells: Vec<UniformGridCellTrace>,
+}
+
 /// Uniform 3D grid. Bodies are inserted into every spatial-hash cell touched by
 /// their AABB; only bodies sharing a cell can become candidate pairs.
 #[derive(Clone, Copy, Debug)]
@@ -216,57 +237,150 @@ impl UniformGridBroadPhase {
     pub const fn cell_size(self) -> f32 {
         self.cell_size
     }
+
+    /// Runs the same broad phase while recording deterministic cell-by-cell
+    /// execution data for debugging, teaching, or visualization.
+    #[must_use]
+    pub fn trace(&self, bodies: &[Body]) -> UniformGridTrace {
+        let run = run_uniform_grid(self.cell_size, bodies, true);
+        UniformGridTrace {
+            result: run.result,
+            cells: run.cells.expect("traced grid run must record cells"),
+        }
+    }
 }
 
 impl BroadPhase for UniformGridBroadPhase {
     fn detect(&self, bodies: &[Body]) -> BroadPhaseResult {
-        validate_unique_ids(bodies);
-        let spatial_hash = SpatialHash3D::new(self.cell_size);
-        let mut cells: HashMap<CellCoord3, Vec<usize>> = HashMap::new();
+        run_uniform_grid(self.cell_size, bodies, false).result
+    }
+}
 
-        for (body_index, body) in bodies.iter().enumerate() {
-            let (min, max) = spatial_hash.cell_bounds(body.aabb);
-            for x in min.x..=max.x {
-                for y in min.y..=max.y {
-                    for z in min.z..=max.z {
-                        cells
-                            .entry(CellCoord3::new(x, y, z))
-                            .or_default()
-                            .push(body_index);
-                    }
+struct UniformGridRun {
+    result: BroadPhaseResult,
+    cells: Option<Vec<UniformGridCellTrace>>,
+}
+
+fn run_uniform_grid(cell_size: f32, bodies: &[Body], trace: bool) -> UniformGridRun {
+    validate_unique_ids(bodies);
+    let spatial_hash = SpatialHash3D::new(cell_size);
+    let mut cells: HashMap<CellCoord3, Vec<usize>> = HashMap::new();
+
+    for (body_index, body) in bodies.iter().enumerate() {
+        let (min, max) = spatial_hash.cell_bounds(body.aabb);
+        for x in min.x..=max.x {
+            for y in min.y..=max.y {
+                for z in min.z..=max.z {
+                    cells
+                        .entry(CellCoord3::new(x, y, z))
+                        .or_default()
+                        .push(body_index);
                 }
             }
         }
+    }
 
-        let mut tested_indices = HashSet::new();
-        let mut overlaps = BTreeSet::new();
-        let mut aabb_tests = 0_u64;
+    let mut tested_indices = HashSet::new();
+    let mut overlaps = BTreeSet::new();
+    let mut aabb_tests = 0_u64;
+    let mut trace_cells = trace.then(|| Vec::with_capacity(cells.len()));
 
-        for members in cells.values() {
-            for left in 0..members.len() {
-                for right in (left + 1)..members.len() {
-                    let a = members[left];
-                    let b = members[right];
-                    let index_pair = if a < b { (a, b) } else { (b, a) };
-                    if !tested_indices.insert(index_pair) {
-                        continue;
-                    }
-
-                    aabb_tests += 1;
-                    if bodies[a].aabb.overlaps(bodies[b].aabb) {
-                        overlaps.insert(Pair::new(bodies[a].id, bodies[b].id));
-                    }
-                }
-            }
+    if trace {
+        let mut ordered_cells: Vec<_> = cells.keys().copied().collect();
+        ordered_cells.sort_unstable();
+        for cell in ordered_cells {
+            let members = cells.get(&cell).expect("ordered cell must exist");
+            process_grid_cell(
+                cell,
+                members,
+                bodies,
+                &mut tested_indices,
+                &mut overlaps,
+                &mut aabb_tests,
+                trace_cells.as_mut(),
+            );
         }
+    } else {
+        for (&cell, members) in &cells {
+            process_grid_cell(
+                cell,
+                members,
+                bodies,
+                &mut tested_indices,
+                &mut overlaps,
+                &mut aabb_tests,
+                None,
+            );
+        }
+    }
 
-        BroadPhaseResult {
+    UniformGridRun {
+        result: BroadPhaseResult {
             pairs: overlaps.into_iter().collect(),
             stats: BroadPhaseStats {
                 aabb_tests,
                 occupied_cells: Some(cells.len()),
             },
+        },
+        cells: trace_cells,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn process_grid_cell(
+    cell: CellCoord3,
+    members: &[usize],
+    bodies: &[Body],
+    tested_indices: &mut HashSet<(usize, usize)>,
+    overlaps: &mut BTreeSet<Pair>,
+    aabb_tests: &mut u64,
+    trace_cells: Option<&mut Vec<UniformGridCellTrace>>,
+) {
+    let mut ordered_members = trace_cells.as_ref().map(|_| members.to_vec());
+    if let Some(ordered) = &mut ordered_members {
+        ordered.sort_unstable_by_key(|&index| bodies[index].id);
+    }
+    let members = ordered_members.as_deref().unwrap_or(members);
+
+    let mut candidate_pairs = trace_cells.as_ref().map(|_| Vec::new());
+    let mut tested_pairs = trace_cells.as_ref().map(|_| Vec::new());
+    let mut overlapping_pairs = trace_cells.as_ref().map(|_| Vec::new());
+
+    for left in 0..members.len() {
+        for right in (left + 1)..members.len() {
+            let a = members[left];
+            let b = members[right];
+            let pair = Pair::new(bodies[a].id, bodies[b].id);
+            if let Some(candidates) = &mut candidate_pairs {
+                candidates.push(pair);
+            }
+
+            let index_pair = if a < b { (a, b) } else { (b, a) };
+            if !tested_indices.insert(index_pair) {
+                continue;
+            }
+
+            *aabb_tests += 1;
+            if let Some(tested) = &mut tested_pairs {
+                tested.push(pair);
+            }
+            if bodies[a].aabb.overlaps(bodies[b].aabb) {
+                overlaps.insert(pair);
+                if let Some(cell_overlaps) = &mut overlapping_pairs {
+                    cell_overlaps.push(pair);
+                }
+            }
         }
+    }
+
+    if let Some(trace_cells) = trace_cells {
+        trace_cells.push(UniformGridCellTrace {
+            cell,
+            members: members.iter().map(|&index| bodies[index].id).collect(),
+            candidate_pairs: candidate_pairs.expect("traced cell must record candidates"),
+            tested_pairs: tested_pairs.expect("traced cell must record tests"),
+            overlapping_pairs: overlapping_pairs.expect("traced cell must record overlaps"),
+        });
     }
 }
 
@@ -289,6 +403,31 @@ impl Axis3 {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct SweepAndPruneStepTrace {
+    pub current: ColliderId,
+    pub interval_min: f32,
+    pub interval_max: f32,
+    /// Active colliders removed because their maximum endpoint lies before the
+    /// current minimum endpoint.
+    pub expired: Vec<ColliderId>,
+    /// Active set after expiration and before testing the current collider.
+    pub active_before_tests: Vec<ColliderId>,
+    pub tested_pairs: Vec<Pair>,
+    pub overlapping_pairs: Vec<Pair>,
+    /// Active set after adding the current collider.
+    pub active_after: Vec<ColliderId>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct SweepAndPruneTrace {
+    pub axis: Axis3,
+    /// Collider IDs in sweep order.
+    pub order: Vec<ColliderId>,
+    pub result: BroadPhaseResult,
+    pub steps: Vec<SweepAndPruneStepTrace>,
+}
+
 /// Sort-and-sweep broad phase over one axis. Bodies enter the active set when
 /// their minimum endpoint is reached and leave after their maximum endpoint.
 #[derive(Clone, Copy, Debug, Default)]
@@ -306,44 +445,110 @@ impl SweepAndPruneBroadPhase {
     pub const fn axis(self) -> Axis3 {
         self.axis
     }
+
+    /// Runs the same sweep while recording active-set evolution and exact tests.
+    #[must_use]
+    pub fn trace(&self, bodies: &[Body]) -> SweepAndPruneTrace {
+        let run = run_sweep_and_prune(self.axis, bodies, true);
+        SweepAndPruneTrace {
+            axis: self.axis,
+            order: run.order.expect("traced sweep must record order"),
+            result: run.result,
+            steps: run.steps.expect("traced sweep must record steps"),
+        }
+    }
 }
 
 impl BroadPhase for SweepAndPruneBroadPhase {
     fn detect(&self, bodies: &[Body]) -> BroadPhaseResult {
-        validate_unique_ids(bodies);
-        let axis = self.axis.index();
-        let mut order: Vec<usize> = (0..bodies.len()).collect();
-        order.sort_unstable_by(|&left, &right| {
-            bodies[left].aabb.min[axis]
-                .total_cmp(&bodies[right].aabb.min[axis])
-                .then_with(|| bodies[left].aabb.max[axis].total_cmp(&bodies[right].aabb.max[axis]))
-                .then_with(|| bodies[left].id.cmp(&bodies[right].id))
-        });
+        run_sweep_and_prune(self.axis, bodies, false).result
+    }
+}
 
-        let mut active: Vec<usize> = Vec::new();
-        let mut pairs = Vec::new();
-        let mut aabb_tests = 0_u64;
+struct SweepAndPruneRun {
+    result: BroadPhaseResult,
+    order: Option<Vec<ColliderId>>,
+    steps: Option<Vec<SweepAndPruneStepTrace>>,
+}
 
-        for current in order {
-            let current_min = bodies[current].aabb.min[axis];
-            active.retain(|&other| bodies[other].aabb.max[axis] >= current_min);
-            for &other in &active {
-                aabb_tests += 1;
-                if bodies[current].aabb.overlaps(bodies[other].aabb) {
-                    pairs.push(Pair::new(bodies[current].id, bodies[other].id));
+fn run_sweep_and_prune(axis: Axis3, bodies: &[Body], trace: bool) -> SweepAndPruneRun {
+    validate_unique_ids(bodies);
+    let axis_index = axis.index();
+    let mut order: Vec<usize> = (0..bodies.len()).collect();
+    order.sort_unstable_by(|&left, &right| {
+        bodies[left].aabb.min[axis_index]
+            .total_cmp(&bodies[right].aabb.min[axis_index])
+            .then_with(|| {
+                bodies[left].aabb.max[axis_index].total_cmp(&bodies[right].aabb.max[axis_index])
+            })
+            .then_with(|| bodies[left].id.cmp(&bodies[right].id))
+    });
+
+    let traced_order = trace.then(|| order.iter().map(|&index| bodies[index].id).collect());
+    let mut steps = trace.then(|| Vec::with_capacity(order.len()));
+    let mut active: Vec<usize> = Vec::new();
+    let mut pairs = Vec::new();
+    let mut aabb_tests = 0_u64;
+
+    for current in order {
+        let current_min = bodies[current].aabb.min[axis_index];
+        let mut expired = trace.then(Vec::new);
+        active.retain(|&other| {
+            let keep = bodies[other].aabb.max[axis_index] >= current_min;
+            if !keep {
+                if let Some(expired) = &mut expired {
+                    expired.push(bodies[other].id);
                 }
             }
-            active.push(current);
-        }
+            keep
+        });
 
-        pairs.sort_unstable();
-        BroadPhaseResult {
+        let active_before_tests = trace.then(|| active.iter().map(|&index| bodies[index].id).collect());
+        let mut tested_pairs = trace.then(Vec::new);
+        let mut overlapping_pairs = trace.then(Vec::new);
+
+        for &other in &active {
+            let pair = Pair::new(bodies[current].id, bodies[other].id);
+            aabb_tests += 1;
+            if let Some(tested) = &mut tested_pairs {
+                tested.push(pair);
+            }
+            if bodies[current].aabb.overlaps(bodies[other].aabb) {
+                pairs.push(pair);
+                if let Some(overlapping) = &mut overlapping_pairs {
+                    overlapping.push(pair);
+                }
+            }
+        }
+        active.push(current);
+
+        if let Some(steps) = &mut steps {
+            steps.push(SweepAndPruneStepTrace {
+                current: bodies[current].id,
+                interval_min: current_min,
+                interval_max: bodies[current].aabb.max[axis_index],
+                expired: expired.expect("traced sweep step must record expirations"),
+                active_before_tests: active_before_tests
+                    .expect("traced sweep step must record active set"),
+                tested_pairs: tested_pairs.expect("traced sweep step must record tests"),
+                overlapping_pairs: overlapping_pairs
+                    .expect("traced sweep step must record overlaps"),
+                active_after: active.iter().map(|&index| bodies[index].id).collect(),
+            });
+        }
+    }
+
+    pairs.sort_unstable();
+    SweepAndPruneRun {
+        result: BroadPhaseResult {
             pairs,
             stats: BroadPhaseStats {
                 aabb_tests,
                 occupied_cells: None,
             },
-        }
+        },
+        order: traced_order,
+        steps,
     }
 }
 
@@ -421,6 +626,34 @@ mod tests {
     }
 
     #[test]
+    fn grid_trace_matches_detect_and_accounts_for_tests() {
+        let bodies = fixture();
+        let grid = UniformGridBroadPhase::new(1.0);
+        let trace = grid.trace(&bodies);
+        assert_eq!(trace.result, grid.detect(&bodies));
+        assert!(trace.cells.windows(2).all(|cells| cells[0].cell < cells[1].cell));
+
+        let tested: Vec<_> = trace
+            .cells
+            .iter()
+            .flat_map(|cell| cell.tested_pairs.iter().copied())
+            .collect();
+        let tested_set: BTreeSet<_> = tested.iter().copied().collect();
+        assert_eq!(tested.len(), tested_set.len());
+        assert_eq!(tested.len() as u64, trace.result.stats.aabb_tests);
+
+        let overlap_set: BTreeSet<_> = trace
+            .cells
+            .iter()
+            .flat_map(|cell| cell.overlapping_pairs.iter().copied())
+            .collect();
+        assert_eq!(
+            overlap_set.into_iter().collect::<Vec<_>>(),
+            trace.result.pairs
+        );
+    }
+
+    #[test]
     fn sparse_grid_avoids_most_pair_tests() {
         let bodies: Vec<_> = (0..100)
             .map(|id| body(id, [id as f32 * 10.0, 0.0, 0.0], 0.25))
@@ -446,6 +679,36 @@ mod tests {
     }
 
     #[test]
+    fn sweep_trace_matches_detect_and_accounts_for_tests() {
+        let bodies = fixture();
+        let sweep = SweepAndPruneBroadPhase::new(Axis3::X);
+        let trace = sweep.trace(&bodies);
+        assert_eq!(trace.result, sweep.detect(&bodies));
+        assert_eq!(trace.order.len(), bodies.len());
+        assert_eq!(trace.steps.len(), bodies.len());
+        assert_eq!(
+            trace
+                .steps
+                .iter()
+                .map(|step| step.tested_pairs.len() as u64)
+                .sum::<u64>(),
+            trace.result.stats.aabb_tests
+        );
+        let overlap_set: BTreeSet<_> = trace
+            .steps
+            .iter()
+            .flat_map(|step| step.overlapping_pairs.iter().copied())
+            .collect();
+        assert_eq!(
+            overlap_set.into_iter().collect::<Vec<_>>(),
+            trace.result.pairs
+        );
+        for step in &trace.steps {
+            assert_eq!(step.active_after.last(), Some(&step.current));
+        }
+    }
+
+    #[test]
     fn sweep_and_prune_output_is_independent_of_input_order() {
         let bodies = fixture();
         let expected = SweepAndPruneBroadPhase::default().detect(&bodies).pairs;
@@ -455,6 +718,15 @@ mod tests {
             SweepAndPruneBroadPhase::default().detect(&reversed).pairs,
             expected
         );
+    }
+
+    #[test]
+    fn sweep_trace_is_independent_of_input_order() {
+        let bodies = fixture();
+        let expected = SweepAndPruneBroadPhase::default().trace(&bodies);
+        let mut reversed = bodies.clone();
+        reversed.reverse();
+        assert_eq!(SweepAndPruneBroadPhase::default().trace(&reversed), expected);
     }
 
     #[test]
