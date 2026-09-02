@@ -3,6 +3,7 @@ members = [
     "crates/bvh-kernels",
     "crates/bvh-trace-kernels",
     "crates/collection-kernels",
+    "crates/geometry-kernels",
     "crates/graph-kernels",
     "crates/octree-kernels",
     "crates/search-kernels",
