@@ -109,7 +109,22 @@ impl<T> RingBuffer<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::VecDeque;
+
     use super::RingBuffer;
+
+    fn assert_matches_model(buffer: &RingBuffer<usize>, model: &VecDeque<usize>, capacity: usize) {
+        assert_eq!(buffer.capacity(), capacity);
+        assert_eq!(buffer.len(), model.len());
+        assert_eq!(buffer.is_empty(), model.is_empty());
+        assert_eq!(buffer.is_full(), model.len() == capacity);
+        assert_eq!(buffer.front(), model.front());
+        assert_eq!(buffer.back(), model.back());
+        assert_eq!(
+            buffer.iter().copied().collect::<Vec<_>>(),
+            model.iter().copied().collect::<Vec<_>>()
+        );
+    }
 
     #[test]
     fn preserves_fifo_order_across_wraparound() {
@@ -137,6 +152,40 @@ mod tests {
         assert!(buffer.is_full());
         assert_eq!(buffer.push("c"), Err("c"));
         assert_eq!(buffer.iter().copied().collect::<Vec<_>>(), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn exhaustive_short_sequences_match_vec_deque_model() {
+        for capacity in 0_usize..=4 {
+            for case in 0_usize..3_usize.pow(7) {
+                let mut encoded = case;
+                let mut buffer = RingBuffer::new(capacity);
+                let mut model = VecDeque::new();
+
+                for step in 0_usize..7 {
+                    match encoded % 3 {
+                        0 => assert_eq!(buffer.pop(), model.pop_front()),
+                        1 => {
+                            let value = case * 8 + step;
+                            let expected = if model.len() == capacity {
+                                Err(value)
+                            } else {
+                                model.push_back(value);
+                                Ok(())
+                            };
+                            assert_eq!(buffer.push(value), expected);
+                        }
+                        2 => {
+                            buffer.clear();
+                            model.clear();
+                        }
+                        _ => unreachable!(),
+                    }
+                    encoded /= 3;
+                    assert_matches_model(&buffer, &model, capacity);
+                }
+            }
+        }
     }
 
     #[test]
