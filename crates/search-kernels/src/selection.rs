@@ -120,6 +120,34 @@ mod tests {
     }
 
     #[test]
+    fn quickselect_matches_sort_for_all_small_ternary_inputs() {
+        for len in 1_usize..=6 {
+            let cases = 3_usize.pow(len as u32);
+
+            for case in 0..cases {
+                let mut encoded = case;
+                let mut input = Vec::with_capacity(len);
+                for _ in 0..len {
+                    input.push((encoded % 3) as i8 - 1);
+                    encoded /= 3;
+                }
+
+                let mut sorted = input.clone();
+                sorted.sort_unstable();
+
+                for nth in 0..len {
+                    let mut candidate = input.clone();
+                    assert_eq!(
+                        quickselect(&mut candidate, nth),
+                        Some(&sorted[nth]),
+                        "len={len}, case={case}, nth={nth}, input={input:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn quickselect_handles_duplicate_only_input_without_special_cases() {
         let mut values = [4; 32];
         assert_eq!(quickselect(&mut values, 17), Some(&4));
@@ -129,6 +157,9 @@ mod tests {
     fn quickselect_returns_none_for_an_out_of_range_index() {
         let mut values = [1, 2, 3];
         assert_eq!(quickselect(&mut values, 3), None);
+
+        let mut empty: [i32; 0] = [];
+        assert_eq!(quickselect(&mut empty, 0), None);
     }
 
     #[test]
