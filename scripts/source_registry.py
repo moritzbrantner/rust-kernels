@@ -15,7 +15,7 @@ from typing import Iterable
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = ROOT / "registry.json"
 LOCK_FILE_NAME = ".rust-kernels.lock.json"
-LOCK_SCHEMA = "./provenance.schema.json"
+LOCK_SCHEMA = "https://raw.githubusercontent.com/moritzbrantner/rust-kernels/main/provenance.schema.json"
 REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 
 

@@ -38,13 +38,13 @@ The registry does not contain its own current commit SHA. Doing so would make ev
 
 ## Consumer lock format
 
-The normative schema is [`provenance.schema.json`](../provenance.schema.json). A consumer should commit `.rust-kernels.lock.json` alongside the copied source.
+The normative schema lives in this repository as [`provenance.schema.json`](../provenance.schema.json) and is published at `https://raw.githubusercontent.com/moritzbrantner/rust-kernels/main/provenance.schema.json`. Consumer locks use that published URI, so validation does not depend on copying a schema file into every consumer repository.
 
-A lock entry is per registry item, not global, so different items may advance independently:
+A consumer should commit `.rust-kernels.lock.json` alongside the copied source. A lock entry is per registry item, not global, so different items may advance independently:
 
 ```json
 {
-  "$schema": "./provenance.schema.json",
+  "$schema": "https://raw.githubusercontent.com/moritzbrantner/rust-kernels/main/provenance.schema.json",
   "version": 1,
   "registry": {
     "name": "rust-kernels",
@@ -121,7 +121,7 @@ This behavior is intentionally conservative. Re-install is not an update mechani
 
 ## Safe update protocol
 
-A future updater can use the provenance contract without hidden state. For each locked file it has three inputs:
+An updater can use the provenance contract without hidden state. For each locked file it has three inputs:
 
 - **base**: source at the recorded `revision`;
 - **ours**: the current consumer target;
@@ -135,7 +135,7 @@ That enables deterministic update behavior:
 4. Run the consumer's tests and benchmarks.
 5. Update the lock only after the new upstream base has been accepted.
 
-The lock should continue to describe the original upstream base while local changes exist. Do not rewrite `sourceSha256` to the consumer's modified hash; doing that would destroy the information required for a future three-way merge.
+The lock should continue to describe the original upstream base while unresolved local/upstream conflicts exist. Do not rewrite `sourceSha256` to the consumer's modified hash; doing that would destroy the information required for a future three-way merge.
 
 ## Relationship to application experimentation
 

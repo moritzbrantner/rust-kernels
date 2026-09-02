@@ -8,7 +8,7 @@
     "revisionType": "git-commit"
   },
   "provenance": {
-    "schema": "./provenance.schema.json",
+    "schema": "https://raw.githubusercontent.com/moritzbrantner/rust-kernels/main/provenance.schema.json",
     "lockFile": ".rust-kernels.lock.json"
   },
   "items": [

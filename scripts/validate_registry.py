@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = ROOT / "registry.json"
 SCHEMA_PATH = ROOT / "registry.schema.json"
 PROVENANCE_SCHEMA_PATH = ROOT / "provenance.schema.json"
+PROVENANCE_SCHEMA_URI = "https://raw.githubusercontent.com/moritzbrantner/rust-kernels/main/provenance.schema.json"
 ALLOWED_ITEM_TYPES = {
     "registry:crate",
     "registry:algorithm",
@@ -47,7 +48,7 @@ def require_relative_path(value: object, context: str) -> PurePosixPath:
 
 registry = load_json(REGISTRY_PATH)
 load_json(SCHEMA_PATH)
-load_json(PROVENANCE_SCHEMA_PATH)
+provenance_schema = load_json(PROVENANCE_SCHEMA_PATH)
 
 if registry.get("$schema") != "./registry.schema.json":
     fail("$schema must point to ./registry.schema.json")
@@ -66,10 +67,12 @@ if source.get("revisionType") != "git-commit":
 provenance = registry.get("provenance")
 if not isinstance(provenance, dict):
     fail("provenance must be an object")
-if provenance.get("schema") != "./provenance.schema.json":
-    fail("provenance.schema must point to ./provenance.schema.json")
+if provenance.get("schema") != PROVENANCE_SCHEMA_URI:
+    fail("provenance.schema must point to the published provenance schema")
 if provenance.get("lockFile") != ".rust-kernels.lock.json":
     fail("provenance.lockFile must be .rust-kernels.lock.json")
+if provenance_schema.get("$id") != PROVENANCE_SCHEMA_URI:
+    fail("provenance.schema.json $id must match the published provenance schema URI")
 
 items = registry.get("items")
 if not isinstance(items, list) or not items:
