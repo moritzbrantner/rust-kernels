@@ -32,12 +32,27 @@ SAT, GJK/EPA, sweep-and-prune, dynamic AABB trees, rays, and CCD remain future k
 - `UnionFind`, using path compression and union by size with deterministic tie-breaking and connectivity checks against a traversal oracle
 - `RingBuffer`, a fixed-capacity FIFO buffer that does not reallocate after construction
 - `SparseSet`, the sparse/dense integer-key set primitive commonly used for fast membership and ECS-style storage
+- `BitSet`, a packed fixed-universe set with efficient set-bit iteration
 
 The collection kernels deliberately stop before lock-free queues, generational arenas, or a full ECS framework.
 
-### Graph search
+### Graph algorithms
 
-`graph-kernels` currently contains Dijkstra and A* search. Callers retain their own graph representation and provide neighbor callbacks. A* is tested against Dijkstra as the minimum-cost oracle.
+`graph-kernels` keeps graph storage caller-owned through neighbor callbacks and currently contains:
+
+- Dijkstra and A* minimum-cost path search, with A* checked against Dijkstra
+- breadth-first and depth-first traversal with deterministic neighbor-order semantics
+- topological sort with cycle detection
+- Tarjan strongly connected components with deterministic normalized output
+
+### Search and selection
+
+`search-kernels` contains:
+
+- `quickselect`, an in-place deterministic three-way selection algorithm
+- `top_k_smallest`, which combines selection with sorting only the requested result set
+
+Selection results are checked against fully sorted reference outputs.
 
 ## Registry
 

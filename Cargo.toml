@@ -3,6 +3,7 @@ members = [
     "crates/bvh-kernels",
     "crates/collection-kernels",
     "crates/graph-kernels",
+    "crates/search-kernels",
     "crates/spatial-kernels",
 ]
 resolver = "2"
