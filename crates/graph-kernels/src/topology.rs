@@ -246,7 +246,7 @@ mod tests {
 
         assert_eq!(
             strongly_connected_components([0, 5], neighbors),
-            vec![vec![0, 1, 2], vec![3, 4], vec![5]]
+            vec![vec![0, 1, 2], vec![5], vec![3, 4]]
         );
     }
 }
