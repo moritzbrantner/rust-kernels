@@ -12,6 +12,7 @@ The repository starts with spatial/collision kernels and expands into small gene
 
 - `Aabb` and stable `ColliderId`/`Pair` primitives
 - `SpatialHash3D` and `CellCoord3` for deterministic world-to-cell mapping and stable compact cell hashes
+- 2D and 3D Morton/Z-order encode/decode kernels for compact integer spatial keys
 - `NaiveBroadPhase`, an intentionally O(n²) correctness oracle
 - `UniformGridBroadPhase`, a sparse 3D grid built on the same public spatial-hash cell mapping
 - deterministic sorted pair output and instrumentation for AABB-test counts
@@ -33,17 +34,19 @@ SAT, GJK/EPA, sweep-and-prune, dynamic AABB trees, rays, and CCD remain future k
 - `RingBuffer`, a fixed-capacity FIFO buffer that does not reallocate after construction
 - `SparseSet`, the sparse/dense integer-key set primitive commonly used for fast membership and ECS-style storage
 - `BitSet`, a packed fixed-universe set with efficient set-bit iteration
+- `GenerationalArena`, O(1) slot storage with stale-handle rejection and deterministic live-entry iteration
 
-The collection kernels deliberately stop before lock-free queues, generational arenas, or a full ECS framework.
+The collection kernels deliberately stop before lock-free queues or a full ECS framework.
 
 ### Graph algorithms
 
-`graph-kernels` keeps graph storage caller-owned through neighbor callbacks and currently contains:
+`graph-kernels` keeps graph storage caller-owned through neighbor callbacks or explicit edge lists and currently contains:
 
 - Dijkstra and A* minimum-cost path search, with A* checked against Dijkstra
 - breadth-first and depth-first traversal with deterministic neighbor-order semantics
 - topological sort with cycle detection
 - Tarjan strongly connected components with deterministic normalized output
+- Kruskal minimum spanning forests, reusing `UnionFind` for connectivity
 
 ### Search and selection
 
@@ -51,8 +54,9 @@ The collection kernels deliberately stop before lock-free queues, generational a
 
 - `quickselect`, an in-place deterministic three-way selection algorithm
 - `top_k_smallest`, which combines selection with sorting only the requested result set
+- `BloomFilter`, deterministic probabilistic membership over byte-oriented keys using the shared `BitSet` primitive
 
-Selection results are checked against fully sorted reference outputs.
+Selection results are checked against fully sorted reference outputs. Bloom-filter tests enforce the no-false-negative contract while keeping false-positive behavior explicit.
 
 ## Registry
 

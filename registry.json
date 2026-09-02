@@ -8,7 +8,7 @@
       "name": "spatial-kernels",
       "type": "registry:crate",
       "title": "Spatial Kernels",
-      "description": "Deterministic spatial primitives, spatial hashing, and collision broad-phase algorithms.",
+      "description": "Deterministic spatial primitives, spatial hashing, Morton encoding, and collision broad-phase algorithms.",
       "crate": {
         "package": "spatial-kernels",
         "manifest": "crates/spatial-kernels/Cargo.toml"
@@ -17,7 +17,9 @@
         "spatial",
         "collision",
         "broad-phase",
-        "spatial-hash"
+        "spatial-hash",
+        "morton",
+        "z-order"
       ],
       "dependencies": [],
       "registryDependencies": [],
@@ -29,6 +31,10 @@
         {
           "path": "crates/spatial-kernels/src/lib.rs",
           "target": "crates/spatial-kernels/src/lib.rs"
+        },
+        {
+          "path": "crates/spatial-kernels/src/morton.rs",
+          "target": "crates/spatial-kernels/src/morton.rs"
         },
         {
           "path": "crates/spatial-kernels/src/spatial_hash.rs",
@@ -58,6 +64,24 @@
           "symbols": [
             "CellCoord3",
             "SpatialHash3D"
+          ]
+        },
+        {
+          "name": "morton-2d",
+          "type": "algorithm",
+          "symbols": [
+            "morton2_encode",
+            "morton2_decode"
+          ]
+        },
+        {
+          "name": "morton-3d",
+          "type": "algorithm",
+          "symbols": [
+            "morton3_encode",
+            "morton3_decode",
+            "MORTON_3D_BITS_PER_AXIS",
+            "MORTON_3D_MAX_COORD"
           ]
         },
         {
@@ -100,7 +124,9 @@
         "data-structures",
         "streaming",
         "ecs-primitives",
-        "bitset"
+        "bitset",
+        "arena",
+        "generational-handles"
       ],
       "dependencies": [],
       "registryDependencies": [],
@@ -116,6 +142,10 @@
         {
           "path": "crates/collection-kernels/src/bit_set.rs",
           "target": "crates/collection-kernels/src/bit_set.rs"
+        },
+        {
+          "path": "crates/collection-kernels/src/generational_arena.rs",
+          "target": "crates/collection-kernels/src/generational_arena.rs"
         },
         {
           "path": "crates/collection-kernels/src/ring_buffer.rs",
@@ -159,6 +189,14 @@
             "BitSet",
             "BitSetIter"
           ]
+        },
+        {
+          "name": "generational-arena",
+          "type": "data-structure",
+          "symbols": [
+            "ArenaKey",
+            "GenerationalArena"
+          ]
         }
       ]
     },
@@ -166,7 +204,7 @@
       "name": "graph-kernels",
       "type": "registry:crate",
       "title": "Graph Kernels",
-      "description": "Graph algorithms that accept caller-owned graph storage through callbacks.",
+      "description": "Graph algorithms that accept caller-owned graph storage through callbacks or edge lists.",
       "crate": {
         "package": "graph-kernels",
         "manifest": "crates/graph-kernels/Cargo.toml"
@@ -176,10 +214,14 @@
         "pathfinding",
         "search",
         "traversal",
-        "topology"
+        "topology",
+        "minimum-spanning-tree",
+        "kruskal"
       ],
       "dependencies": [],
-      "registryDependencies": [],
+      "registryDependencies": [
+        "collection-kernels"
+      ],
       "files": [
         {
           "path": "crates/graph-kernels/Cargo.toml",
@@ -188,6 +230,10 @@
         {
           "path": "crates/graph-kernels/src/lib.rs",
           "target": "crates/graph-kernels/src/lib.rs"
+        },
+        {
+          "path": "crates/graph-kernels/src/minimum_spanning.rs",
+          "target": "crates/graph-kernels/src/minimum_spanning.rs"
         },
         {
           "path": "crates/graph-kernels/src/search.rs",
@@ -247,6 +293,15 @@
           "symbols": [
             "strongly_connected_components"
           ]
+        },
+        {
+          "name": "kruskal-minimum-spanning-forest",
+          "type": "algorithm",
+          "symbols": [
+            "kruskal_minimum_spanning_forest",
+            "WeightedEdge",
+            "SpanningForest"
+          ]
         }
       ]
     },
@@ -254,7 +309,7 @@
       "name": "search-kernels",
       "type": "registry:crate",
       "title": "Search and Selection Kernels",
-      "description": "In-place selection and top-k algorithms for ordered data.",
+      "description": "Selection, top-k, and probabilistic membership algorithms.",
       "crate": {
         "package": "search-kernels",
         "manifest": "crates/search-kernels/Cargo.toml"
@@ -263,10 +318,14 @@
         "search",
         "selection",
         "quickselect",
-        "top-k"
+        "top-k",
+        "probabilistic",
+        "bloom-filter"
       ],
       "dependencies": [],
-      "registryDependencies": [],
+      "registryDependencies": [
+        "collection-kernels"
+      ],
       "files": [
         {
           "path": "crates/search-kernels/Cargo.toml",
@@ -275,6 +334,10 @@
         {
           "path": "crates/search-kernels/src/lib.rs",
           "target": "crates/search-kernels/src/lib.rs"
+        },
+        {
+          "path": "crates/search-kernels/src/bloom_filter.rs",
+          "target": "crates/search-kernels/src/bloom_filter.rs"
         },
         {
           "path": "crates/search-kernels/src/selection.rs",
@@ -294,6 +357,13 @@
           "type": "algorithm",
           "symbols": [
             "top_k_smallest"
+          ]
+        },
+        {
+          "name": "bloom-filter",
+          "type": "data-structure",
+          "symbols": [
+            "BloomFilter"
           ]
         }
       ]

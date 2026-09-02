@@ -1,12 +1,18 @@
 //! Reusable spatial kernels with deterministic outputs.
 //!
 //! The representation stays small: axis-aligned bounding boxes, spatial cell
-//! hashing, a brute-force reference broad phase, and a uniform-grid broad phase.
+//! hashing, integer spatial keys, a brute-force reference broad phase, and a
+//! uniform-grid broad phase.
 
+mod morton;
 mod spatial_hash;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+pub use morton::{
+    MORTON_3D_BITS_PER_AXIS, MORTON_3D_MAX_COORD, morton2_decode, morton2_encode, morton3_decode,
+    morton3_encode,
+};
 pub use spatial_hash::{CellCoord3, SpatialHash3D};
 
 pub type ColliderId = u32;
