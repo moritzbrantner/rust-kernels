@@ -151,12 +151,7 @@ mod tests {
         }
     }
 
-    fn oracle_connected(
-        len: usize,
-        edges: &[(usize, usize)],
-        start: usize,
-        goal: usize,
-    ) -> bool {
+    fn oracle_connected(len: usize, edges: &[(usize, usize)], start: usize, goal: usize) -> bool {
         let mut seen = vec![false; len];
         let mut stack = vec![start];
         seen[start] = true;
@@ -175,11 +170,12 @@ mod tests {
                     None
                 };
 
-                if let Some(neighbor) = neighbor {
-                    if !seen[neighbor] {
+                match neighbor {
+                    Some(neighbor) if !seen[neighbor] => {
                         seen[neighbor] = true;
                         stack.push(neighbor);
                     }
+                    _ => {}
                 }
             }
         }
