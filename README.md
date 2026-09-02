@@ -62,12 +62,17 @@ Selection results are checked against fully sorted reference outputs. Bloom-filt
 
 `registry.json` is a shadcn-inspired machine-readable catalog for an additional source-level integration path. It does not imply a `rust-kernels` CLI and does not replace normal Cargo dependencies.
 
-Each registry item describes its crate/source files, registry dependencies, tags, and the algorithms or data structures it provides. Agents or external tooling can use that metadata to discover and vendor a kernel while Cargo consumers can continue depending on the workspace crates normally.
+Each registry item describes its crate/source files, registry dependencies, tags, and the algorithms or data structures it provides. Agents or external tooling can use that metadata to discover and copy a kernel while Cargo consumers can continue depending on the workspace crates normally.
+
+Copied source has an explicit provenance contract. A consumer records the exact upstream Git revision and SHA-256 hashes in `.rust-kernels.lock.json`, using [`provenance.schema.json`](provenance.schema.json). Local modification after copying is supported: the lock preserves the upstream base so tooling can classify files as clean, modified, or missing and later perform a safe three-way update.
+
+See [`docs/provenance.md`](docs/provenance.md) for the contract and update semantics. `scripts/source_registry.py` is an optional standard-library reference helper for exercising the contract; the JSON registry and schemas remain the integration surface.
 
 ## Development
 
 ```bash
 python3 scripts/validate_registry.py
+python3 scripts/test_source_registry.py
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features

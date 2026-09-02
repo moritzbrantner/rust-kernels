@@ -6,6 +6,7 @@ from pathlib import Path, PurePosixPath
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = ROOT / "registry.json"
 SCHEMA_PATH = ROOT / "registry.schema.json"
+PROVENANCE_SCHEMA_PATH = ROOT / "provenance.schema.json"
 ALLOWED_ITEM_TYPES = {
     "registry:crate",
     "registry:algorithm",
@@ -46,13 +47,29 @@ def require_relative_path(value: object, context: str) -> PurePosixPath:
 
 registry = load_json(REGISTRY_PATH)
 load_json(SCHEMA_PATH)
+load_json(PROVENANCE_SCHEMA_PATH)
 
 if registry.get("$schema") != "./registry.schema.json":
     fail("$schema must point to ./registry.schema.json")
 if registry.get("name") != "rust-kernels":
     fail("name must be rust-kernels")
-if registry.get("version") != 1:
-    fail("version must be 1")
+if registry.get("version") != 2:
+    fail("version must be 2")
+
+source = registry.get("source")
+if not isinstance(source, dict):
+    fail("source must be an object")
+require_string(source.get("repository"), "source.repository")
+if source.get("revisionType") != "git-commit":
+    fail("source.revisionType must be git-commit")
+
+provenance = registry.get("provenance")
+if not isinstance(provenance, dict):
+    fail("provenance must be an object")
+if provenance.get("schema") != "./provenance.schema.json":
+    fail("provenance.schema must point to ./provenance.schema.json")
+if provenance.get("lockFile") != ".rust-kernels.lock.json":
+    fail("provenance.lockFile must be .rust-kernels.lock.json")
 
 items = registry.get("items")
 if not isinstance(items, list) or not items:
@@ -83,24 +100,34 @@ for index, item in enumerate(items):
         fail(f"{context}.files must be a non-empty array")
 
     source_paths: set[PurePosixPath] = set()
+    target_paths: set[PurePosixPath] = set()
     for file_index, file_entry in enumerate(files):
         file_context = f"{context}.files[{file_index}]"
         if not isinstance(file_entry, dict):
             fail(f"{file_context} must be an object")
-        source = require_relative_path(file_entry.get("path"), f"{file_context}.path")
-        require_relative_path(file_entry.get("target"), f"{file_context}.target")
-        if source in source_paths:
-            fail(f"{context} lists source file {source} more than once")
-        source_paths.add(source)
-        if not (ROOT / source).is_file():
-            fail(f"{context} references missing source file {source}")
+        source_path = require_relative_path(
+            file_entry.get("path"), f"{file_context}.path"
+        )
+        target_path = require_relative_path(
+            file_entry.get("target"), f"{file_context}.target"
+        )
+        if source_path in source_paths:
+            fail(f"{context} lists source file {source_path} more than once")
+        if target_path in target_paths:
+            fail(f"{context} maps target file {target_path} more than once")
+        source_paths.add(source_path)
+        target_paths.add(target_path)
+        if not (ROOT / source_path).is_file():
+            fail(f"{context} references missing source file {source_path}")
 
     crate = item.get("crate")
     if crate is not None:
         if not isinstance(crate, dict):
             fail(f"{context}.crate must be an object")
         require_string(crate.get("package"), f"{context}.crate.package")
-        manifest = require_relative_path(crate.get("manifest"), f"{context}.crate.manifest")
+        manifest = require_relative_path(
+            crate.get("manifest"), f"{context}.crate.manifest"
+        )
         if manifest not in source_paths:
             fail(f"{context}.crate.manifest must also be listed in files")
 
@@ -109,6 +136,8 @@ for index, item in enumerate(items):
         isinstance(dependency, str) and dependency for dependency in dependencies
     ):
         fail(f"{context}.registryDependencies must be an array of non-empty strings")
+    if len(dependencies) != len(set(dependencies)):
+        fail(f"{context}.registryDependencies contains duplicates")
     registry_dependencies[name] = set(dependencies)
 
     provided = item.get("provides", [])
@@ -138,5 +167,7 @@ for item_name, dependencies in registry_dependencies.items():
     missing = dependencies - item_names
     if missing:
         fail(f"{item_name!r} has unknown registry dependencies: {sorted(missing)}")
+    if item_name in dependencies:
+        fail(f"{item_name!r} cannot depend on itself")
 
 print(f"registry ok: {len(items)} item(s)")
