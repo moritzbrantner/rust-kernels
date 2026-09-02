@@ -128,10 +128,7 @@ mod tests {
         WeightedEdge::new(a, b, weight)
     }
 
-    fn prim_forest_oracle(
-        vertex_count: usize,
-        edges: &[WeightedEdge<u8>],
-    ) -> (u128, usize) {
+    fn prim_forest_oracle(vertex_count: usize, edges: &[WeightedEdge<u8>]) -> (u128, usize) {
         let mut visited = vec![false; vertex_count];
         let mut total_weight = 0_u128;
         let mut component_count = 0_usize;
@@ -270,7 +267,11 @@ mod tests {
                 expected,
                 "case={case}"
             );
-            assert_eq!(actual.edges.len(), 4 - actual.component_count, "case={case}");
+            assert_eq!(
+                actual.edges.len(),
+                4 - actual.component_count,
+                "case={case}"
+            );
         }
     }
 }
