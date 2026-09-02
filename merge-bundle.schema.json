@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "rust-kernels source merge bundle",
+  "description": "Deterministic base/ours/theirs evidence for resolving copied-source update conflicts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "version",
+    "registry",
+    "candidateRevision",
+    "candidateRegistrySha256",
+    "conflicts"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "pattern": "^https://raw\\.githubusercontent\\.com/moritzbrantner/rust-kernels/[0-9a-f]{40}/merge-bundle\\.schema\\.json$"
+    },
+    "version": {
+      "const": 1
+    },
+    "registry": {
+      "$ref": "#/$defs/registry"
+    },
+    "candidateRevision": {
+      "$ref": "#/$defs/revision"
+    },
+    "candidateRegistrySha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "conflicts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/conflict"
+      }
+    }
+  },
+  "$defs": {
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "repository"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item",
+        "source",
+        "target",
+        "baseRevision",
+        "baseSha256",
+        "oursSha256",
+        "theirsSha256",
+        "artifacts"
+      ],
+      "properties": {
+        "item": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "source": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "target": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "baseRevision": {
+          "$ref": "#/$defs/revision"
+        },
+        "baseSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "oursSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "theirsSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "artifacts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "base",
+            "ours",
+            "theirs"
+          ],
+          "properties": {
+            "base": {
+              "$ref": "#/$defs/relativePath"
+            },
+            "ours": {
+              "$ref": "#/$defs/relativePath"
+            },
+            "theirs": {
+              "$ref": "#/$defs/relativePath"
+            }
+          }
+        }
+      }
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "(^/|(^|/)\\.\\.(/|$))"
+      }
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

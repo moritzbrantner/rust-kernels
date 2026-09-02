@@ -87,9 +87,19 @@ python3 scripts/source_update.py plan --root ../consumer
 
 # Apply only a plan that is entirely safe; conflicts are never overwritten.
 python3 scripts/source_update.py apply --root ../consumer
+
+# Materialize exact base / ours / theirs evidence for real conflicts.
+python3 scripts/source_resolution.py export \
+  --root ../consumer \
+  --out ../consumer/.rust-kernels-merge
+
+# After resolving and testing a conflict, explicitly advance its provenance.
+python3 scripts/source_resolution.py accept search-kernels \
+  --root ../consumer \
+  --bundle ../consumer/.rust-kernels-merge/merge-bundle.json
 ```
 
-See [`docs/provenance.md`](docs/provenance.md) for the lock contract, update states, and conflict semantics. The JSON registry and schemas remain the actual integration surface; agents and other tooling can implement the same protocol directly.
+See [`docs/provenance.md`](docs/provenance.md) for the lock and update contract and [`docs/source-resolution.md`](docs/source-resolution.md) for the human/coding-agent conflict handoff. The JSON registry and schemas remain the actual integration surface; agents and other tooling can implement the same protocol directly.
 
 ## Development
 
@@ -97,6 +107,7 @@ See [`docs/provenance.md`](docs/provenance.md) for the lock contract, update sta
 python3 scripts/validate_registry.py
 python3 scripts/test_source_registry.py
 python3 scripts/test_source_update.py
+python3 scripts/test_source_resolution.py
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
