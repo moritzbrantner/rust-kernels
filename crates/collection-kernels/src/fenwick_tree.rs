@@ -145,11 +145,8 @@ mod tests {
                     );
 
                     for start in 0..=end {
-                        let expected_range = values
-                            .iter()
-                            .skip(start)
-                            .take(end - start)
-                            .sum::<i64>();
+                        let expected_range =
+                            values.iter().skip(start).take(end - start).sum::<i64>();
                         assert_eq!(
                             tree.range_sum(start..end),
                             expected_range,
