@@ -3,8 +3,7 @@ use spatial_kernels::Aabb;
 use crate::{
     Sphere,
     math3::{
-        NORMALIZE_EPSILON_SQUARED, Vec3, add, clamp01, dot, length, length_squared, lerp, scale,
-        sub,
+        NORMALIZE_EPSILON_SQUARED, Vec3, add, clamp01, dot, length_squared, lerp, scale, sub,
     },
 };
 
