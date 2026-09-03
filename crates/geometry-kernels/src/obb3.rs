@@ -10,11 +10,7 @@ pub struct Obb3 {
 
 impl Obb3 {
     #[must_use]
-    pub fn new(
-        center: [f32; 3],
-        half_extents: [f32; 3],
-        rotation_radians_xyz: [f32; 3],
-    ) -> Self {
+    pub fn new(center: [f32; 3], half_extents: [f32; 3], rotation_radians_xyz: [f32; 3]) -> Self {
         assert!(
             center.iter().all(|coordinate| coordinate.is_finite()),
             "OBB3 center must be finite"
@@ -201,7 +197,12 @@ mod tests {
         let right = Obb3::new([1.2, 0.35, 0.25], [1.0, 0.7, 0.8], [-0.3, 0.15, 0.55]);
         let relation = obb3_sat(left, right);
         assert!(relation.overlaps);
-        assert!(relation.axes.iter().all(|axis| !axis.active || !axis.separating));
+        assert!(
+            relation
+                .axes
+                .iter()
+                .all(|axis| !axis.active || !axis.separating)
+        );
     }
 
     #[test]
@@ -210,7 +211,12 @@ mod tests {
         let right = Obb3::new([4.0, 1.5, 0.8], [1.0, 0.7, 0.8], [-0.3, 0.15, 0.55]);
         let relation = obb3_sat(left, right);
         assert!(!relation.overlaps);
-        assert!(relation.axes.iter().any(|axis| axis.active && axis.separating));
+        assert!(
+            relation
+                .axes
+                .iter()
+                .any(|axis| axis.active && axis.separating)
+        );
         assert!(relation.axes[relation.critical_axis].separating);
     }
 
@@ -218,7 +224,10 @@ mod tests {
     fn decision_is_symmetric() {
         let left = Obb3::new([-0.5, 0.3, 0.2], [1.3, 0.7, 0.9], [0.42, -0.1, 0.2]);
         let right = Obb3::new([1.2, -0.1, 0.4], [0.8, 1.1, 0.6], [-0.73, 0.35, -0.2]);
-        assert_eq!(obb3_sat(left, right).overlaps, obb3_sat(right, left).overlaps);
+        assert_eq!(
+            obb3_sat(left, right).overlaps,
+            obb3_sat(right, left).overlaps
+        );
     }
 
     #[test]
