@@ -20,7 +20,10 @@ fn unit_or_x(direction: Vec3) -> Vec3 {
 impl SupportMap3 for Sphere {
     fn support_point(&self, direction: Vec3) -> Vec3 {
         let unit = unit_or_x(direction);
-        add(self.center.map(f64::from), scale(unit, f64::from(self.radius)))
+        add(
+            self.center.map(f64::from),
+            scale(unit, f64::from(self.radius)),
+        )
     }
 }
 
@@ -88,7 +91,10 @@ pub struct ConvexHull3<'a> {
 impl<'a> ConvexHull3<'a> {
     #[must_use]
     pub fn new(points: &'a [Vec3]) -> Self {
-        assert!(!points.is_empty(), "convex hull support set must not be empty");
+        assert!(
+            !points.is_empty(),
+            "convex hull support set must not be empty"
+        );
         assert!(
             points.iter().copied().all(is_finite),
             "convex hull support points must be finite"
@@ -129,11 +135,7 @@ pub struct MinkowskiSupportPoint {
 }
 
 #[must_use]
-pub fn minkowski_support<L, R>(
-    left: &L,
-    right: &R,
-    direction: Vec3,
-) -> MinkowskiSupportPoint
+pub fn minkowski_support<L, R>(left: &L, right: &R, direction: Vec3) -> MinkowskiSupportPoint
 where
     L: SupportMap3 + ?Sized,
     R: SupportMap3 + ?Sized,
@@ -184,11 +186,7 @@ mod tests {
 
     #[test]
     fn convex_hull_support_is_deterministic_on_ties() {
-        let points = [
-            [-1.0, 0.0, 0.0],
-            [1.0, 1.0, 0.0],
-            [1.0, -1.0, 0.0],
-        ];
+        let points = [[-1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [1.0, -1.0, 0.0]];
         let hull = ConvexHull3::new(&points);
         assert_eq!(hull.support_point([1.0, 0.0, 0.0]), points[1]);
         assert_eq!(hull.points(), &points);
