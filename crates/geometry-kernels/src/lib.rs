@@ -1,3 +1,5 @@
+pub mod obb3;
+
 use spatial_kernels::Aabb;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
