@@ -1,0 +1,19 @@
+name: OBB3 benchmark evidence
+
+on:
+  push:
+    branches:
+      - perf/obb3-sat-benchmarks
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: >-
+          cargo bench -p geometry-kernels --bench obb3_sat --
+          --noplot --warm-up-time 1 --measurement-time 2 --sample-size 50
