@@ -45,15 +45,15 @@ impl SupportMap3 for Obb3 {
         assert!(is_finite(direction), "support direction must be finite");
         let axes = self.axes();
         let mut point = self.center.map(f64::from);
-        for axis in 0..3 {
-            let sign = if dot(axes[axis], direction) >= 0.0 {
+        for (axis, local_axis) in axes.into_iter().enumerate() {
+            let sign = if dot(local_axis, direction) >= 0.0 {
                 1.0
             } else {
                 -1.0
             };
             point = add(
                 point,
-                scale(axes[axis], sign * f64::from(self.half_extents[axis])),
+                scale(local_axis, sign * f64::from(self.half_extents[axis])),
             );
         }
         point
