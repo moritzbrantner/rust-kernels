@@ -2,7 +2,10 @@ use spatial_kernels::Aabb;
 
 use crate::{
     Sphere,
-    math3::{NORMALIZE_EPSILON_SQUARED, Vec3, add, clamp01, dot, length, length_squared, lerp, scale, sub},
+    math3::{
+        NORMALIZE_EPSILON_SQUARED, Vec3, add, clamp01, dot, length, length_squared, lerp, scale,
+        sub,
+    },
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -15,7 +18,10 @@ impl Segment3 {
     #[must_use]
     pub fn new(start: [f32; 3], end: [f32; 3]) -> Self {
         assert!(
-            start.iter().chain(end.iter()).all(|value| value.is_finite()),
+            start
+                .iter()
+                .chain(end.iter())
+                .all(|value| value.is_finite()),
             "segment endpoints must be finite"
         );
         Self { start, end }
@@ -67,7 +73,10 @@ pub struct PointSegmentRelation {
 
 #[must_use]
 pub fn point_segment(point: Vec3, segment: Segment3) -> PointSegmentRelation {
-    assert!(point.into_iter().all(f64::is_finite), "point must be finite");
+    assert!(
+        point.into_iter().all(f64::is_finite),
+        "point must be finite"
+    );
     let start = segment.start64();
     let end = segment.end64();
     let direction = sub(end, start);
@@ -125,12 +134,11 @@ pub fn segment_segment(left: Segment3, right: Segment3) -> SegmentSegmentRelatio
         } else {
             let cross_projection = dot(left_direction, right_direction);
             let right_projection = dot(right_direction, between_starts);
-            let denominator = left_length_squared * right_length_squared
-                - cross_projection * cross_projection;
+            let denominator =
+                left_length_squared * right_length_squared - cross_projection * cross_projection;
             let mut left_parameter = if denominator.abs() > NORMALIZE_EPSILON_SQUARED {
                 clamp01(
-                    (cross_projection * right_projection
-                        - left_projection * right_length_squared)
+                    (cross_projection * right_projection - left_projection * right_length_squared)
                         / denominator,
                 )
             } else {
@@ -144,9 +152,8 @@ pub fn segment_segment(left: Segment3, right: Segment3) -> SegmentSegmentRelatio
                 left_parameter = clamp01(-left_projection / left_length_squared);
             } else if right_parameter > 1.0 {
                 right_parameter = 1.0;
-                left_parameter = clamp01(
-                    (cross_projection - left_projection) / left_length_squared,
-                );
+                left_parameter =
+                    clamp01((cross_projection - left_projection) / left_length_squared);
             }
             (left_parameter, right_parameter)
         }
@@ -169,7 +176,10 @@ pub fn segment_segment(left: Segment3, right: Segment3) -> SegmentSegmentRelatio
 
 #[must_use]
 pub fn closest_point_on_aabb(point: Vec3, aabb: Aabb) -> Vec3 {
-    assert!(point.into_iter().all(f64::is_finite), "point must be finite");
+    assert!(
+        point.into_iter().all(f64::is_finite),
+        "point must be finite"
+    );
     std::array::from_fn(|axis| {
         point[axis].clamp(f64::from(aabb.min[axis]), f64::from(aabb.max[axis]))
     })
@@ -318,7 +328,10 @@ mod tests {
     #[test]
     fn closest_point_on_aabb_clamps_each_axis() {
         let aabb = Aabb::new([-1.0, -2.0, -3.0], [1.0, 2.0, 3.0]);
-        assert_eq!(closest_point_on_aabb([4.0, 0.5, -5.0], aabb), [1.0, 0.5, -3.0]);
+        assert_eq!(
+            closest_point_on_aabb([4.0, 0.5, -5.0], aabb),
+            [1.0, 0.5, -3.0]
+        );
     }
 
     #[test]
