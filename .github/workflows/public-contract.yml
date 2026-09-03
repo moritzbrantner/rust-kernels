@@ -11,6 +11,6 @@ permissions:
 
 jobs:
   public-contract:
-    uses: moritzbrantner/reusable-workflows/.github/workflows/public-contract-validation.yml@0bb5172f1942b2f58f3022275fba7693b7d32a63
+    uses: moritzbrantner/reusable-workflows/.github/workflows/public-contract-validation.yml@e89be9c125880081ebcec54095d2823a15365798
     with:
       install_mode: none
