@@ -109,16 +109,15 @@ where
 }
 
 #[must_use]
-pub fn gjk_intersection_with_config<L, R>(
-    left: &L,
-    right: &R,
-    config: GjkConfig,
-) -> GjkResult
+pub fn gjk_intersection_with_config<L, R>(left: &L, right: &R, config: GjkConfig) -> GjkResult
 where
     L: SupportMap3 + ?Sized,
     R: SupportMap3 + ?Sized,
 {
-    assert!(config.max_iterations > 0, "GJK max_iterations must be positive");
+    assert!(
+        config.max_iterations > 0,
+        "GJK max_iterations must be positive"
+    );
     assert!(
         config.epsilon.is_finite() && config.epsilon >= 0.0,
         "GJK epsilon must be non-negative and finite"
@@ -217,11 +216,7 @@ fn process_line(simplex: &mut Simplex, direction: &mut Vec3, epsilon_squared: f6
     false
 }
 
-fn process_triangle(
-    simplex: &mut Simplex,
-    direction: &mut Vec3,
-    epsilon_squared: f64,
-) -> bool {
+fn process_triangle(simplex: &mut Simplex, direction: &mut Vec3, epsilon_squared: f64) -> bool {
     let a = simplex.points[0].point;
     let b = simplex.points[1].point;
     let c = simplex.points[2].point;
@@ -291,11 +286,7 @@ fn reduce_degenerate_triangle(
     false
 }
 
-fn process_tetrahedron(
-    simplex: &mut Simplex,
-    direction: &mut Vec3,
-    epsilon_squared: f64,
-) -> bool {
+fn process_tetrahedron(simplex: &mut Simplex, direction: &mut Vec3, epsilon_squared: f64) -> bool {
     let a = simplex.points[0].point;
     let b = simplex.points[1].point;
     let c = simplex.points[2].point;
@@ -374,7 +365,10 @@ mod tests {
             Sphere::new([2.001, 0.0, 0.0], 1.0),
         ] {
             let expected = sphere_sphere(left, right).overlaps;
-            assert_eq!(gjk_intersection(&left, &right).intersection(), Some(expected));
+            assert_eq!(
+                gjk_intersection(&left, &right).intersection(),
+                Some(expected)
+            );
         }
     }
 
@@ -387,7 +381,10 @@ mod tests {
             Aabb::new([1.001, -0.5, -0.5], [2.0, 0.5, 0.5]),
         ] {
             let expected = aabb_aabb(left, right).overlaps;
-            assert_eq!(gjk_intersection(&left, &right).intersection(), Some(expected));
+            assert_eq!(
+                gjk_intersection(&left, &right).intersection(),
+                Some(expected)
+            );
         }
     }
 
@@ -400,7 +397,10 @@ mod tests {
             Capsule::new([0.0, 1.1, -1.0], [0.0, 1.1, 1.0], 0.5),
         ] {
             let expected = capsule_capsule(left, right).overlaps;
-            assert_eq!(gjk_intersection(&left, &right).intersection(), Some(expected));
+            assert_eq!(
+                gjk_intersection(&left, &right).intersection(),
+                Some(expected)
+            );
         }
     }
 
@@ -412,7 +412,10 @@ mod tests {
             Obb3::new([4.0, 1.5, 0.8], [1.0, 0.7, 0.8], [-0.3, 0.15, 0.55]),
         ] {
             let expected = obb3_sat(left, right).overlaps;
-            assert_eq!(gjk_intersection(&left, &right).intersection(), Some(expected));
+            assert_eq!(
+                gjk_intersection(&left, &right).intersection(),
+                Some(expected)
+            );
         }
     }
 
@@ -433,8 +436,14 @@ mod tests {
         let left = ConvexHull3::new(&left_points);
         let overlapping = ConvexHull3::new(&overlapping_points);
         let separated = ConvexHull3::new(&separated_points);
-        assert_eq!(gjk_intersection(&left, &overlapping).intersection(), Some(true));
-        assert_eq!(gjk_intersection(&left, &separated).intersection(), Some(false));
+        assert_eq!(
+            gjk_intersection(&left, &overlapping).intersection(),
+            Some(true)
+        );
+        assert_eq!(
+            gjk_intersection(&left, &separated).intersection(),
+            Some(false)
+        );
     }
 
     #[test]
