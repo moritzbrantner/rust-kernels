@@ -9,20 +9,12 @@ pub fn is_finite(vector: Vec3) -> bool {
 
 #[must_use]
 pub fn add(left: Vec3, right: Vec3) -> Vec3 {
-    [
-        left[0] + right[0],
-        left[1] + right[1],
-        left[2] + right[2],
-    ]
+    [left[0] + right[0], left[1] + right[1], left[2] + right[2]]
 }
 
 #[must_use]
 pub fn sub(left: Vec3, right: Vec3) -> Vec3 {
-    [
-        left[0] - right[0],
-        left[1] - right[1],
-        left[2] - right[2],
-    ]
+    [left[0] - right[0], left[1] - right[1], left[2] - right[2]]
 }
 
 #[must_use]
@@ -32,11 +24,7 @@ pub fn neg(vector: Vec3) -> Vec3 {
 
 #[must_use]
 pub fn scale(vector: Vec3, scalar: f64) -> Vec3 {
-    [
-        vector[0] * scalar,
-        vector[1] * scalar,
-        vector[2] * scalar,
-    ]
+    [vector[0] * scalar, vector[1] * scalar, vector[2] * scalar]
 }
 
 #[must_use]
