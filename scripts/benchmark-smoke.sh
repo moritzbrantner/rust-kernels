@@ -14,6 +14,11 @@ mkdir -p "$artifact_dir" "$target_dir"
   printf 'baseline=%s\n' "${PERF_BASE_SHA:-none}"
   printf 'rustflags=%s\n' "${RUSTFLAGS:-}"
   printf 'cargo_target_dir=%s\n' "$target_dir"
+  if [[ -f Cargo.lock ]]; then
+    printf 'cargo_lock_sha256=%s\n' "$(sha256sum Cargo.lock | cut -d' ' -f1)"
+  else
+    printf 'cargo_lock=absent\n'
+  fi
   rustc -vV
   cargo -V
   valgrind --version
