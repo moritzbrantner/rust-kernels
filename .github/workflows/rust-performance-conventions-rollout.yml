@@ -1,0 +1,55 @@
+name: Rust performance convention rollout
+
+on:
+  push:
+    branches:
+      - feat/rust-performance-adopter
+
+permissions:
+  contents: write
+
+jobs:
+  install-rust-performance:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout consumer
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.0
+
+      - name: Prepare pinned convention tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init "$RUNNER_TEMP/coding-tooling"
+          git -C "$RUNNER_TEMP/coding-tooling" remote add origin https://github.com/moritzbrantner/coding-tooling.git
+          git -C "$RUNNER_TEMP/coding-tooling" fetch --depth=1 origin dfd459a3f5d6858ae813dca9e1e8442c3dd0cc17
+          git -C "$RUNNER_TEMP/coding-tooling" checkout --detach FETCH_HEAD
+          git init "$RUNNER_TEMP/coding-agent-conventions"
+          git -C "$RUNNER_TEMP/coding-agent-conventions" remote add origin https://github.com/moritzbrantner/coding-agent-conventions.git
+          git -C "$RUNNER_TEMP/coding-agent-conventions" fetch --depth=1 origin cd6c229e8c61ff3e3bd949ca82394fa788039897
+          git -C "$RUNNER_TEMP/coding-agent-conventions" checkout --detach FETCH_HEAD
+
+      - name: Install rust-performance convention
+        run: |
+          bun "$RUNNER_TEMP/coding-tooling/src/entry.ts" conventions init rust-performance \
+            --root "$GITHUB_WORKSPACE" \
+            --conventions-root "$RUNNER_TEMP/coding-agent-conventions" \
+            --json
+          bun "$RUNNER_TEMP/coding-tooling/src/entry.ts" conventions check \
+            --root "$GITHUB_WORKSPACE" \
+            --json
+
+      - name: Commit generated convention artifacts
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add conventions.json conventions.lock.json .conventions
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: install rust-performance conventions"
+          git push origin HEAD
