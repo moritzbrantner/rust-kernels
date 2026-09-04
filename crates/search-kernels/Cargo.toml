@@ -8,3 +8,15 @@ description = "Small deterministic selection and search kernels"
 
 [dependencies]
 collection-kernels = { path = "../collection-kernels" }
+
+[dev-dependencies]
+divan = "0.1.21"
+iai-callgrind = "0.16.1"
+
+[[bench]]
+name = "search"
+harness = false
+
+[[bench]]
+name = "performance_smoke"
+harness = false
