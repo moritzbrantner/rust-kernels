@@ -16,6 +16,8 @@ mkdir -p "$artifact_dir" "$target_dir"
   printf 'cargo_target_dir=%s\n' "$target_dir"
   rustc -vV
   cargo -V
+  valgrind --version
+  iai-callgrind-runner --version
   uname -srm
 } > "$artifact_dir/fingerprint.txt"
 
