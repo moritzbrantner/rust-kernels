@@ -36,6 +36,7 @@ run_benchmark() {
 
 base_sha="${PERF_BASE_SHA:-}"
 bench_path="crates/search-kernels/benches/performance_smoke.rs"
+baseline_name="pr_base"
 
 if [[ -n "$base_sha" ]] && git cat-file -e "$base_sha:$bench_path" 2>/dev/null; then
   worktree_parent="$(mktemp -d)"
@@ -51,10 +52,10 @@ if [[ -n "$base_sha" ]] && git cat-file -e "$base_sha:$bench_path" 2>/dev/null; 
   (
     cd "$baseline_dir"
     CARGO_TARGET_DIR="$target_dir" \
-      cargo bench -p search-kernels --bench performance_smoke -- --save-baseline=pr-base
+      cargo bench -p search-kernels --bench performance_smoke -- --save-baseline="$baseline_name"
   ) 2>&1 | tee "$artifact_dir/baseline.log"
 
-  run_benchmark candidate.log --baseline=pr-base
+  run_benchmark candidate.log --baseline="$baseline_name"
 else
   printf '%s\n' \
     'No compatible base benchmark exists; this run seeds the performance-smoke contract.' \
