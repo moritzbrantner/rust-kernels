@@ -1,0 +1,86 @@
+name: mutation-baseline
+
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-baseline-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  catalog:
+    name: Mutation catalog smoke
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: '1.95.0'
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Install cargo-mutants
+        run: cargo install cargo-mutants --version 27.1.0 --locked
+      - name: Verify deterministic mutation discovery
+        run: |
+          mkdir -p target/mutation-catalog
+          cargo mutants --list --json --no-times > target/mutation-catalog/mutants.json
+          test -s target/mutation-catalog/mutants.json
+      - name: Upload mutation catalog
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-catalog-${{ github.sha }}
+          path: target/mutation-catalog/
+          if-no-files-found: error
+
+  advisory-baseline:
+    name: Advisory mutation baseline
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: '1.95.0'
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Install cargo-mutants
+        run: cargo install cargo-mutants --version 27.1.0 --locked
+      - name: Capture advisory mutation evidence
+        id: mutation
+        continue-on-error: true
+        run: |
+          mkdir -p target/mutation-baseline
+          set +e
+          cargo mutants \
+            --output target/mutation-baseline \
+            --jobs 2 \
+            --no-times
+          status=$?
+          set -e
+          printf '%s\n' "$status" > target/mutation-baseline/exit-status.txt
+          exit "$status"
+      - name: Preserve mutation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-baseline-${{ github.sha }}
+          path: target/mutation-baseline/
+          if-no-files-found: warn
+      - name: Record advisory boundary
+        if: always()
+        run: |
+          {
+            echo '## cargo-mutants advisory baseline'
+            echo
+            echo 'Mutation outcomes are descriptive evidence in this slice.'
+            echo 'Missed, timed-out, unviable, or incomplete mutation evidence does not create a new required merge threshold.'
+            echo 'The existing correctness and deterministic performance gates remain authoritative.'
+          } >> "$GITHUB_STEP_SUMMARY"
