@@ -1,4 +1,4 @@
-use divan::{counter::ItemsCount, Bencher};
+use divan::{Bencher, counter::ItemsCount};
 use search_kernels::{quickselect, radix_sort_u32, top_k_smallest};
 
 const SIZES: &[usize] = &[256, 4_096, 65_536];
