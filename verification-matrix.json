@@ -1,0 +1,551 @@
+{
+  "schemaVersion": 1,
+  "issue": 52,
+  "scope": "Public kernel families on main, tracked at implementation-source granularity. Multiple public kernels may share one source file.",
+  "statusValues": [
+    "present",
+    "partial",
+    "missing",
+    "planned",
+    "n/a"
+  ],
+  "coveragePolicy": "cargo llvm-cov is report-only in this slice. No coverage percentage or regression threshold is enforced.",
+  "deferred": {
+    "mutation": "issue #52 later slice",
+    "deterministicPerformance": "issue #52 later complexity/performance-invariant slice",
+    "benchmarkExpansion": "issue #52 later benchmark slice"
+  },
+  "facades": [
+    "crates/collection-kernels/src/lib.rs",
+    "crates/geometry-kernels/src/lib.rs",
+    "crates/graph-kernels/src/lib.rs",
+    "crates/search-kernels/src/lib.rs",
+    "crates/statistics-kernels/src/lib.rs"
+  ],
+  "kernels": [
+    {
+      "id": "aabb-primitives",
+      "crate": "spatial-kernels",
+      "module": "crate::Aabb / Pair",
+      "sources": [
+        "crates/spatial-kernels/src/lib.rs"
+      ],
+      "oracleDifferential": "partial",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "morton-code",
+      "crate": "spatial-kernels",
+      "module": "crate::morton",
+      "sources": [
+        "crates/spatial-kernels/src/morton.rs"
+      ],
+      "oracleDifferential": "missing",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "spatial-hash-3d",
+      "crate": "spatial-kernels",
+      "module": "crate::spatial_hash",
+      "sources": [
+        "crates/spatial-kernels/src/spatial_hash.rs"
+      ],
+      "oracleDifferential": "partial",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "naive-broad-phase",
+      "crate": "spatial-kernels",
+      "module": "crate::NaiveBroadPhase",
+      "sources": [
+        "crates/spatial-kernels/src/lib.rs"
+      ],
+      "oracleDifferential": "n/a",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "oracleDifferential: This intentionally simple O(n^2) implementation is the correctness oracle for optimized broad phases."
+      ]
+    },
+    {
+      "id": "uniform-grid-broad-phase",
+      "crate": "spatial-kernels",
+      "module": "crate::UniformGridBroadPhase",
+      "sources": [
+        "crates/spatial-kernels/src/lib.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "sweep-and-prune-broad-phase",
+      "crate": "spatial-kernels",
+      "module": "crate::SweepAndPruneBroadPhase",
+      "sources": [
+        "crates/spatial-kernels/src/lib.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "static-bvh",
+      "crate": "bvh-kernels",
+      "module": "crate::StaticBvh / StaticBvhBroadPhase",
+      "sources": [
+        "crates/bvh-kernels/src/lib.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "dynamic-aabb-tree",
+      "crate": "bvh-kernels",
+      "module": "crate::DynamicAabbTree / DynamicAabbTreeBroadPhase",
+      "sources": [
+        "crates/bvh-kernels/src/lib.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "static-bvh-trace",
+      "crate": "bvh-trace-kernels",
+      "module": "crate::trace_static_bvh",
+      "sources": [
+        "crates/bvh-trace-kernels/src/lib.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "octree-broad-phase",
+      "crate": "octree-kernels",
+      "module": "crate::OctreeBroadPhase",
+      "sources": [
+        "crates/octree-kernels/src/lib.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "addressable-priority-queue",
+      "crate": "collection-kernels",
+      "module": "crate::AddressablePriorityQueue",
+      "sources": [
+        "crates/collection-kernels/src/addressable_priority_queue.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "present",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "bit-set",
+      "crate": "collection-kernels",
+      "module": "crate::BitSet",
+      "sources": [
+        "crates/collection-kernels/src/bit_set.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "fenwick-tree",
+      "crate": "collection-kernels",
+      "module": "crate::FenwickTree",
+      "sources": [
+        "crates/collection-kernels/src/fenwick_tree.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "generational-arena",
+      "crate": "collection-kernels",
+      "module": "crate::GenerationalArena",
+      "sources": [
+        "crates/collection-kernels/src/generational_arena.rs"
+      ],
+      "oracleDifferential": "missing",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "lru-cache",
+      "crate": "collection-kernels",
+      "module": "crate::LruCache",
+      "sources": [
+        "crates/collection-kernels/src/lru_cache.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "planned",
+      "notes": [
+        "runtimeProfiler: Open PR #48 proposes a deterministic runtime-profiler LRU workload; it is not evidence on main yet."
+      ]
+    },
+    {
+      "id": "ring-buffer",
+      "crate": "collection-kernels",
+      "module": "crate::RingBuffer",
+      "sources": [
+        "crates/collection-kernels/src/ring_buffer.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "sparse-set",
+      "crate": "collection-kernels",
+      "module": "crate::SparseSet",
+      "sources": [
+        "crates/collection-kernels/src/sparse_set.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "union-find",
+      "crate": "collection-kernels",
+      "module": "crate::UnionFind",
+      "sources": [
+        "crates/collection-kernels/src/union_find.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "shortest-path-search",
+      "crate": "graph-kernels",
+      "module": "crate::dijkstra / astar",
+      "sources": [
+        "crates/graph-kernels/src/search.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "graph-traversal",
+      "crate": "graph-kernels",
+      "module": "crate::breadth_first / depth_first",
+      "sources": [
+        "crates/graph-kernels/src/traversal.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "planned",
+      "notes": [
+        "runtimeProfiler: Open PR #48 proposes a deterministic breadth/depth traversal runtime-profiler workload; it is not evidence on main yet."
+      ]
+    },
+    {
+      "id": "graph-topology",
+      "crate": "graph-kernels",
+      "module": "crate::topological_sort / strongly_connected_components",
+      "sources": [
+        "crates/graph-kernels/src/topology.rs"
+      ],
+      "oracleDifferential": "partial",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "minimum-spanning-forest",
+      "crate": "graph-kernels",
+      "module": "crate::kruskal_minimum_spanning_forest",
+      "sources": [
+        "crates/graph-kernels/src/minimum_spanning.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "selection",
+      "crate": "search-kernels",
+      "module": "crate::quickselect / top_k_smallest",
+      "sources": [
+        "crates/search-kernels/src/selection.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "planned",
+      "notes": [
+        "runtimeProfiler: Open PR #48 proposes a deterministic quickselect runtime-profiler workload; it is not evidence on main yet."
+      ]
+    },
+    {
+      "id": "radix-sort",
+      "crate": "search-kernels",
+      "module": "crate::radix_sort_u32 / radix_sort_u64",
+      "sources": [
+        "crates/search-kernels/src/radix_sort.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "planned",
+      "notes": [
+        "runtimeProfiler: Open PR #48 proposes a deterministic radix-sort runtime-profiler workload; it is not evidence on main yet."
+      ]
+    },
+    {
+      "id": "bloom-filter",
+      "crate": "search-kernels",
+      "module": "crate::BloomFilter",
+      "sources": [
+        "crates/search-kernels/src/bloom_filter.rs"
+      ],
+      "oracleDifferential": "n/a",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "oracleDifferential: The probabilistic contract is better expressed as no false negatives; exact false-positive equality is not an oracle contract."
+      ]
+    },
+    {
+      "id": "running-statistics",
+      "crate": "statistics-kernels",
+      "module": "crate::RunningStats",
+      "sources": [
+        "crates/statistics-kernels/src/running_stats.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "analytical-overlap-kernels",
+      "crate": "geometry-kernels",
+      "module": "crate root analytical primitives",
+      "sources": [
+        "crates/geometry-kernels/src/analytical.rs"
+      ],
+      "oracleDifferential": "partial",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "gjk-intersection",
+      "crate": "geometry-kernels",
+      "module": "crate::gjk",
+      "sources": [
+        "crates/geometry-kernels/src/gjk.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "geometry-math3",
+      "crate": "geometry-kernels",
+      "module": "crate::math3",
+      "sources": [
+        "crates/geometry-kernels/src/math3.rs"
+      ],
+      "oracleDifferential": "missing",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "obb3-sat",
+      "crate": "geometry-kernels",
+      "module": "crate::obb3",
+      "sources": [
+        "crates/geometry-kernels/src/obb3.rs"
+      ],
+      "oracleDifferential": "partial",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "present",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "geometry-primitives",
+      "crate": "geometry-kernels",
+      "module": "crate::primitives",
+      "sources": [
+        "crates/geometry-kernels/src/primitives.rs"
+      ],
+      "oracleDifferential": "missing",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    },
+    {
+      "id": "support-mapping",
+      "crate": "geometry-kernels",
+      "module": "crate::support",
+      "sources": [
+        "crates/geometry-kernels/src/support.rs"
+      ],
+      "oracleDifferential": "partial",
+      "propertyMetamorphic": "partial",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    }
+  ]
+}

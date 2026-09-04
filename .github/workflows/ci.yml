@@ -13,6 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/validate_registry.py
+      - run: python3 scripts/validate_verification_matrix.py
       - run: python3 scripts/test_standalone_registry.py
       - run: python3 scripts/test_source_registry.py
       - run: python3 scripts/test_source_contract.py
@@ -54,3 +55,43 @@ jobs:
           name: performance-smoke-${{ github.sha }}
           path: .artifacts/performance-smoke/
           if-no-files-found: warn
+
+  coverage-baseline:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov@0.9.0
+      - name: Capture workspace coverage baseline
+        run: |
+          mkdir -p target/llvm-cov-baseline
+          cargo llvm-cov --workspace --all-features --json --summary-only \
+            --output-path target/llvm-cov-baseline/summary.json
+          cargo llvm-cov report --workspace \
+            | tee target/llvm-cov-baseline/summary.txt
+          cargo llvm-cov report --workspace --lcov \
+            --output-path target/llvm-cov-baseline/lcov.info
+      - name: Publish coverage summary
+        if: success()
+        run: |
+          {
+            echo '## cargo llvm-cov baseline'
+            echo
+            echo 'No coverage percentage or regression threshold is enforced in this slice.'
+            echo
+            echo '```text'
+            cat target/llvm-cov-baseline/summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage baseline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: llvm-cov-baseline-${{ github.sha }}
+          path: target/llvm-cov-baseline/
+          if-no-files-found: ignore
