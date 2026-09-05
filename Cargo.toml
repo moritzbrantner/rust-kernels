@@ -9,6 +9,7 @@ members = [
     "crates/search-kernels",
     "crates/spatial-kernels",
     "crates/statistics-kernels",
+    "crates/web-demo",
 ]
 resolver = "2"
 
