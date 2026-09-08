@@ -49,17 +49,22 @@ jobs:
       - name: Install runtime-profiler
         run: cargo install --git https://github.com/moritzbrantner/runtime-profiler --rev "$RUNTIME_PROFILER_REV" --locked
 
-      - name: Give the base the identical profiler scenarios
+      - name: Give the base the identical profiler workload contract
         run: |
           cp candidate/profiles/runtime-profiler/search.json reference/profiles/runtime-profiler/search.json
           cp candidate/profiles/runtime-profiler/lru.json reference/profiles/runtime-profiler/lru.json
           cp candidate/profiles/runtime-profiler/traversal.json reference/profiles/runtime-profiler/traversal.json
-          git -C reference add profiles/runtime-profiler/search.json profiles/runtime-profiler/lru.json profiles/runtime-profiler/traversal.json
+          cp candidate/scripts/profile-workload.sh reference/scripts/profile-workload.sh
+          git -C reference add \
+            profiles/runtime-profiler/search.json \
+            profiles/runtime-profiler/lru.json \
+            profiles/runtime-profiler/traversal.json \
+            scripts/profile-workload.sh
           if ! git -C reference diff --cached --quiet; then
             git -C reference \
               -c user.name='runtime-profiler' \
               -c user.email='runtime-profiler@invalid' \
-              commit -m 'chore: attach comparable profiler scenarios'
+              commit -m 'chore: attach comparable profiler workload contract'
           fi
 
       - name: Prime deterministic workloads
@@ -68,6 +73,8 @@ jobs:
             (cd reference && bash scripts/profile-workload.sh "$workload" >/dev/null)
             (cd candidate && bash scripts/profile-workload.sh "$workload" >/dev/null)
           done
+          test -z "$(git -C reference status --porcelain)"
+          test -z "$(git -C candidate status --porcelain)"
 
       - name: Capture and compare runtime evidence
         run: |
