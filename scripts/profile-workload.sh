@@ -42,7 +42,7 @@ elif find "$root/$crate_dir" -type f \( -name '*.rs' -o -name 'Cargo.toml' \) -n
 fi
 
 if [[ "$needs_build" -eq 1 ]]; then
-  cargo build --quiet --release -p "$package" --example "$example"
+  cargo build --quiet --locked --release -p "$package" --example "$example"
 fi
 
 exec "$binary"
