@@ -5,7 +5,7 @@
     "type": "command",
     "program": "bash",
     "args": ["scripts/profile-workload.sh", "lru"],
-    "working_directory": "."
+    "working_directory": "../.."
   },
   "run": {
     "warmup_iterations": 1,
