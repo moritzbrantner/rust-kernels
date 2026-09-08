@@ -1,0 +1,149 @@
+name: Runtime evidence and Moonlight
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  RUNTIME_PROFILER_REV: 8280c95feb2a1075efa0480a9622e40c723e0b3a
+  MOONLIGHT_REV: a615843b6497cfa0e746224673592c107d969bda
+
+jobs:
+  kernel-evidence:
+    name: Kernel runtime evidence and behavior
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: candidate
+          fetch-depth: 0
+
+      - name: Check out exact base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: reference
+          fetch-depth: 0
+
+      - name: Check out pinned Moonlight
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: moritzbrantner/moonlight
+          ref: ${{ env.MOONLIGHT_REV }}
+          path: moonlight
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+          rustup default stable
+
+      - name: Install runtime-profiler
+        run: cargo install --git https://github.com/moritzbrantner/runtime-profiler --rev "$RUNTIME_PROFILER_REV" --locked
+
+      - name: Give the base the identical profiler workload contract
+        run: |
+          cp candidate/profiles/runtime-profiler/search.json reference/profiles/runtime-profiler/search.json
+          cp candidate/profiles/runtime-profiler/lru.json reference/profiles/runtime-profiler/lru.json
+          cp candidate/profiles/runtime-profiler/traversal.json reference/profiles/runtime-profiler/traversal.json
+          cp candidate/scripts/profile-workload.sh reference/scripts/profile-workload.sh
+          git -C reference add \
+            profiles/runtime-profiler/search.json \
+            profiles/runtime-profiler/lru.json \
+            profiles/runtime-profiler/traversal.json \
+            scripts/profile-workload.sh
+          if ! git -C reference diff --cached --quiet; then
+            git -C reference \
+              -c user.name='runtime-profiler' \
+              -c user.email='runtime-profiler@invalid' \
+              commit -m 'chore: attach comparable profiler workload contract'
+          fi
+
+      - name: Prime deterministic workloads
+        run: |
+          for workload in search lru traversal; do
+            (cd reference && bash scripts/profile-workload.sh "$workload" >/dev/null)
+            (cd candidate && bash scripts/profile-workload.sh "$workload" >/dev/null)
+          done
+          test -z "$(git -C reference status --porcelain)"
+          test -z "$(git -C candidate status --porcelain)"
+
+      - name: Capture and compare runtime evidence
+        run: |
+          set -euo pipefail
+          for workload in search lru traversal; do
+            (
+              cd reference
+              runtime-profiler capture \
+                --scenario "profiles/runtime-profiler/$workload.json" \
+                --output "$RUNNER_TEMP/reference-$workload"
+              runtime-profiler validate --bundle "$RUNNER_TEMP/reference-$workload"
+            )
+            (
+              cd candidate
+              runtime-profiler capture \
+                --scenario "profiles/runtime-profiler/$workload.json" \
+                --output "$RUNNER_TEMP/candidate-$workload"
+              runtime-profiler validate --bundle "$RUNNER_TEMP/candidate-$workload"
+            )
+            runtime-profiler score \
+              --reference "$RUNNER_TEMP/reference-$workload" \
+              --candidate "$RUNNER_TEMP/candidate-$workload" \
+              --json | tee "$RUNNER_TEMP/runtime-$workload.json"
+          done
+          {
+            echo '### runtime-profiler comparisons'
+            for workload in search lru traversal; do
+              echo
+              echo "#### $workload"
+              echo '```json'
+              cat "$RUNNER_TEMP/runtime-$workload.json"
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run Moonlight correctness evaluation
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
+          cargo run --quiet \
+            --manifest-path ../moonlight/Cargo.toml \
+            -p moonlight-cli --bin moonlight -- \
+            eval run \
+            --project moonlight.eval.toml \
+            --storage-path .moonlight/runtime-evidence.jsonl \
+            --format markdown \
+            --baseline-ref "${{ github.event.pull_request.base.sha }}" \
+            --candidate-ref "${{ github.event.pull_request.head.sha }}" \
+            | tee "$RUNNER_TEMP/moonlight.md"
+          {
+            echo '### Moonlight evaluation'
+            cat "$RUNNER_TEMP/moonlight.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: runtime-moonlight-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/reference-search
+            ${{ runner.temp }}/candidate-search
+            ${{ runner.temp }}/reference-lru
+            ${{ runner.temp }}/candidate-lru
+            ${{ runner.temp }}/reference-traversal
+            ${{ runner.temp }}/candidate-traversal
+            ${{ runner.temp }}/runtime-search.json
+            ${{ runner.temp }}/runtime-lru.json
+            ${{ runner.temp }}/runtime-traversal.json
+            ${{ runner.temp }}/moonlight.md
+          if-no-files-found: warn
