@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Interactive, browser-runnable demonstrations of the small deterministic algorithms and data structures in rust-kernels."
+    />
+    <title>rust-kernels — small algorithms, real Rust, live in the browser</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <p class="eyebrow">Algorithm laboratory · Rust → WebAssembly</p>
+        <h1>rust-kernels</h1>
+        <p class="lede">
+          Small, deterministic algorithm and data-structure kernels with explicit behavior, strong
+          oracle tests, and browser demos that execute the same Rust code.
+        </p>
+        <nav class="actions" aria-label="Project links">
+          <a class="button primary" href="#fenwick-demo">Run the WASM demo</a>
+          <a class="button" href="https://github.com/moritzbrantner/rust-kernels">Source on GitHub</a>
+        </nav>
+      </header>
+
+      <section class="demo" id="fenwick-demo" aria-labelledby="fenwick-title">
+        <div class="section-heading">
+          <p class="eyebrow">Live kernel 01</p>
+          <h2 id="fenwick-title">Fenwick tree prefix sums</h2>
+          <p>
+            A Fenwick tree answers additive prefix and range queries in O(log n). The controls below
+            call the compiled <code>collection-kernels::FenwickTree&lt;i64&gt;</code> through a tiny
+            WebAssembly adapter.
+          </p>
+        </div>
+
+        <div class="demo-card">
+          <div>
+            <p class="label">Fixture values</p>
+            <div class="bars" id="value-bars" aria-label="Fenwick tree input values"></div>
+          </div>
+
+          <div class="controls">
+            <label for="prefix-end">Prefix end: <strong id="prefix-label">4</strong></label>
+            <input id="prefix-end" type="range" min="0" max="8" value="4" step="1" />
+          </div>
+
+          <div class="result" aria-live="polite">
+            <span>sum(0..<span id="result-end">4</span>)</span>
+            <strong id="prefix-result">Loading Rust…</strong>
+          </div>
+
+          <p class="runtime-status" id="runtime-status">Loading WebAssembly module…</p>
+        </div>
+      </section>
+
+      <section class="catalog" aria-labelledby="catalog-title">
+        <div class="section-heading">
+          <p class="eyebrow">Kernel families</p>
+          <h2 id="catalog-title">A reusable algorithm shelf</h2>
+          <p>
+            The repository is organized by domain so applications can depend on focused crates instead
+            of a single all-purpose utility package.
+          </p>
+        </div>
+        <div class="grid">
+          <article><h3>Collections</h3><p>Bit sets, Fenwick trees, arenas, LRU caches, ring buffers, sparse sets, union-find.</p></article>
+          <article><h3>Geometry</h3><p>Small geometry operations intended to compose into rendering, collision, and spatial systems.</p></article>
+          <article><h3>Spatial</h3><p>Broad-phase and spatial indexing kernels designed for deterministic parity checks.</p></article>
+          <article><h3>Graphs</h3><p>Graph algorithms and structures kept independent from application-specific graph models.</p></article>
+          <article><h3>Search</h3><p>Reusable search primitives with explicit semantics and testable reference behavior.</p></article>
+          <article><h3>Statistics</h3><p>Numerical building blocks intended for profiling, analysis, and data-processing pipelines.</p></article>
+        </div>
+      </section>
+
+      <section class="contract" aria-labelledby="contract-title">
+        <div class="section-heading">
+          <p class="eyebrow">Repository contract</p>
+          <h2 id="contract-title">Why these kernels exist</h2>
+        </div>
+        <ol>
+          <li><strong>Correctness first.</strong> New optimized implementations are checked against simple oracles.</li>
+          <li><strong>Determinism by default.</strong> Reproducible inputs and outputs make performance work debuggable.</li>
+          <li><strong>Small boundaries.</strong> Kernels stay usable from native Rust, WASM, benchmarks, and higher-level applications.</li>
+          <li><strong>Performance with evidence.</strong> Optimization claims belong next to repeatable measurements.</li>
+        </ol>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
