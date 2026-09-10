@@ -21,5 +21,13 @@
       "benchmark": ["cargo", "bench", "-p", "search-kernels", "--bench", "search"],
       "benchmark:smoke": ["bash", "scripts/benchmark-smoke.sh"]
     }
+  },
+  "merge": {
+    "authority": "hosted",
+    "requiredChecks": [
+      "rust",
+      "registry",
+      "public-contract / public-contract / Coding Tooling Validation"
+    ]
   }
 }
