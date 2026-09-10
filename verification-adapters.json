@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "adapters": [
+    {
+      "crate": "rust-kernels-web-demo",
+      "role": "GitHub Pages WebAssembly adapter that delegates algorithm ownership to collection-kernels",
+      "sources": [
+        "crates/web-demo/src/lib.rs"
+      ]
+    }
+  ]
+}
