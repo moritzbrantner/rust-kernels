@@ -6,6 +6,7 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 MATRIX_PATH = ROOT / "verification-matrix.json"
+ADAPTERS_PATH = ROOT / "verification-adapters.json"
 WORKSPACE_PATH = ROOT / "Cargo.toml"
 
 EXPECTED_STATUS_VALUES = {"present", "partial", "missing", "planned", "n/a"}
@@ -123,6 +124,43 @@ for index, value in enumerate(facades):
         fail(f"facades[{index}] must be a crate src/lib.rs")
     facade_sources.add(source)
 
+adapter_config = load_json(ADAPTERS_PATH)
+if adapter_config.get("schemaVersion") != 1:
+    fail("verification-adapters.json schemaVersion must be 1")
+adapters = adapter_config.get("adapters")
+if not isinstance(adapters, list):
+    fail("verification-adapters.json adapters must be an array")
+
+adapter_sources: set[str] = set()
+adapter_crates: set[str] = set()
+for index, adapter in enumerate(adapters):
+    context = f"adapters[{index}]"
+    if not isinstance(adapter, dict):
+        fail(f"{context} must be an object")
+
+    crate = require_string(adapter.get("crate"), f"{context}.crate")
+    member = member_by_crate.get(crate)
+    if member is None:
+        fail(f"{context}.crate {crate!r} is not a workspace package")
+    if crate in adapter_crates:
+        fail(f"duplicate adapter crate {crate!r}")
+    adapter_crates.add(crate)
+
+    require_string(adapter.get("role"), f"{context}.role")
+    sources = require_strings(adapter.get("sources"), f"{context}.sources")
+    expected_prefix = f"{member}/src/"
+    for source_index, value in enumerate(sources):
+        source = require_source_path(value, f"{context}.sources[{source_index}]")
+        if not source.startswith(expected_prefix):
+            fail(
+                f"{context}.sources[{source_index}] must belong to workspace package {crate!r}"
+            )
+        if source in facade_sources:
+            fail(f"{context} uses facade source {source}")
+        if source in adapter_sources:
+            fail(f"adapter source {source} is assigned more than once")
+        adapter_sources.add(source)
+
 kernels = matrix.get("kernels")
 if not isinstance(kernels, list) or not kernels:
     fail("kernels must be a non-empty array")
@@ -158,6 +196,8 @@ for index, kernel in enumerate(kernels):
             )
         if source in facade_sources:
             fail(f"{context} uses facade source {source}; remove it from facades first")
+        if source in adapter_sources:
+            fail(f"{context} uses adapter source {source}; remove it from adapters first")
         kernel_sources.add(source)
 
     notes = kernel.get("notes", [])
@@ -182,19 +222,28 @@ for index, kernel in enumerate(kernels):
             "covers every workspace source in this slice"
         )
 
-unassigned = sorted(workspace_sources - kernel_sources - facade_sources)
+mixed_crates = sorted(adapter_crates & crates_with_kernels)
+if mixed_crates:
+    fail("workspace packages cannot be both adapters and kernel owners: " + ", ".join(mixed_crates))
+
+assigned_sources = kernel_sources | facade_sources | adapter_sources
+unassigned = sorted(workspace_sources - assigned_sources)
 if unassigned:
-    fail("workspace Rust sources missing from matrix/facades: " + ", ".join(unassigned))
+    fail(
+        "workspace Rust sources missing from matrix/facades/adapters: "
+        + ", ".join(unassigned)
+    )
 
-unknown = sorted((kernel_sources | facade_sources) - workspace_sources)
+unknown = sorted(assigned_sources - workspace_sources)
 if unknown:
-    fail("matrix references Rust sources outside the workspace inventory: " + ", ".join(unknown))
+    fail("verification metadata references Rust sources outside the workspace inventory: " + ", ".join(unknown))
 
-missing_crates = sorted(set(member_by_crate) - crates_with_kernels)
+missing_crates = sorted(set(member_by_crate) - crates_with_kernels - adapter_crates)
 if missing_crates:
-    fail("workspace packages without a kernel row: " + ", ".join(missing_crates))
+    fail("workspace packages without a kernel row or adapter declaration: " + ", ".join(missing_crates))
 
 print(
     f"verification matrix valid: {len(kernels)} kernels, "
-    f"{len(kernel_sources)} implementation sources, {len(facade_sources)} facades"
+    f"{len(kernel_sources)} implementation sources, {len(facade_sources)} facades, "
+    f"{len(adapter_sources)} adapter sources"
 )
