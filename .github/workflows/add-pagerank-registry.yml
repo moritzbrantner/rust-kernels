@@ -1,0 +1,51 @@
+name: Add PageRank registry metadata
+
+on:
+  push:
+    branches:
+      - docs/registry-pagerank
+    paths:
+      - .github/workflows/add-pagerank-registry.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: docs/registry-pagerank
+      - name: Register PageRank capability
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("registry.json")
+          registry = json.loads(path.read_text())
+          graph = next(item for item in registry["items"] if item["name"] == "graph-kernels")
+          if "pagerank" not in graph["tags"]:
+              graph["tags"].append("pagerank")
+          if not any(item["name"] == "page-rank" for item in graph["provides"]):
+              graph["provides"].insert(-1, {
+                  "name": "page-rank",
+                  "type": "algorithm",
+                  "symbols": ["page_rank", "PageRank", "PageRankConfig", "PageRankError"],
+              })
+          path.write_text(json.dumps(registry, indent=2) + "\n")
+          PY
+      - name: Validate registry
+        run: |
+          python3 scripts/validate_registry.py
+          cargo test -p graph-kernels --all-features
+          cargo clippy -p graph-kernels --all-targets --all-features -- -D warnings
+      - name: Commit metadata and remove helper workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/add-pagerank-registry.yml
+          git add registry.json
+          git commit -m "docs(registry): advertise PageRank graph kernel"
+          git push origin HEAD:docs/registry-pagerank
