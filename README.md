@@ -49,6 +49,7 @@ The collection kernels deliberately stop before lock-free queues or a full ECS f
 - breadth-first and depth-first traversal with deterministic neighbor-order semantics
 - topological sort with cycle detection
 - Tarjan strongly connected components with deterministic normalized output
+- deterministic PageRank with bounded convergence, explicit damping/tolerance policy, and dangling-node redistribution
 - Kruskal minimum spanning forests, reusing `UnionFind` for connectivity
 
 ### Search, selection, and sorting
