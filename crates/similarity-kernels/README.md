@@ -25,3 +25,15 @@ Available operations include union, intersection, left-minus-right difference, s
 ## Rolling hashes
 
 `rolling_hashes` hashes byte shingles with a stable wrapping-`u64` polynomial. The first window costs `O(k)` for width `k`; each subsequent overlapping window updates in `O(1)`. The hash is deterministic and non-cryptographic. Equal hashes are only candidate evidence because collisions are possible; consumers that require exact equality must compare the original bytes.
+
+## MinHash
+
+`minhash_signature` accepts caller-supplied stable `u64` feature hashes and produces a deterministic signature. The seed and signature length are part of the evidence identity: `minhash_jaccard_estimate` refuses to compare incompatible signatures instead of silently producing a number. Input order and duplicate hashes do not affect a signature.
+
+MinHash is an approximation of Jaccard similarity, not exact equality evidence. Larger signatures usually reduce estimator variance but do not establish a universal error bound for an individual pair.
+
+## SimHash
+
+`simhash64` and `simhash64_weighted` turn stable feature hashes into a compact 64-bit fingerprint. Repeated features contribute repeatedly; weighted SimHash accepts explicit non-negative integer weights, and zero weight has no effect. `hamming_distance64` exposes exact fingerprint distance.
+
+SimHash Hamming distance is a locality signal. The crate deliberately defines no universal near-duplicate threshold; consumers must calibrate thresholds against their own feature producer and corpus.
