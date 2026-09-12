@@ -33,6 +33,7 @@ SAT, GJK/EPA, sweep-and-prune, dynamic AABB trees, rays, and CCD remain future k
 - `UnionFind`, using path compression and union by size with deterministic tie-breaking and connectivity checks against a traversal oracle
 - `RingBuffer`, a fixed-capacity FIFO buffer that does not reallocate after construction
 - `SparseSet`, the sparse/dense integer-key set primitive commonly used for fast membership and ECS-style storage
+- `SparseMap<T>`, the value-bearing sparse/dense map primitive for ECS-style typed component storage and other integer-key workloads
 - `BitSet`, a packed fixed-universe set with efficient set-bit iteration
 - `GenerationalArena`, O(1) slot storage with stale-handle rejection and deterministic live-entry iteration
 - `FenwickTree`, compact O(log n) additive point updates with half-open prefix/range-sum queries

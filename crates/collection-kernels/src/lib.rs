@@ -17,5 +17,5 @@ pub use fenwick_tree::FenwickTree;
 pub use generational_arena::{ArenaKey, GenerationalArena};
 pub use lru_cache::LruCache;
 pub use ring_buffer::RingBuffer;
-pub use sparse_set::SparseSet;
+pub use sparse_set::{SparseMap, SparseSet};
 pub use union_find::UnionFind;
