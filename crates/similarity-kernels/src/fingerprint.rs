@@ -161,8 +161,10 @@ where
 /// Builds a weighted 64-bit SimHash fingerprint from stable feature hashes.
 ///
 /// Weight zero contributes nothing. Positive weight adds or subtracts that
-/// amount from each bit accumulator according to the feature hash bit. Ties
-/// resolve to zero, making the empty fingerprint exactly `0`.
+/// amount from each bit accumulator according to the feature hash bit. The
+/// accumulators saturate at the `i128` bounds so pathological streams remain
+/// deterministic in debug and release builds. Ties resolve to zero, making the
+/// empty fingerprint exactly `0`.
 #[must_use]
 pub fn simhash64_weighted<I>(features: I) -> u64
 where
@@ -173,9 +175,9 @@ where
         let weight = i128::from(weight);
         for (bit, accumulator) in accumulators.iter_mut().enumerate() {
             if feature & (1_u64 << bit) == 0 {
-                *accumulator -= weight;
+                *accumulator = accumulator.saturating_sub(weight);
             } else {
-                *accumulator += weight;
+                *accumulator = accumulator.saturating_add(weight);
             }
         }
     }
