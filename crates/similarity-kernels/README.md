@@ -37,3 +37,15 @@ MinHash is an approximation of Jaccard similarity, not exact equality evidence. 
 `simhash64` and `simhash64_weighted` turn stable feature hashes into a compact 64-bit fingerprint. Repeated features contribute repeatedly; weighted SimHash accepts explicit non-negative integer weights, and zero weight has no effect. `hamming_distance64` exposes exact fingerprint distance.
 
 SimHash Hamming distance is a locality signal. The crate deliberately defines no universal near-duplicate threshold; consumers must calibrate thresholds against their own feature producer and corpus.
+
+## BK-tree fuzzy index
+
+`BkTree<T>` stores caller-owned values without imposing string or token policy. Construction and radius search receive a distance function from the caller. Correct pruning requires that construction and search use the same true metric; the kernel does not pretend arbitrary scoring functions satisfy the triangle inequality.
+
+Search results are deterministic: ascending exact distance, then insertion order. `BkSearchReport::distance_evaluations` exposes how many stored values actually required metric evaluation so pruning effectiveness can be measured separately from the cost of the metric itself.
+
+## Myers byte edit distance
+
+`myers_levenshtein_bytes` is the optimized byte-oriented companion to generic `levenshtein`. The single-word implementation supports patterns up to 64 bytes and returns an explicit error above that boundary instead of silently changing algorithms. Unicode normalization, grapheme semantics, and tokenization stay outside the kernel.
+
+The fuzzy benchmark keeps two questions separate: BK-tree traversal with a deliberately cheap integer metric measures index overhead, while the Levenshtein/Myers pair measures metric computation on the same 64-byte-pattern/4,096-byte-text workload.
