@@ -354,8 +354,8 @@ mod tests {
         for left_index in 0..=left.len() {
             matrix[left_index * width] = left_index;
         }
-        for right_index in 0..=right.len() {
-            matrix[right_index] = right_index;
+        for (right_index, cell) in matrix.iter_mut().take(width).enumerate() {
+            *cell = right_index;
         }
 
         for left_index in 1..=left.len() {
