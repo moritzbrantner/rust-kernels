@@ -101,11 +101,8 @@ where
     compare(&left.value, &right.value).then_with(|| left.sequence.cmp(&right.sequence))
 }
 
-fn sift_up_worst<T, Compare>(
-    heap: &mut [Ranked<T>],
-    mut index: usize,
-    compare: &mut Compare,
-) where
+fn sift_up_worst<T, Compare>(heap: &mut [Ranked<T>], mut index: usize, compare: &mut Compare)
+where
     Compare: FnMut(&T, &T) -> Ordering,
 {
     while index > 0 {
@@ -118,11 +115,8 @@ fn sift_up_worst<T, Compare>(
     }
 }
 
-fn sift_down_worst<T, Compare>(
-    heap: &mut [Ranked<T>],
-    mut index: usize,
-    compare: &mut Compare,
-) where
+fn sift_down_worst<T, Compare>(heap: &mut [Ranked<T>], mut index: usize, compare: &mut Compare)
+where
     Compare: FnMut(&T, &T) -> Ordering,
 {
     loop {
