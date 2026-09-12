@@ -6,6 +6,7 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 MATRIX_PATH = ROOT / "verification-matrix.json"
+MATRIX_FRAGMENT_DIR = ROOT / "verification-matrix.d"
 ADAPTERS_PATH = ROOT / "verification-adapters.json"
 WORKSPACE_PATH = ROOT / "Cargo.toml"
 
@@ -34,6 +35,26 @@ def load_json(path: Path) -> dict:
     if not isinstance(value, dict):
         fail(f"{path.relative_to(ROOT)} must contain a JSON object")
     return value
+
+
+def load_kernel_fragments() -> list[dict]:
+    if not MATRIX_FRAGMENT_DIR.exists():
+        return []
+    if not MATRIX_FRAGMENT_DIR.is_dir():
+        fail("verification-matrix.d must be a directory when present")
+
+    kernels: list[dict] = []
+    for path in sorted(MATRIX_FRAGMENT_DIR.glob("*.json")):
+        fragment = load_json(path)
+        if fragment.get("schemaVersion") != 1:
+            fail(f"{path.relative_to(ROOT)} schemaVersion must be 1")
+        if fragment.get("issue") != 52:
+            fail(f"{path.relative_to(ROOT)} issue must be 52")
+        fragment_kernels = fragment.get("kernels")
+        if not isinstance(fragment_kernels, list) or not fragment_kernels:
+            fail(f"{path.relative_to(ROOT)} kernels must be a non-empty array")
+        kernels.extend(fragment_kernels)
+    return kernels
 
 
 def require_string(value: object, context: str) -> str:
@@ -164,6 +185,7 @@ for index, adapter in enumerate(adapters):
 kernels = matrix.get("kernels")
 if not isinstance(kernels, list) or not kernels:
     fail("kernels must be a non-empty array")
+kernels = [*kernels, *load_kernel_fragments()]
 
 kernel_ids: set[str] = set()
 kernel_sources: set[str] = set()
