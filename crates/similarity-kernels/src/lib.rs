@@ -50,11 +50,29 @@ pub fn levenshtein<T: Eq>(left: &[T], right: &[T]) -> usize {
 #[must_use]
 pub fn sorted_unique_union<T: Clone + Ord>(left: &[T], right: &[T]) -> Vec<T> {
     let mut output = Vec::with_capacity(left.len() + right.len());
-    merge_sorted_unique(left, right, |ordering, left_value, right_value| match ordering {
-        Ordering::Less => output.push(left_value.clone()),
-        Ordering::Greater => output.push(right_value.clone()),
-        Ordering::Equal => output.push(left_value.clone()),
-    });
+    let mut left_index = 0_usize;
+    let mut right_index = 0_usize;
+
+    while left_index < left.len() && right_index < right.len() {
+        match left[left_index].cmp(&right[right_index]) {
+            Ordering::Less => {
+                output.push(left[left_index].clone());
+                left_index += 1;
+            }
+            Ordering::Greater => {
+                output.push(right[right_index].clone());
+                right_index += 1;
+            }
+            Ordering::Equal => {
+                output.push(left[left_index].clone());
+                left_index += 1;
+                right_index += 1;
+            }
+        }
+    }
+
+    output.extend(left[left_index..].iter().cloned());
+    output.extend(right[right_index..].iter().cloned());
     output
 }
 
@@ -62,11 +80,21 @@ pub fn sorted_unique_union<T: Clone + Ord>(left: &[T], right: &[T]) -> Vec<T> {
 #[must_use]
 pub fn sorted_unique_intersection<T: Clone + Ord>(left: &[T], right: &[T]) -> Vec<T> {
     let mut output = Vec::with_capacity(left.len().min(right.len()));
-    merge_sorted_unique(left, right, |ordering, left_value, _right_value| {
-        if ordering == Ordering::Equal {
-            output.push(left_value.clone());
+    let mut left_index = 0_usize;
+    let mut right_index = 0_usize;
+
+    while left_index < left.len() && right_index < right.len() {
+        match left[left_index].cmp(&right[right_index]) {
+            Ordering::Less => left_index += 1,
+            Ordering::Greater => right_index += 1,
+            Ordering::Equal => {
+                output.push(left[left_index].clone());
+                left_index += 1;
+                right_index += 1;
+            }
         }
-    });
+    }
+
     output
 }
 
@@ -131,9 +159,21 @@ pub fn sorted_unique_symmetric_difference<T: Clone + Ord>(left: &[T], right: &[T
 #[must_use]
 pub fn sorted_unique_intersection_count<T: Ord>(left: &[T], right: &[T]) -> usize {
     let mut count = 0_usize;
-    merge_sorted_unique(left, right, |ordering, _left_value, _right_value| {
-        count += usize::from(ordering == Ordering::Equal);
-    });
+    let mut left_index = 0_usize;
+    let mut right_index = 0_usize;
+
+    while left_index < left.len() && right_index < right.len() {
+        match left[left_index].cmp(&right[right_index]) {
+            Ordering::Less => left_index += 1,
+            Ordering::Greater => right_index += 1,
+            Ordering::Equal => {
+                count += 1;
+                left_index += 1;
+                right_index += 1;
+            }
+        }
+    }
+
     count
 }
 
@@ -142,9 +182,23 @@ pub fn sorted_unique_intersection_count<T: Ord>(left: &[T], right: &[T]) -> usiz
 #[must_use]
 pub fn sorted_unique_union_count<T: Ord>(left: &[T], right: &[T]) -> usize {
     let mut count = 0_usize;
-    merge_sorted_unique(left, right, |_ordering, _left_value, _right_value| {
+    let mut left_index = 0_usize;
+    let mut right_index = 0_usize;
+
+    while left_index < left.len() && right_index < right.len() {
         count += 1;
-    });
+        match left[left_index].cmp(&right[right_index]) {
+            Ordering::Less => left_index += 1,
+            Ordering::Greater => right_index += 1,
+            Ordering::Equal => {
+                left_index += 1;
+                right_index += 1;
+            }
+        }
+    }
+
+    count += left.len() - left_index;
+    count += right.len() - right_index;
     count
 }
 
@@ -166,36 +220,6 @@ pub fn jaccard_similarity_sorted_unique<T: Ord>(left: &[T], right: &[T]) -> f64 
 #[must_use]
 pub fn jaccard_distance_sorted_unique<T: Ord>(left: &[T], right: &[T]) -> f64 {
     1.0 - jaccard_similarity_sorted_unique(left, right)
-}
-
-fn merge_sorted_unique<T: Ord, Visit>(left: &[T], right: &[T], mut visit: Visit)
-where
-    Visit: FnMut(Ordering, &T, &T),
-{
-    let mut left_index = 0_usize;
-    let mut right_index = 0_usize;
-
-    while left_index < left.len() && right_index < right.len() {
-        let ordering = left[left_index].cmp(&right[right_index]);
-        visit(ordering, &left[left_index], &right[right_index]);
-        match ordering {
-            Ordering::Less => left_index += 1,
-            Ordering::Greater => right_index += 1,
-            Ordering::Equal => {
-                left_index += 1;
-                right_index += 1;
-            }
-        }
-    }
-
-    while left_index < left.len() {
-        visit(Ordering::Less, &left[left_index], &right[right.len() - 1]);
-        left_index += 1;
-    }
-    while right_index < right.len() {
-        visit(Ordering::Greater, &left[left.len() - 1], &right[right_index]);
-        right_index += 1;
-    }
 }
 
 #[cfg(test)]
