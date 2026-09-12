@@ -1,8 +1,6 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
 
-use crate::levenshtein;
-
 const MYERS_MAX_PATTERN_LEN: usize = u64::BITS as usize;
 
 /// Metric BK-tree over caller-owned values.
@@ -183,7 +181,7 @@ impl std::error::Error for MyersError {}
 /// Patterns up to 64 bytes are supported. Longer patterns return an explicit
 /// error instead of silently falling back to another algorithm. This function
 /// operates on raw bytes; Unicode normalization, grapheme segmentation, and
-/// tokenization remain caller policy. Use [`levenshtein`] when a generic
+/// tokenization remain caller policy. Use [`crate::levenshtein`] when a generic
 /// sequence boundary or an unrestricted pattern length is required.
 pub fn myers_levenshtein_bytes(pattern: &[u8], text: &[u8]) -> Result<usize, MyersError> {
     if pattern.len() > MYERS_MAX_PATTERN_LEN {
