@@ -65,6 +65,22 @@
       "criterion": "missing",
       "runtimeProfiler": "missing",
       "notes": []
+    },
+    {
+      "id": "k-way-sorted-merge",
+      "crate": "similarity-kernels",
+      "module": "crate::merge_sorted_unique_many",
+      "sources": [
+        "crates/similarity-kernels/src/merge.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
     }
   ]
 }
