@@ -33,6 +33,22 @@
       "criterion": "missing",
       "runtimeProfiler": "missing",
       "notes": []
+    },
+    {
+      "id": "approximate-similarity-fingerprints",
+      "crate": "similarity-kernels",
+      "module": "crate::fingerprint",
+      "sources": [
+        "crates/similarity-kernels/src/fingerprint.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
     }
   ]
 }
