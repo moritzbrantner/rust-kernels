@@ -51,7 +51,9 @@ library_benchmark_group!(
 
 fn benchmark_config() -> LibraryBenchmarkConfig {
     let mut callgrind = Callgrind::default();
-    callgrind.soft_limits([(EventKind::Ir, 5.0)]).fail_fast(true);
+    callgrind
+        .soft_limits([(EventKind::Ir, 5.0)])
+        .fail_fast(true);
     let mut config = LibraryBenchmarkConfig::default();
     config.tool(callgrind);
     config
