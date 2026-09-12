@@ -17,6 +17,22 @@
       "criterion": "missing",
       "runtimeProfiler": "missing",
       "notes": []
+    },
+    {
+      "id": "shingling-rolling-hash",
+      "crate": "similarity-kernels",
+      "module": "crate::shingling",
+      "sources": [
+        "crates/similarity-kernels/src/shingling.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
     }
   ]
 }

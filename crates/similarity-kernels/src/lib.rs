@@ -4,7 +4,11 @@
 //! interpretation, ranking policy, and approximate-index policy remain with
 //! callers.
 
+mod shingling;
+
 use std::cmp::Ordering;
+
+pub use shingling::{RollingHashes, Shingles, rolling_hashes, shingles};
 
 /// Computes Levenshtein edit distance between two generic sequences.
 ///
