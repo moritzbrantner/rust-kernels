@@ -280,7 +280,10 @@ mod tests {
                 let right_set = right.iter().copied().collect::<BTreeSet<_>>();
 
                 let union = left_set.union(&right_set).copied().collect::<Vec<_>>();
-                let intersection = left_set.intersection(&right_set).copied().collect::<Vec<_>>();
+                let intersection = left_set
+                    .intersection(&right_set)
+                    .copied()
+                    .collect::<Vec<_>>();
                 let difference = left_set.difference(&right_set).copied().collect::<Vec<_>>();
                 let symmetric = left_set
                     .symmetric_difference(&right_set)
@@ -291,7 +294,10 @@ mod tests {
                 assert_eq!(sorted_unique_intersection(&left, &right), intersection);
                 assert_eq!(sorted_unique_difference(&left, &right), difference);
                 assert_eq!(sorted_unique_symmetric_difference(&left, &right), symmetric);
-                assert_eq!(sorted_unique_intersection_count(&left, &right), intersection.len());
+                assert_eq!(
+                    sorted_unique_intersection_count(&left, &right),
+                    intersection.len()
+                );
                 assert_eq!(sorted_unique_union_count(&left, &right), union.len());
             }
         }
@@ -301,7 +307,10 @@ mod tests {
     fn jaccard_uses_exact_set_counts_and_explicit_empty_semantics() {
         assert_eq!(jaccard_similarity_sorted_unique::<u8>(&[], &[]), 1.0);
         assert_eq!(jaccard_distance_sorted_unique::<u8>(&[], &[]), 0.0);
-        assert_eq!(jaccard_similarity_sorted_unique(&[1, 2], &[2, 3]), 1.0 / 3.0);
+        assert_eq!(
+            jaccard_similarity_sorted_unique(&[1, 2], &[2, 3]),
+            1.0 / 3.0
+        );
         assert_eq!(jaccard_distance_sorted_unique(&[1, 2], &[2, 3]), 2.0 / 3.0);
     }
 
@@ -364,8 +373,6 @@ mod tests {
     }
 
     fn set_from_mask(mask: u8) -> Vec<u8> {
-        (0_u8..6)
-            .filter(|value| mask & (1 << value) != 0)
-            .collect()
+        (0_u8..6).filter(|value| mask & (1 << value) != 0).collect()
     }
 }
