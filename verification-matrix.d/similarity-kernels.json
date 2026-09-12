@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "issue": 52,
+  "kernels": [
+    {
+      "id": "exact-similarity",
+      "crate": "similarity-kernels",
+      "module": "crate::levenshtein / sorted_unique_* / jaccard_*",
+      "sources": [
+        "crates/similarity-kernels/src/lib.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
+    }
+  ]
+}
