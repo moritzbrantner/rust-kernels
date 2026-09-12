@@ -155,10 +155,7 @@ mod tests {
     fn shingles_are_zero_copy_overlapping_windows_with_explicit_boundaries() {
         let values = [10, 20, 30, 40];
         let windows = shingles(&values, 2).collect::<Vec<_>>();
-        assert_eq!(
-            windows,
-            vec![&values[0..2], &values[1..3], &values[2..4]]
-        );
+        assert_eq!(windows, vec![&values[0..2], &values[1..3], &values[2..4]]);
         assert!(std::ptr::eq(windows[0].as_ptr(), values.as_ptr()));
 
         assert_eq!(shingles(&values, 1).count(), values.len());
