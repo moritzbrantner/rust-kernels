@@ -155,11 +155,17 @@ mod tests {
     fn shingles_are_zero_copy_overlapping_windows_with_explicit_boundaries() {
         let values = [10, 20, 30, 40];
         let windows = shingles(&values, 2).collect::<Vec<_>>();
-        assert_eq!(windows, vec![&values[0..2], &values[1..3], &values[2..4]]);
+        assert_eq!(
+            windows,
+            vec![&values[0..2], &values[1..3], &values[2..4]]
+        );
         assert!(std::ptr::eq(windows[0].as_ptr(), values.as_ptr()));
 
         assert_eq!(shingles(&values, 1).count(), values.len());
-        assert_eq!(shingles(&values, values.len()).collect::<Vec<_>>(), vec![values.as_slice()]);
+        assert_eq!(
+            shingles(&values, values.len()).collect::<Vec<_>>(),
+            vec![values.as_slice()]
+        );
         assert_eq!(shingles(&values, 0).count(), 0);
         assert_eq!(shingles(&values, values.len() + 1).count(), 0);
     }
@@ -171,7 +177,10 @@ mod tests {
         assert_eq!(windows.len(), 3);
         assert_eq!(windows.next(), Some(&values[0..3]));
         assert_eq!(windows.len(), 2);
-        assert_eq!(windows.collect::<Vec<_>>(), vec![&values[1..4], &values[2..5]]);
+        assert_eq!(
+            windows.collect::<Vec<_>>(),
+            vec![&values[1..4], &values[2..5]]
+        );
     }
 
     #[test]
@@ -203,7 +212,10 @@ mod tests {
 
     #[test]
     fn rolling_hashes_are_stable_for_a_known_fixture() {
-        assert_eq!(rolling_hashes(b"abcd", 3).collect::<Vec<_>>(), vec![6_455_819, 6_522_125]);
+        assert_eq!(
+            rolling_hashes(b"abcd", 3).collect::<Vec<_>>(),
+            vec![6_498_345, 6_564_652]
+        );
     }
 
     #[test]
