@@ -284,10 +284,12 @@ mod tests {
         let report = tree.search(&b"cat".to_vec(), 0, |left, right| levenshtein(left, right));
         assert_eq!(report.matches.len(), 2);
         assert!(report.matches.iter().all(|matched| matched.distance == 0));
-        assert!(report
-            .matches
-            .iter()
-            .all(|matched| matched.value.as_slice() == b"cat"));
+        assert!(
+            report
+                .matches
+                .iter()
+                .all(|matched| matched.value.as_slice() == b"cat")
+        );
     }
 
     #[test]
