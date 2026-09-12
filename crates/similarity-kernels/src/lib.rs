@@ -4,10 +4,15 @@
 //! interpretation, ranking policy, and approximate-index policy remain with
 //! callers.
 
+mod fingerprint;
 mod shingling;
 
 use std::cmp::Ordering;
 
+pub use fingerprint::{
+    MinHashError, MinHashSignature, hamming_distance64, minhash_jaccard_estimate,
+    minhash_signature, simhash64, simhash64_weighted,
+};
 pub use shingling::{RollingHashes, Shingles, rolling_hashes, shingles};
 
 /// Computes Levenshtein edit distance between two generic sequences.
