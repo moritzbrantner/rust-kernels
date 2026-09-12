@@ -14,6 +14,12 @@ The `sorted_unique_*` functions operate on caller-owned slices that are already 
 
 Available operations include union, intersection, left-minus-right difference, symmetric difference, and count-only intersection/union paths.
 
+## K-way sorted merge
+
+`merge_sorted_unique_many` performs a heap-based `O(n log k)` merge across any number of already-sorted unique slices while removing duplicates that occur across lists. It retains only one cursor per non-empty input list, which makes it suitable for posting-list, filter, and candidate-ID unions without materializing and resorting the complete concatenated input.
+
+The kernel deliberately assumes each individual input is already sorted and duplicate-free. Index construction and normalization policy remain caller-owned.
+
 ## Jaccard
 
 `jaccard_similarity_sorted_unique` and `jaccard_distance_sorted_unique` reuse the count-only sorted-set path. Two empty sets have similarity `1.0` and distance `0.0`.
