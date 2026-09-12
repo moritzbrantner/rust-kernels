@@ -6,4 +6,4 @@ mod selection;
 
 pub use bloom_filter::BloomFilter;
 pub use radix_sort::{radix_sort_u32, radix_sort_u64};
-pub use selection::{quickselect, top_k_smallest};
+pub use selection::{quickselect, top_k_by, top_k_smallest};

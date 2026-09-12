@@ -1,5 +1,5 @@
 use divan::{Bencher, counter::ItemsCount};
-use search_kernels::{quickselect, radix_sort_u32, top_k_smallest};
+use search_kernels::{quickselect, radix_sort_u32, top_k_by, top_k_smallest};
 
 const SIZES: &[usize] = &[256, 4_096, 65_536];
 
@@ -45,4 +45,15 @@ fn smallest_one_percent(bencher: Bencher, len: usize) {
         .with_inputs(|| generated_values(len))
         .counter(ItemsCount::new(len))
         .bench_local_values(|values| divan::black_box(top_k_smallest(&values, k)));
+}
+
+#[divan::bench(args = SIZES, skip_ext_time)]
+fn highest_ranked_one_percent_streaming(bencher: Bencher, len: usize) {
+    let k = (len / 100).max(1);
+    bencher
+        .with_inputs(|| generated_values(len))
+        .counter(ItemsCount::new(len))
+        .bench_local_values(|values| {
+            divan::black_box(top_k_by(values, k, |left, right| right.cmp(left)))
+        });
 }

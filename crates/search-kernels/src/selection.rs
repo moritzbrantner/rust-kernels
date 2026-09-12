@@ -48,6 +48,97 @@ pub fn top_k_smallest<T: Clone + Ord>(values: &[T], k: usize) -> Vec<T> {
     selected
 }
 
+/// Returns the best `k` values from a stream according to a sort-style comparator.
+///
+/// `compare(left, right) == Ordering::Less` means `left` ranks before `right`.
+/// The result is returned best-first. Values that compare equal retain their
+/// encounter order, providing deterministic tie-breaking without requiring the
+/// caller to add a synthetic secondary key.
+///
+/// Unlike [`top_k_smallest`], this function does not materialize the full input:
+/// it retains at most `k` candidate values while consuming the iterator. This is
+/// useful for search and ranking pipelines where candidate records may be large
+/// or generated incrementally.
+#[must_use]
+pub fn top_k_by<I, T, Compare>(values: I, k: usize, mut compare: Compare) -> Vec<T>
+where
+    I: IntoIterator<Item = T>,
+    Compare: FnMut(&T, &T) -> Ordering,
+{
+    if k == 0 {
+        return Vec::new();
+    }
+
+    let mut heap = Vec::with_capacity(k);
+    for (sequence, value) in values.into_iter().enumerate() {
+        let candidate = Ranked { value, sequence };
+        if heap.len() < k {
+            heap.push(candidate);
+            let last = heap.len() - 1;
+            sift_up_worst(&mut heap, last, &mut compare);
+            continue;
+        }
+
+        if rank_cmp(&candidate, &heap[0], &mut compare).is_lt() {
+            heap[0] = candidate;
+            sift_down_worst(&mut heap, 0, &mut compare);
+        }
+    }
+
+    heap.sort_by(|left, right| rank_cmp(left, right, &mut compare));
+    heap.into_iter().map(|entry| entry.value).collect()
+}
+
+struct Ranked<T> {
+    value: T,
+    sequence: usize,
+}
+
+fn rank_cmp<T, Compare>(left: &Ranked<T>, right: &Ranked<T>, compare: &mut Compare) -> Ordering
+where
+    Compare: FnMut(&T, &T) -> Ordering,
+{
+    compare(&left.value, &right.value).then_with(|| left.sequence.cmp(&right.sequence))
+}
+
+fn sift_up_worst<T, Compare>(heap: &mut [Ranked<T>], mut index: usize, compare: &mut Compare)
+where
+    Compare: FnMut(&T, &T) -> Ordering,
+{
+    while index > 0 {
+        let parent = (index - 1) / 2;
+        if !rank_cmp(&heap[index], &heap[parent], compare).is_gt() {
+            break;
+        }
+        heap.swap(index, parent);
+        index = parent;
+    }
+}
+
+fn sift_down_worst<T, Compare>(heap: &mut [Ranked<T>], mut index: usize, compare: &mut Compare)
+where
+    Compare: FnMut(&T, &T) -> Ordering,
+{
+    loop {
+        let left = index * 2 + 1;
+        if left >= heap.len() {
+            break;
+        }
+
+        let right = left + 1;
+        let mut worst_child = left;
+        if right < heap.len() && rank_cmp(&heap[right], &heap[left], compare).is_gt() {
+            worst_child = right;
+        }
+
+        if !rank_cmp(&heap[worst_child], &heap[index], compare).is_gt() {
+            break;
+        }
+        heap.swap(index, worst_child);
+        index = worst_child;
+    }
+}
+
 fn partition_three_way<T: Ord>(
     values: &mut [T],
     left: usize,
@@ -101,7 +192,13 @@ fn median_of_three<T: Ord>(values: &[T], first: usize, middle: usize, last: usiz
 
 #[cfg(test)]
 mod tests {
-    use super::{quickselect, top_k_smallest};
+    use super::{quickselect, top_k_by, top_k_smallest};
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    struct Candidate {
+        id: usize,
+        score: i8,
+    }
 
     #[test]
     fn quickselect_matches_a_fully_sorted_oracle_for_every_index() {
@@ -171,5 +268,69 @@ mod tests {
             expected.truncate(k.min(values.len()));
             assert_eq!(top_k_smallest(&values, k), expected, "k={k}");
         }
+    }
+
+    #[test]
+    fn ranked_top_k_supports_descending_search_scores_and_stable_ties() {
+        let candidates = vec![
+            Candidate { id: 0, score: 7 },
+            Candidate { id: 1, score: 10 },
+            Candidate { id: 2, score: 7 },
+            Candidate { id: 3, score: 12 },
+            Candidate { id: 4, score: 10 },
+        ];
+
+        let selected = top_k_by(candidates, 4, |left, right| right.score.cmp(&left.score));
+        assert_eq!(
+            selected,
+            vec![
+                Candidate { id: 3, score: 12 },
+                Candidate { id: 1, score: 10 },
+                Candidate { id: 4, score: 10 },
+                Candidate { id: 0, score: 7 },
+            ]
+        );
+    }
+
+    #[test]
+    fn ranked_top_k_matches_a_stable_full_sort_for_all_small_score_sequences() {
+        for len in 0_usize..=6 {
+            let cases = 3_usize.pow(len as u32);
+            for case in 0..cases {
+                let mut encoded = case;
+                let mut input = Vec::with_capacity(len);
+                for id in 0..len {
+                    input.push(Candidate {
+                        id,
+                        score: (encoded % 3) as i8 - 1,
+                    });
+                    encoded /= 3;
+                }
+
+                for k in 0..=len + 1 {
+                    let mut expected = input.clone();
+                    expected.sort_by_key(|candidate| std::cmp::Reverse(candidate.score));
+                    expected.truncate(k.min(len));
+
+                    assert_eq!(
+                        top_k_by(input.clone(), k, |left, right| right.score.cmp(&left.score)),
+                        expected,
+                        "len={len}, case={case}, k={k}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn ranked_top_k_accepts_float_scores_through_total_cmp() {
+        let selected = top_k_by(
+            [("a", 0.5_f64), ("b", f64::NAN), ("c", 2.0), ("d", -1.0)],
+            2,
+            |left, right| right.1.total_cmp(&left.1),
+        );
+
+        assert_eq!(selected[0].0, "b");
+        assert_eq!(selected[1], ("c", 2.0));
     }
 }
