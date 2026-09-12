@@ -249,7 +249,8 @@
         "traversal",
         "topology",
         "minimum-spanning-tree",
-        "kruskal"
+        "kruskal",
+        "pagerank"
       ],
       "dependencies": [],
       "registryDependencies": [
@@ -325,6 +326,16 @@
           "type": "algorithm",
           "symbols": [
             "strongly_connected_components"
+          ]
+        },
+        {
+          "name": "page-rank",
+          "type": "algorithm",
+          "symbols": [
+            "page_rank",
+            "PageRank",
+            "PageRankConfig",
+            "PageRankError"
           ]
         },
         {
