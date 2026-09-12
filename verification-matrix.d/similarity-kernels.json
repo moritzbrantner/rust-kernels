@@ -49,6 +49,22 @@
       "criterion": "missing",
       "runtimeProfiler": "missing",
       "notes": []
+    },
+    {
+      "id": "fuzzy-search",
+      "crate": "similarity-kernels",
+      "module": "crate::BkTree / crate::myers_levenshtein_bytes",
+      "sources": [
+        "crates/similarity-kernels/src/fuzzy.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": []
     }
   ]
 }

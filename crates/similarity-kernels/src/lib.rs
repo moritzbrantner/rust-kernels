@@ -5,6 +5,7 @@
 //! callers.
 
 mod fingerprint;
+mod fuzzy;
 mod shingling;
 
 use std::cmp::Ordering;
@@ -13,6 +14,7 @@ pub use fingerprint::{
     MinHashError, MinHashSignature, hamming_distance64, minhash_jaccard_estimate,
     minhash_signature, simhash64, simhash64_weighted,
 };
+pub use fuzzy::{BkMatch, BkSearchReport, BkTree, MyersError, myers_levenshtein_bytes};
 pub use shingling::{RollingHashes, Shingles, rolling_hashes, shingles};
 
 /// Computes Levenshtein edit distance between two generic sequences.
