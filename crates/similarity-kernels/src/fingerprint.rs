@@ -58,13 +58,19 @@ pub enum MinHashError {
 impl fmt::Display for MinHashError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ZeroLength => write!(formatter, "MinHash signature length must be greater than zero"),
+            Self::ZeroLength => write!(
+                formatter,
+                "MinHash signature length must be greater than zero"
+            ),
             Self::LengthMismatch { left, right } => write!(
                 formatter,
                 "MinHash signature lengths differ: left={left}, right={right}"
             ),
             Self::SeedMismatch { left, right } => {
-                write!(formatter, "MinHash seeds differ: left={left}, right={right}")
+                write!(
+                    formatter,
+                    "MinHash seeds differ: left={left}, right={right}"
+                )
             }
         }
     }
