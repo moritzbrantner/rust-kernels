@@ -1,7 +1,7 @@
 use iai_callgrind::{
     Callgrind, EventKind, LibraryBenchmarkConfig, library_benchmark, library_benchmark_group, main,
 };
-use search_kernels::{quickselect, radix_sort_u32, top_k_smallest};
+use search_kernels::{quickselect, radix_sort_u32, top_k_by, top_k_smallest};
 use std::hint::black_box;
 
 const SMOKE_LEN: usize = 4_096;
@@ -38,16 +38,20 @@ fn bench_top_k(values: Vec<u32>) -> Vec<u32> {
     black_box(top_k_smallest(&values, 40))
 }
 
+#[library_benchmark]
+#[bench::ranked_top_40_of_4096(generated_values())]
+fn bench_ranked_top_k(values: Vec<u32>) -> Vec<u32> {
+    black_box(top_k_by(values, 40, |left, right| right.cmp(left)))
+}
+
 library_benchmark_group!(
     name = search_smoke;
-    benchmarks = bench_radix_sort, bench_quickselect, bench_top_k
+    benchmarks = bench_radix_sort, bench_quickselect, bench_top_k, bench_ranked_top_k
 );
 
 fn benchmark_config() -> LibraryBenchmarkConfig {
     let mut callgrind = Callgrind::default();
-    callgrind
-        .soft_limits([(EventKind::Ir, 5.0)])
-        .fail_fast(true);
+    callgrind.soft_limits([(EventKind::Ir, 5.0)]).fail_fast(true);
     let mut config = LibraryBenchmarkConfig::default();
     config.tool(callgrind);
     config
