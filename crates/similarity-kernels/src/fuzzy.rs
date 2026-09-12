@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn bk_tree_exposes_candidate_pruning_separately_from_metric_cost() {
         let mut tree = BkTree::new();
-        for value in std::iter::once(50_i32).chain(0..=100).filter(|value| *value != 50) {
+        for value in std::iter::once(50_i32).chain((0..=100).filter(|value| *value != 50)) {
             tree.insert(value, |left, right| left.abs_diff(*right) as usize);
         }
 
