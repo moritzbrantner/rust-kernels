@@ -309,7 +309,7 @@ mod tests {
 
                 for k in 0..=len + 1 {
                     let mut expected = input.clone();
-                    expected.sort_by(|left, right| right.score.cmp(&left.score));
+                    expected.sort_by_key(|candidate| std::cmp::Reverse(candidate.score));
                     expected.truncate(k.min(len));
 
                     assert_eq!(
