@@ -311,7 +311,10 @@ mod tests {
             jaccard_similarity_sorted_unique(&[1, 2], &[2, 3]),
             1.0 / 3.0
         );
-        assert_eq!(jaccard_distance_sorted_unique(&[1, 2], &[2, 3]), 2.0 / 3.0);
+        assert_eq!(
+            jaccard_distance_sorted_unique(&[1, 2], &[2, 3]),
+            1.0 - 1.0 / 3.0
+        );
     }
 
     #[test]
