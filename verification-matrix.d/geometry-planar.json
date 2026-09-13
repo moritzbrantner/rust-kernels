@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "issue": 52,
+  "kernels": [
+    {
+      "id": "planar-gjk-adapter",
+      "crate": "geometry-kernels",
+      "module": "crate::planar",
+      "sources": [
+        "crates/geometry-kernels/src/planar.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "missing",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "Tests cover overlapping and separated coplanar convex hulls and require the trace terminal result to match the authoritative planar GJK result."
+      ]
+    }
+  ]
+}
