@@ -1,3 +1,4 @@
+pub mod epa;
 pub mod gjk;
 pub mod gjk_trace;
 pub mod math3;
