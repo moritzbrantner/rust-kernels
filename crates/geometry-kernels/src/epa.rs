@@ -259,7 +259,8 @@ where
     if hull.len() == 2 {
         let delta = sub(hull[1].point, hull[0].point);
         let perpendicular = [-delta[1], delta[0], 0.0];
-        let length_squared = perpendicular[0] * perpendicular[0] + perpendicular[1] * perpendicular[1];
+        let length_squared =
+            perpendicular[0] * perpendicular[0] + perpendicular[1] * perpendicular[1];
         if length_squared > epsilon * epsilon {
             seeds.push(minkowski_support(left, right, perpendicular));
             seeds.push(minkowski_support(
@@ -408,8 +409,7 @@ fn contains_origin_xy(polytope: &[MinkowskiSupportPoint], epsilon: f64) -> bool 
 }
 
 fn cross_xy(origin: Vec3, left: Vec3, right: Vec3) -> f64 {
-    (left[0] - origin[0]) * (right[1] - origin[1])
-        - (left[1] - origin[1]) * (right[0] - origin[0])
+    (left[0] - origin[0]) * (right[1] - origin[1]) - (left[1] - origin[1]) * (right[0] - origin[0])
 }
 
 fn dot_xy(left: Vec3, right: Vec3) -> f64 {
