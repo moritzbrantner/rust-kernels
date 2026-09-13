@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "issue": 52,
+  "kernels": [
+    {
+      "id": "gjk-intersection-trace",
+      "crate": "geometry-kernels",
+      "module": "crate::gjk_trace",
+      "sources": [
+        "crates/geometry-kernels/src/gjk_trace.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "missing",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "Trace tests compare the materialized result and every retained simplex/search-direction prefix against the allocation-free authoritative GJK implementation."
+      ]
+    }
+  ]
+}
