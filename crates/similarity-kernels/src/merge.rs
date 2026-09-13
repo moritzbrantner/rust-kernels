@@ -10,16 +10,14 @@ use std::collections::BinaryHeap;
 #[must_use]
 pub fn merge_sorted_unique_many<T: Clone + Ord>(inputs: &[&[T]]) -> Vec<T> {
     let mut heap = BinaryHeap::new();
-    let mut total_len = 0_usize;
 
     for (input_index, input) in inputs.iter().copied().enumerate() {
-        total_len = total_len.saturating_add(input.len());
         if let Some(first) = input.first() {
             heap.push(Reverse((first, input_index, 0_usize)));
         }
     }
 
-    let mut output = Vec::with_capacity(total_len);
+    let mut output = Vec::with_capacity(initial_output_capacity(inputs));
     while let Some(Reverse((value, input_index, item_index))) = heap.pop() {
         if output.last().is_none_or(|previous| previous != value) {
             output.push(value.clone());
@@ -34,11 +32,15 @@ pub fn merge_sorted_unique_many<T: Clone + Ord>(inputs: &[&[T]]) -> Vec<T> {
     output
 }
 
+fn initial_output_capacity<T>(inputs: &[&[T]]) -> usize {
+    inputs.iter().map(|input| input.len()).max().unwrap_or(0)
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
 
-    use super::merge_sorted_unique_many;
+    use super::{initial_output_capacity, merge_sorted_unique_many};
 
     #[test]
     fn merges_sorted_posting_lists_and_removes_cross_list_duplicates() {
@@ -61,6 +63,15 @@ mod tests {
         assert!(merge_sorted_unique_many(&[&empty, &empty]).is_empty());
         assert_eq!(merge_sorted_unique_many(&[&values]), values);
         assert_eq!(merge_sorted_unique_many(&[&empty, &values, &empty]), values);
+    }
+
+    #[test]
+    fn heavily_overlapping_inputs_reserve_only_the_largest_input() {
+        let values = (0_u32..2048).collect::<Vec<_>>();
+        let inputs = vec![values.as_slice(); 64];
+
+        assert_eq!(initial_output_capacity(&inputs), values.len());
+        assert_eq!(merge_sorted_unique_many(&inputs), values);
     }
 
     #[test]
