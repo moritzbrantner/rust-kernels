@@ -45,11 +45,7 @@ where
 
 /// Configurable tracing variant of [`gjk_intersection_trace`].
 #[must_use]
-pub fn gjk_intersection_trace_with_config<L, R>(
-    left: &L,
-    right: &R,
-    config: GjkConfig,
-) -> GjkTrace
+pub fn gjk_intersection_trace_with_config<L, R>(left: &L, right: &R, config: GjkConfig) -> GjkTrace
 where
     L: SupportMap3 + ?Sized,
     R: SupportMap3 + ?Sized,
