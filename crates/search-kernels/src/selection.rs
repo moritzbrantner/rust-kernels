@@ -40,10 +40,15 @@ pub fn top_k_smallest<T: Clone + Ord>(values: &[T], k: usize) -> Vec<T> {
     if k == 0 {
         return Vec::new();
     }
+    if k == 1 {
+        return values.iter().min().cloned().into_iter().collect();
+    }
 
     let mut selected = values.to_vec();
-    let _ = quickselect(&mut selected, k - 1);
-    selected.truncate(k);
+    if k < selected.len() {
+        let _ = quickselect(&mut selected, k - 1);
+        selected.truncate(k);
+    }
     selected.sort_unstable();
     selected
 }
@@ -192,7 +197,21 @@ fn median_of_three<T: Ord>(values: &[T], first: usize, middle: usize, last: usiz
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+
     use super::{quickselect, top_k_by, top_k_smallest};
+
+    static CLONE_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+    struct CountedValue(i32);
+
+    impl Clone for CountedValue {
+        fn clone(&self) -> Self {
+            CLONE_COUNT.fetch_add(1, AtomicOrdering::Relaxed);
+            Self(self.0)
+        }
+    }
 
     #[derive(Clone, Debug, Eq, PartialEq)]
     struct Candidate {
@@ -268,6 +287,17 @@ mod tests {
             expected.truncate(k.min(values.len()));
             assert_eq!(top_k_smallest(&values, k), expected, "k={k}");
         }
+    }
+
+    #[test]
+    fn smallest_one_clones_only_the_selected_value() {
+        let values = (0..128).rev().map(CountedValue).collect::<Vec<_>>();
+        CLONE_COUNT.store(0, AtomicOrdering::Relaxed);
+
+        let selected = top_k_smallest(&values, 1);
+
+        assert_eq!(selected, vec![CountedValue(0)]);
+        assert_eq!(CLONE_COUNT.load(AtomicOrdering::Relaxed), 1);
     }
 
     #[test]
