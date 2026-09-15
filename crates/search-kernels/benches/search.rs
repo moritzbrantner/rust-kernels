@@ -19,10 +19,25 @@ fn generated_values(len: usize) -> Vec<u32> {
         .collect()
 }
 
+fn generated_low_byte_values(len: usize) -> Vec<u32> {
+    generated_values(len)
+        .into_iter()
+        .map(|value| value & 0xff)
+        .collect()
+}
+
 #[divan::bench(args = SIZES, skip_ext_time)]
 fn radix_sort(bencher: Bencher, len: usize) {
     bencher
         .with_inputs(|| generated_values(len))
+        .counter(ItemsCount::new(len))
+        .bench_local_refs(|values| radix_sort_u32(values));
+}
+
+#[divan::bench(args = SIZES, skip_ext_time)]
+fn radix_sort_low_byte_range(bencher: Bencher, len: usize) {
+    bencher
+        .with_inputs(|| generated_low_byte_values(len))
         .counter(ItemsCount::new(len))
         .bench_local_refs(|values| radix_sort_u32(values));
 }
