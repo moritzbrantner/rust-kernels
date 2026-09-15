@@ -240,11 +240,7 @@ mod tests {
         }
 
         clones.store(0, Ordering::Relaxed);
-        let path = reconstruct_path(
-            &came_from,
-            CountedNode::new(NODE_COUNT - 1, &clones),
-            17,
-        );
+        let path = reconstruct_path(&came_from, CountedNode::new(NODE_COUNT - 1, &clones), 17);
 
         assert_eq!(clones.load(Ordering::Relaxed), NODE_COUNT - 1);
         assert_eq!(path.cost, 17);
