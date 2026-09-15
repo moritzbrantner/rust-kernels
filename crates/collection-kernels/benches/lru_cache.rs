@@ -87,5 +87,10 @@ fn evict_at_capacity(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, fill_to_capacity, update_existing, evict_at_capacity);
+criterion_group!(
+    benches,
+    fill_to_capacity,
+    update_existing,
+    evict_at_capacity
+);
 criterion_main!(benches);
