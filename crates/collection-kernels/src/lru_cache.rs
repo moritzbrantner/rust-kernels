@@ -122,32 +122,39 @@ where
             };
         }
 
-        if let Some(&index) = self.indices.get(&key) {
-            self.promote(index);
-            let node = self.nodes[index]
-                .as_mut()
-                .expect("LRU index must be occupied");
-            return Some(std::mem::replace(&mut node.value, value));
+        let victim_index = self
+            .least_recent
+            .expect("full LRU cache must have a least-recent entry");
+        match self.indices.entry(key) {
+            Entry::Occupied(entry) => {
+                let index = *entry.get();
+                self.promote(index);
+                let node = self.nodes[index]
+                    .as_mut()
+                    .expect("LRU index must be occupied");
+                Some(std::mem::replace(&mut node.value, value))
+            }
+            Entry::Vacant(entry) => {
+                let node_key = entry.key().clone();
+                entry.insert(victim_index);
+
+                self.detach(victim_index);
+                let evicted = self.nodes[victim_index]
+                    .take()
+                    .expect("LRU index must be occupied");
+                let removed = self.indices.remove(&evicted.key);
+                debug_assert_eq!(removed, Some(victim_index));
+
+                self.nodes[victim_index] = Some(Node {
+                    key: node_key,
+                    value,
+                    previous: None,
+                    next: None,
+                });
+                self.attach_front(victim_index);
+                None
+            }
         }
-
-        self.evict_least_recent();
-
-        let index = if let Some(index) = self.free.pop() {
-            index
-        } else {
-            self.nodes.push(None);
-            self.nodes.len() - 1
-        };
-
-        self.nodes[index] = Some(Node {
-            key: key.clone(),
-            value,
-            previous: None,
-            next: None,
-        });
-        self.indices.insert(key, index);
-        self.attach_front(index);
-        None
     }
 
     pub fn remove(&mut self, key: &K) -> Option<V> {
@@ -235,18 +242,6 @@ where
             .expect("LRU index must be occupied");
         node.previous = None;
         node.next = None;
-    }
-
-    fn evict_least_recent(&mut self) {
-        let Some(index) = self.least_recent else {
-            return;
-        };
-        self.detach(index);
-        let node = self.nodes[index]
-            .take()
-            .expect("LRU index must be occupied");
-        self.indices.remove(&node.key);
-        self.free.push(index);
     }
 }
 
@@ -390,6 +385,21 @@ mod tests {
         HASH_CALLS.store(0, Ordering::Relaxed);
         assert_eq!(cache.insert(CountingKey(1), 20), Some(10));
         assert_eq!(HASH_CALLS.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn full_capacity_eviction_hashes_incoming_key_once() {
+        let mut cache = LruCache::new(4);
+        for key in 0..4_u64 {
+            assert_eq!(cache.insert(CountingKey(key), key), None);
+        }
+
+        HASH_CALLS.store(0, Ordering::Relaxed);
+        assert_eq!(cache.insert(CountingKey(4), 4), None);
+        assert_eq!(HASH_CALLS.load(Ordering::Relaxed), 2);
+        assert_eq!(cache.len(), 4);
+        assert!(!cache.contains_key(&CountingKey(0)));
+        assert!(cache.contains_key(&CountingKey(4)));
     }
 
     #[test]
