@@ -143,13 +143,24 @@ fn byte_term(byte: u8) -> u64 {
     u64::from(byte) + 1
 }
 
-fn rolling_power(exponent: usize) -> u64 {
-    (0..exponent).fold(1_u64, |power, _| power.wrapping_mul(ROLLING_BASE))
+fn rolling_power(mut exponent: usize) -> u64 {
+    let mut result = 1_u64;
+    let mut factor = ROLLING_BASE;
+
+    while exponent != 0 {
+        if exponent & 1 != 0 {
+            result = result.wrapping_mul(factor);
+        }
+        exponent >>= 1;
+        factor = factor.wrapping_mul(factor);
+    }
+
+    result
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{hash_window, rolling_hashes, shingles};
+    use super::{ROLLING_BASE, hash_window, rolling_hashes, rolling_power, shingles};
 
     #[test]
     fn shingles_are_zero_copy_overlapping_windows_with_explicit_boundaries() {
@@ -178,6 +189,15 @@ mod tests {
             windows.collect::<Vec<_>>(),
             vec![&values[1..4], &values[2..5]]
         );
+    }
+
+    #[test]
+    fn rolling_power_matches_repeated_wrapping_multiplication() {
+        for exponent in 0_usize..=4_096 {
+            let expected = (0..exponent)
+                .fold(1_u64, |power, _| power.wrapping_mul(ROLLING_BASE));
+            assert_eq!(rolling_power(exponent), expected, "exponent={exponent}");
+        }
     }
 
     #[test]
