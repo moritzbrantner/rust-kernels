@@ -157,6 +157,7 @@ where
 
     let node_count_f64 = node_count as f64;
     let mut scores = vec![1.0 / node_count_f64; node_count];
+    let mut next = vec![0.0; node_count];
     let base = (1.0 - config.damping) / node_count_f64;
     let mut residual = f64::INFINITY;
 
@@ -169,7 +170,7 @@ where
             .map(|(index, _)| scores[index])
             .sum();
         let dangling_share = config.damping * dangling_mass / node_count_f64;
-        let mut next = vec![base + dangling_share; node_count];
+        next.fill(base + dangling_share);
 
         for (source, outgoing) in graph.adjacency.iter().enumerate() {
             if outgoing.is_empty() {
@@ -186,7 +187,7 @@ where
             .zip(&next)
             .map(|(left, right)| (left - right).abs())
             .sum();
-        scores = next;
+        std::mem::swap(&mut scores, &mut next);
 
         if residual <= config.tolerance {
             return Ok(PageRank {
