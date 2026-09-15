@@ -38,32 +38,26 @@ where
     Vertices: IntoIterator<Item = N>,
     Edges: IntoIterator<Item = WeightedEdge<N>>,
 {
-    let edges: Vec<_> = edges.into_iter().collect();
     let mut nodes = Vec::new();
     let mut indices = HashMap::new();
 
     for vertex in vertices {
-        add_vertex(vertex, &mut nodes, &mut indices);
-    }
-    for edge in &edges {
-        add_vertex(edge.a.clone(), &mut nodes, &mut indices);
-        add_vertex(edge.b.clone(), &mut nodes, &mut indices);
+        let _ = vertex_index(vertex, &mut nodes, &mut indices);
     }
 
-    let mut indexed: Vec<_> = edges
-        .into_iter()
-        .enumerate()
-        .map(|(order, edge)| {
-            let left = indices[&edge.a];
-            let right = indices[&edge.b];
-            IndexedEdge {
-                left,
-                right,
-                order,
-                edge,
-            }
-        })
-        .collect();
+    let edges = edges.into_iter();
+    let (minimum_edges, _) = edges.size_hint();
+    let mut indexed = Vec::with_capacity(minimum_edges);
+    for (order, edge) in edges.enumerate() {
+        let left = vertex_index(edge.a.clone(), &mut nodes, &mut indices);
+        let right = vertex_index(edge.b.clone(), &mut nodes, &mut indices);
+        indexed.push(IndexedEdge {
+            left,
+            right,
+            order,
+            edge,
+        });
+    }
 
     indexed.sort_by_key(|entry| {
         (
@@ -109,14 +103,18 @@ struct IndexedEdge<N> {
     edge: WeightedEdge<N>,
 }
 
-fn add_vertex<N>(vertex: N, nodes: &mut Vec<N>, indices: &mut HashMap<N, usize>)
+fn vertex_index<N>(vertex: N, nodes: &mut Vec<N>, indices: &mut HashMap<N, usize>) -> usize
 where
     N: Clone + Eq + Hash,
 {
-    if let Entry::Vacant(entry) = indices.entry(vertex.clone()) {
-        let index = nodes.len();
-        entry.insert(index);
-        nodes.push(vertex);
+    match indices.entry(vertex) {
+        Entry::Occupied(entry) => *entry.get(),
+        Entry::Vacant(entry) => {
+            let index = nodes.len();
+            nodes.push(entry.key().clone());
+            entry.insert(index);
+            index
+        }
     }
 }
 
