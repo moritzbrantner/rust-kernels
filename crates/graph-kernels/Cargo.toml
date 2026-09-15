@@ -15,3 +15,7 @@ criterion = "0.5.1"
 [[bench]]
 name = "minimum_spanning"
 harness = false
+
+[[bench]]
+name = "page_rank"
+harness = false
