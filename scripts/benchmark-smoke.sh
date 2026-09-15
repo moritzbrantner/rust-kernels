@@ -55,6 +55,12 @@ if [[ -n "$base_sha" ]] && git cat-file -e "$base_sha:$bench_path" 2>/dev/null; 
       cargo bench -p search-kernels --bench performance_smoke -- --save-baseline="$baseline_name"
   ) 2>&1 | tee "$artifact_dir/baseline.log"
 
+  # The detached base worktree is checked out after the candidate and shares the
+  # same package id and target directory. Without invalidating its Cargo output,
+  # Cargo can reuse the newer base benchmark executable for the candidate run.
+  # A package-scoped clean keeps the Iai-Callgrind baseline under target/iai but
+  # forces the candidate crate and benchmark harness to be rebuilt from HEAD.
+  CARGO_TARGET_DIR="$target_dir" cargo clean -p search-kernels
   run_benchmark candidate.log --baseline="$baseline_name"
 else
   printf '%s\n' \
