@@ -18,9 +18,23 @@ fn generated_values() -> Vec<u32> {
         .collect()
 }
 
+fn generated_low_byte_values() -> Vec<u32> {
+    generated_values()
+        .into_iter()
+        .map(|value| value & 0xff)
+        .collect()
+}
+
 #[library_benchmark]
 #[bench::radix_4096(generated_values())]
 fn bench_radix_sort(mut values: Vec<u32>) -> u32 {
+    radix_sort_u32(&mut values);
+    black_box(values[values.len() / 2])
+}
+
+#[library_benchmark]
+#[bench::radix_low_byte_4096(generated_low_byte_values())]
+fn bench_radix_sort_low_byte(mut values: Vec<u32>) -> u32 {
     radix_sort_u32(&mut values);
     black_box(values[values.len() / 2])
 }
@@ -46,7 +60,11 @@ fn bench_ranked_top_k(values: Vec<u32>) -> Vec<u32> {
 
 library_benchmark_group!(
     name = search_smoke;
-    benchmarks = bench_radix_sort, bench_quickselect, bench_top_k, bench_ranked_top_k
+    benchmarks = bench_radix_sort,
+        bench_radix_sort_low_byte,
+        bench_quickselect,
+        bench_top_k,
+        bench_ranked_top_k
 );
 
 fn benchmark_config() -> LibraryBenchmarkConfig {
