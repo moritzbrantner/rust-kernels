@@ -71,7 +71,9 @@ where
     for (bucket, count) in counts.into_iter().enumerate() {
         offsets[bucket] = next;
         next += count;
-        occupied_buckets += usize::from(count != 0);
+        if count != 0 {
+            occupied_buckets += 1;
+        }
     }
 
     if occupied_buckets <= 1 {
