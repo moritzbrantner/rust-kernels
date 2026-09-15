@@ -22,14 +22,14 @@ where
         }
     }
 
+    /// Builds the tree from all values in O(n).
     #[must_use]
     pub fn from_slice(values: &[T]) -> Self {
         let mut tree = vec![T::default(); values.len() + 1];
-        for (index, &value) in values.iter().enumerate() {
-            tree[index + 1] = value;
-        }
+        for (zero_index, &value) in values.iter().enumerate() {
+            let index = zero_index + 1;
+            tree[index] += value;
 
-        for index in 1..tree.len() {
             let parent = index + lowbit(index);
             if parent < tree.len() {
                 let subtotal = tree[index];
