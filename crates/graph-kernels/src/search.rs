@@ -144,32 +144,27 @@ where
 mod tests {
     use std::collections::HashMap;
     use std::hash::{Hash, Hasher};
-    use std::sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    };
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::{Path, astar, dijkstra, reconstruct_path};
+
+    static CLONE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
     #[derive(Debug)]
     struct CountedNode {
         id: usize,
-        clones: Arc<AtomicUsize>,
     }
 
     impl CountedNode {
-        fn new(id: usize, clones: &Arc<AtomicUsize>) -> Self {
-            Self {
-                id,
-                clones: Arc::clone(clones),
-            }
+        const fn new(id: usize) -> Self {
+            Self { id }
         }
     }
 
     impl Clone for CountedNode {
         fn clone(&self) -> Self {
-            self.clones.fetch_add(1, Ordering::Relaxed);
-            Self::new(self.id, &self.clones)
+            CLONE_COUNT.fetch_add(1, Ordering::Relaxed);
+            Self::new(self.id)
         }
     }
 
@@ -230,19 +225,15 @@ mod tests {
     fn path_reconstruction_clones_each_predecessor_once() {
         const NODE_COUNT: usize = 64;
 
-        let clones = Arc::new(AtomicUsize::new(0));
         let mut came_from = HashMap::new();
         for id in 1..NODE_COUNT {
-            came_from.insert(
-                CountedNode::new(id, &clones),
-                CountedNode::new(id - 1, &clones),
-            );
+            came_from.insert(CountedNode::new(id), CountedNode::new(id - 1));
         }
 
-        clones.store(0, Ordering::Relaxed);
-        let path = reconstruct_path(&came_from, CountedNode::new(NODE_COUNT - 1, &clones), 17);
+        CLONE_COUNT.store(0, Ordering::Relaxed);
+        let path = reconstruct_path(&came_from, CountedNode::new(NODE_COUNT - 1), 17);
 
-        assert_eq!(clones.load(Ordering::Relaxed), NODE_COUNT - 1);
+        assert_eq!(CLONE_COUNT.load(Ordering::Relaxed), NODE_COUNT - 1);
         assert_eq!(path.cost, 17);
         assert_eq!(
             path.nodes.iter().map(|node| node.id).collect::<Vec<_>>(),
