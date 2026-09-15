@@ -14,8 +14,8 @@ impl Hash for WideKey {
     }
 }
 
-fn generated_keys() -> Vec<WideKey> {
-    (0..ITEMS)
+fn generated_keys(len: usize) -> Vec<WideKey> {
+    (0..len)
         .map(|index| {
             let base = index as u64;
             WideKey([
@@ -33,7 +33,7 @@ fn generated_keys() -> Vec<WideKey> {
 }
 
 fn fill_to_capacity(c: &mut Criterion) {
-    let keys = generated_keys();
+    let keys = generated_keys(ITEMS);
     c.bench_function("lru/fill_to_capacity_8192", |b| {
         b.iter(|| {
             let mut cache = LruCache::new(keys.len());
@@ -46,7 +46,7 @@ fn fill_to_capacity(c: &mut Criterion) {
 }
 
 fn update_existing(c: &mut Criterion) {
-    let keys = generated_keys();
+    let keys = generated_keys(ITEMS);
     c.bench_function("lru/update_existing_8192", |b| {
         b.iter_batched(
             || {
@@ -66,5 +66,31 @@ fn update_existing(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, fill_to_capacity, update_existing);
+fn evict_at_capacity(c: &mut Criterion) {
+    let keys = generated_keys(ITEMS * 2);
+    c.bench_function("lru/evict_at_capacity_8192", |b| {
+        b.iter_batched(
+            || {
+                let mut cache = LruCache::new(ITEMS);
+                for (index, key) in keys[..ITEMS].iter().cloned().enumerate() {
+                    cache.insert(key, index);
+                }
+                cache
+            },
+            |mut cache| {
+                for (index, key) in keys[ITEMS..].iter().cloned().enumerate() {
+                    black_box(cache.insert(key, index));
+                }
+            },
+            criterion::BatchSize::LargeInput,
+        );
+    });
+}
+
+criterion_group!(
+    benches,
+    fill_to_capacity,
+    update_existing,
+    evict_at_capacity
+);
 criterion_main!(benches);
