@@ -29,63 +29,33 @@ where
     }
 
     let mut scratch = values.to_vec();
-    let mut source_in_values = true;
-
     for pass in 0..passes {
-        let wrote_pass = if source_in_values {
-            radix_pass(values, &mut scratch, pass, &mut bucket)
-        } else {
-            radix_pass(&scratch, values, pass, &mut bucket)
-        };
-
-        if wrote_pass {
-            source_in_values = !source_in_values;
+        let mut counts = [0_usize; 256];
+        for value in values.iter() {
+            counts[bucket(value, pass)] += 1;
         }
-    }
 
-    if !source_in_values {
+        // If every value has the same byte, this pass cannot change ordering.
+        // Avoid the scatter and full-buffer copy while retaining the cheap
+        // counting pass needed to discover that fact.
+        if counts.contains(&values.len()) {
+            continue;
+        }
+
+        let mut offsets = [0_usize; 256];
+        let mut next = 0_usize;
+        for (bucket, count) in counts.into_iter().enumerate() {
+            offsets[bucket] = next;
+            next += count;
+        }
+
+        for &value in values.iter() {
+            let bucket = bucket(&value, pass);
+            scratch[offsets[bucket]] = value;
+            offsets[bucket] += 1;
+        }
         values.copy_from_slice(&scratch);
     }
-}
-
-fn radix_pass<T, Bucket>(
-    source: &[T],
-    destination: &mut [T],
-    pass: usize,
-    bucket: &mut Bucket,
-) -> bool
-where
-    T: Copy,
-    Bucket: FnMut(&T, usize) -> usize,
-{
-    debug_assert_eq!(source.len(), destination.len());
-
-    let mut counts = [0_usize; 256];
-    for value in source {
-        counts[bucket(value, pass)] += 1;
-    }
-
-    let mut offsets = [0_usize; 256];
-    let mut next = 0_usize;
-    let mut occupied_buckets = 0_usize;
-    for (bucket, count) in counts.into_iter().enumerate() {
-        offsets[bucket] = next;
-        next += count;
-        if count != 0 {
-            occupied_buckets += 1;
-        }
-    }
-
-    if occupied_buckets <= 1 {
-        return false;
-    }
-
-    for &value in source {
-        let bucket = bucket(&value, pass);
-        destination[offsets[bucket]] = value;
-        offsets[bucket] += 1;
-    }
-    true
 }
 
 #[cfg(test)]
@@ -227,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    fn odd_number_of_written_passes_copy_the_final_buffer_back() {
+    fn single_active_byte_pass_sorts_values() {
         let mut values = [3_u8, 1, 2, 0];
         radix_sort_by_byte(&mut values, 1, |value, _| usize::from(*value));
         assert_eq!(values, [0, 1, 2, 3]);
