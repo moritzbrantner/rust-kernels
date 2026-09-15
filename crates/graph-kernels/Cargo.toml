@@ -19,3 +19,7 @@ harness = false
 [[bench]]
 name = "page_rank"
 harness = false
+
+[[bench]]
+name = "topology"
+harness = false
