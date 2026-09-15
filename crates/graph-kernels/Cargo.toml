@@ -23,3 +23,7 @@ harness = false
 [[bench]]
 name = "topology"
 harness = false
+
+[[bench]]
+name = "shortest_path"
+harness = false

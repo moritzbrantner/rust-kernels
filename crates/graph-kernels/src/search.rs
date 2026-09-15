@@ -132,11 +132,9 @@ fn reconstruct_path<N>(came_from: &HashMap<N, N>, goal: N, cost: u64) -> Path<N>
 where
     N: Clone + Eq + Hash,
 {
-    let mut current = goal;
-    let mut nodes = vec![current.clone()];
-    while let Some(previous) = came_from.get(&current) {
-        current = previous.clone();
-        nodes.push(current.clone());
+    let mut nodes = vec![goal];
+    while let Some(previous) = came_from.get(nodes.last().expect("path always contains its goal")) {
+        nodes.push(previous.clone());
     }
     nodes.reverse();
     Path { cost, nodes }
@@ -144,7 +142,45 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{Path, astar, dijkstra};
+    use std::collections::HashMap;
+    use std::hash::{Hash, Hasher};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use super::{Path, astar, dijkstra, reconstruct_path};
+
+    static CLONE_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    #[derive(Debug)]
+    struct CountedNode {
+        id: usize,
+    }
+
+    impl CountedNode {
+        const fn new(id: usize) -> Self {
+            Self { id }
+        }
+    }
+
+    impl Clone for CountedNode {
+        fn clone(&self) -> Self {
+            CLONE_COUNT.fetch_add(1, Ordering::Relaxed);
+            Self::new(self.id)
+        }
+    }
+
+    impl PartialEq for CountedNode {
+        fn eq(&self, other: &Self) -> bool {
+            self.id == other.id
+        }
+    }
+
+    impl Eq for CountedNode {}
+
+    impl Hash for CountedNode {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.id.hash(state);
+        }
+    }
 
     fn neighbors(node: &char) -> Vec<(char, u64)> {
         match node {
@@ -183,6 +219,26 @@ mod tests {
         );
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn path_reconstruction_clones_each_predecessor_once() {
+        const NODE_COUNT: usize = 64;
+
+        let mut came_from = HashMap::new();
+        for id in 1..NODE_COUNT {
+            came_from.insert(CountedNode::new(id), CountedNode::new(id - 1));
+        }
+
+        CLONE_COUNT.store(0, Ordering::Relaxed);
+        let path = reconstruct_path(&came_from, CountedNode::new(NODE_COUNT - 1), 17);
+
+        assert_eq!(CLONE_COUNT.load(Ordering::Relaxed), NODE_COUNT - 1);
+        assert_eq!(path.cost, 17);
+        assert_eq!(
+            path.nodes.iter().map(|node| node.id).collect::<Vec<_>>(),
+            (0..NODE_COUNT).collect::<Vec<_>>()
+        );
     }
 
     #[test]
