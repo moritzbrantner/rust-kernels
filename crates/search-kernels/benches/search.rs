@@ -39,12 +39,31 @@ fn middle_quickselect(bencher: Bencher, len: usize) {
 }
 
 #[divan::bench(args = SIZES, skip_ext_time)]
+fn smallest_one(bencher: Bencher, len: usize) {
+    bencher
+        .with_inputs(|| generated_values(len))
+        .counter(ItemsCount::new(len))
+        .bench_local_values(|values| divan::black_box(top_k_smallest(&values, 1)));
+}
+
+#[divan::bench(args = SIZES, skip_ext_time)]
 fn smallest_one_percent(bencher: Bencher, len: usize) {
     let k = (len / 100).max(1);
     bencher
         .with_inputs(|| generated_values(len))
         .counter(ItemsCount::new(len))
         .bench_local_values(|values| divan::black_box(top_k_smallest(&values, k)));
+}
+
+#[divan::bench(args = SIZES, skip_ext_time)]
+fn all_smallest_sorted(bencher: Bencher, len: usize) {
+    bencher
+        .with_inputs(|| generated_values(len))
+        .counter(ItemsCount::new(len))
+        .bench_local_values(|values| {
+            let k = values.len();
+            divan::black_box(top_k_smallest(&values, k))
+        });
 }
 
 #[divan::bench(args = SIZES, skip_ext_time)]
