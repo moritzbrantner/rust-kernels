@@ -72,18 +72,18 @@ impl BloomFilter {
 }
 
 fn base_hashes(bytes: &[u8]) -> (u64, u64) {
-    let first = fnv1a(bytes, 0);
-    let second = fnv1a(bytes, SECOND_SEED) | 1;
-    (first, second)
-}
+    let mut first = FNV_OFFSET;
+    let mut second = FNV_OFFSET ^ SECOND_SEED;
 
-fn fnv1a(bytes: &[u8], seed: u64) -> u64 {
-    let mut hash = FNV_OFFSET ^ seed;
     for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(FNV_PRIME);
+        let byte = u64::from(*byte);
+        first ^= byte;
+        first = first.wrapping_mul(FNV_PRIME);
+        second ^= byte;
+        second = second.wrapping_mul(FNV_PRIME);
     }
-    hash
+
+    (first, second | 1)
 }
 
 fn bloom_index(first: u64, second: u64, round: u32, bit_count: usize) -> usize {
@@ -93,7 +93,7 @@ fn bloom_index(first: u64, second: u64, round: u32, bit_count: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::BloomFilter;
+    use super::{BloomFilter, base_hashes};
 
     #[test]
     fn inserted_values_never_become_false_negatives() {
@@ -109,6 +109,14 @@ mod tests {
             assert!(filter.might_contain(value), "false negative for {value}");
         }
         assert_eq!(filter.insertions(), values.len() as u64);
+    }
+
+    #[test]
+    fn base_hashes_remain_bit_for_bit_stable() {
+        assert_eq!(
+            base_hashes(b"alpha"),
+            (0x8ac6_25bb_85ed_202b, 0x3251_afea_874b_0f85)
+        );
     }
 
     #[test]
