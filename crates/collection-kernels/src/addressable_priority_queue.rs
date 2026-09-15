@@ -1,3 +1,4 @@
+use std::cmp::Ordering as CmpOrdering;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -192,8 +193,11 @@ impl<P: Ord, V> AddressablePriorityQueue<P, V> {
     fn precedes(&self, left: usize, right: usize) -> bool {
         let left = &self.heap[left];
         let right = &self.heap[right];
-        left.priority < right.priority
-            || (left.priority == right.priority && left.insertion_order < right.insertion_order)
+        match left.priority.cmp(&right.priority) {
+            CmpOrdering::Less => true,
+            CmpOrdering::Equal => left.insertion_order < right.insertion_order,
+            CmpOrdering::Greater => false,
+        }
     }
 
     fn swap_entries(&mut self, left: usize, right: usize) {
@@ -265,8 +269,39 @@ impl<P: Ord, V> AddressablePriorityQueue<P, V> {
 
 #[cfg(test)]
 mod tests {
+    use std::cmp::Ordering as CmpOrdering;
+    use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+
     use super::*;
     use proptest::prelude::*;
+
+    static ORDER_COMPARISONS: AtomicUsize = AtomicUsize::new(0);
+    static EQUALITY_COMPARISONS: AtomicUsize = AtomicUsize::new(0);
+
+    #[derive(Debug, Clone)]
+    struct CountingPriority(i32);
+
+    impl PartialEq for CountingPriority {
+        fn eq(&self, other: &Self) -> bool {
+            EQUALITY_COMPARISONS.fetch_add(1, AtomicOrdering::Relaxed);
+            self.0 == other.0
+        }
+    }
+
+    impl Eq for CountingPriority {}
+
+    impl PartialOrd for CountingPriority {
+        fn partial_cmp(&self, other: &Self) -> Option<CmpOrdering> {
+            Some(self.cmp(other))
+        }
+    }
+
+    impl Ord for CountingPriority {
+        fn cmp(&self, other: &Self) -> CmpOrdering {
+            ORDER_COMPARISONS.fetch_add(1, AtomicOrdering::Relaxed);
+            self.0.cmp(&other.0)
+        }
+    }
 
     #[derive(Debug, Clone)]
     struct ModelEntry {
@@ -295,6 +330,24 @@ mod tests {
         assert_eq!(actual, expected);
         assert_eq!(queue.len(), model.len());
         assert_eq!(queue.is_empty(), model.is_empty());
+    }
+
+    #[test]
+    fn heap_ordering_uses_one_priority_comparison_per_decision() {
+        let mut queue = AddressablePriorityQueue::new();
+        queue.insert(CountingPriority(1), "first");
+
+        ORDER_COMPARISONS.store(0, AtomicOrdering::Relaxed);
+        EQUALITY_COMPARISONS.store(0, AtomicOrdering::Relaxed);
+        queue.insert(CountingPriority(2), "second");
+        assert_eq!(ORDER_COMPARISONS.load(AtomicOrdering::Relaxed), 1);
+        assert_eq!(EQUALITY_COMPARISONS.load(AtomicOrdering::Relaxed), 0);
+
+        ORDER_COMPARISONS.store(0, AtomicOrdering::Relaxed);
+        EQUALITY_COMPARISONS.store(0, AtomicOrdering::Relaxed);
+        queue.insert(CountingPriority(1), "equal");
+        assert_eq!(ORDER_COMPARISONS.load(AtomicOrdering::Relaxed), 1);
+        assert_eq!(EQUALITY_COMPARISONS.load(AtomicOrdering::Relaxed), 0);
     }
 
     #[test]
