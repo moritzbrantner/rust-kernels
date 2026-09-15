@@ -194,8 +194,7 @@ mod tests {
     #[test]
     fn rolling_power_matches_repeated_wrapping_multiplication() {
         for exponent in 0_usize..=4_096 {
-            let expected = (0..exponent)
-                .fold(1_u64, |power, _| power.wrapping_mul(ROLLING_BASE));
+            let expected = (0..exponent).fold(1_u64, |power, _| power.wrapping_mul(ROLLING_BASE));
             assert_eq!(rolling_power(exponent), expected, "exponent={exponent}");
         }
     }
