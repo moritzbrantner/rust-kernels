@@ -33,12 +33,8 @@ fn neighbors(node: &WideNode) -> Option<(WideNode, u64)> {
 fn dijkstra_wide_chain(c: &mut Criterion) {
     c.bench_function("shortest_path/dijkstra_wide_chain_4096", |b| {
         b.iter(|| {
-            let path = dijkstra(
-                WideNode::new(0),
-                |node| node.id == NODES - 1,
-                neighbors,
-            )
-            .expect("chain endpoint is reachable");
+            let path = dijkstra(WideNode::new(0), |node| node.id == NODES - 1, neighbors)
+                .expect("chain endpoint is reachable");
             black_box((path.cost, path.nodes.len()));
         });
     });
