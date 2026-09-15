@@ -22,13 +22,22 @@ where
         }
     }
 
+    /// Builds the tree from all values in O(n).
     #[must_use]
     pub fn from_slice(values: &[T]) -> Self {
-        let mut tree = Self::new(values.len());
-        for (index, &value) in values.iter().enumerate() {
-            tree.add(index, value);
+        let mut tree = vec![T::default(); values.len() + 1];
+        for (zero_index, &value) in values.iter().enumerate() {
+            let index = zero_index + 1;
+            tree[index] += value;
+
+            let parent = index + lowbit(index);
+            if parent < tree.len() {
+                let subtotal = tree[index];
+                tree[parent] += subtotal;
+            }
         }
-        tree
+
+        Self { tree }
     }
 
     #[must_use]
@@ -47,7 +56,7 @@ where
         let mut cursor = index + 1;
         while cursor < self.tree.len() {
             self.tree[cursor] += delta;
-            cursor += cursor & (!cursor + 1);
+            cursor += lowbit(cursor);
         }
     }
 
@@ -71,6 +80,11 @@ where
         assert!(range.end <= self.len(), "Fenwick range end out of bounds");
         self.prefix_sum(range.end) - self.prefix_sum(range.start)
     }
+}
+
+fn lowbit(index: usize) -> usize {
+    debug_assert!(index > 0);
+    index & index.wrapping_neg()
 }
 
 #[cfg(test)]
@@ -156,6 +170,20 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn bulk_construction_matches_incremental_updates() {
+        let values = (0_i64..257)
+            .map(|value| (value * 17) % 31 - 15)
+            .collect::<Vec<_>>();
+        let bulk = FenwickTree::from_slice(&values);
+        let mut incremental = FenwickTree::new(values.len());
+        for (index, value) in values.into_iter().enumerate() {
+            incremental.add(index, value);
+        }
+
+        assert_eq!(bulk, incremental);
     }
 
     #[test]
