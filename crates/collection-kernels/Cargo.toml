@@ -19,3 +19,7 @@ harness = false
 [[bench]]
 name = "fenwick_tree"
 harness = false
+
+[[bench]]
+name = "lru_cache"
+harness = false
