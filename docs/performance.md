@@ -20,6 +20,18 @@ cargo bench -p search-kernels --bench search
 
 The suite measures radix sort, middle quickselect, and top-k selection at 256, 4,096, and 65,536 items. Input generation is deterministic and excluded from the measured region.
 
+## Collection-kernel microbenchmarks
+
+Run the Fenwick construction comparison with:
+
+```sh
+cargo bench -p collection-kernels --bench fenwick_tree
+```
+
+The Divan matrix compares ordered `FenwickTree::from_slice` construction with the explicitly regrouped O(n) `FenwickTree::from_slice_linear` path at 256, 4,096, and 65,536 items. Input generation is excluded from the measured region. The ordinary constructor preserves repeated-point-update addition order for non-associative arithmetic; the linear constructor is a separate API because its regrouping can change floating-point results.
+
+A deterministic unit-level work check complements the timing benchmark by counting `AddAssign` operations on a 64-item fixture. It locks the linear constructor to 127 additions and verifies that it performs less addition work than the ordered constructor without using a wall-clock threshold.
+
 ## Deterministic smoke gate
 
 Run the bounded Callgrind sentinel with:

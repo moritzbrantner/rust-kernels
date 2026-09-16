@@ -10,6 +10,7 @@ description = "Small deterministic collection and data-structure kernels"
 
 [dev-dependencies]
 criterion = "0.5.1"
+divan = "0.1.21"
 proptest = "1.11.0"
 
 [[bench]]
