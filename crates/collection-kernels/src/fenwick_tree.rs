@@ -247,7 +247,10 @@ mod tests {
         }
 
         assert_eq!(ordered.prefix_sum(values.len()), 1.0);
-        assert_eq!(ordered.prefix_sum(values.len()), incremental.prefix_sum(values.len()));
+        assert_eq!(
+            ordered.prefix_sum(values.len()),
+            incremental.prefix_sum(values.len())
+        );
     }
 
     #[test]
