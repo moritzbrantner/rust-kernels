@@ -1,33 +1,30 @@
 use collection_kernels::FenwickTree;
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use divan::{Bencher, counter::ItemsCount};
 
-const ITEMS: usize = 65_536;
+const SIZES: &[usize] = &[256, 4_096, 65_536];
 
-fn generated_values() -> Vec<i64> {
-    (0..ITEMS)
+fn main() {
+    divan::main();
+}
+
+fn generated_values(len: usize) -> Vec<i64> {
+    (0..len)
         .map(|index| ((index * 17 + 11) % 1_009) as i64 - 504)
         .collect()
 }
 
-fn bulk_build(c: &mut Criterion) {
-    let values = generated_values();
-    c.bench_function("fenwick/from_slice_65536", |b| {
-        b.iter(|| black_box(FenwickTree::from_slice(black_box(&values))))
-    });
+#[divan::bench(args = SIZES, skip_ext_time)]
+fn ordered_build(bencher: Bencher, len: usize) {
+    bencher
+        .with_inputs(|| generated_values(len))
+        .counter(ItemsCount::new(len))
+        .bench_local_values(|values| divan::black_box(FenwickTree::from_slice(&values)));
 }
 
-fn incremental_build(c: &mut Criterion) {
-    let values = generated_values();
-    c.bench_function("fenwick/incremental_add_65536", |b| {
-        b.iter(|| {
-            let mut tree = FenwickTree::new(values.len());
-            for (index, &value) in values.iter().enumerate() {
-                tree.add(index, value);
-            }
-            black_box(tree)
-        });
-    });
+#[divan::bench(args = SIZES, skip_ext_time)]
+fn linear_build(bencher: Bencher, len: usize) {
+    bencher
+        .with_inputs(|| generated_values(len))
+        .counter(ItemsCount::new(len))
+        .bench_local_values(|values| divan::black_box(FenwickTree::from_slice_linear(&values)));
 }
-
-criterion_group!(benches, bulk_build, incremental_build);
-criterion_main!(benches);

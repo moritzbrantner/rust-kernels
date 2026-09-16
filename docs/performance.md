@@ -2,6 +2,12 @@
 
 `rust-kernels` treats execution cost as an explicit engineering contract for performance-sensitive kernels.
 
+## Machine-readable contract
+
+`.performance/contract.json` is the repository-owned machine-readable summary of representative performance scenarios and their deterministic budgets. It follows coding-tooling performance-contract schema v1. The repository owns scenario dimensions, correctness evidence, metrics, and budgets; coding-tooling owns the shared schema and discovery contract; runtime-profiler owns runtime captures; Moonlight/evaluators own cross-revision verdicts.
+
+The contract intentionally records only evidence that can be interpreted deterministically. Shared-runner wall-clock measurements are not blocking performance evidence.
+
 ## Evidence layers
 
 - Correctness remains owned by tests and property/reference-model checks.
@@ -19,6 +25,18 @@ cargo bench -p search-kernels --bench search
 ```
 
 The suite measures radix sort, middle quickselect, and top-k selection at 256, 4,096, and 65,536 items. Input generation is deterministic and excluded from the measured region.
+
+## Collection-kernel microbenchmarks
+
+Run the Fenwick construction comparison with:
+
+```sh
+cargo bench -p collection-kernels --bench fenwick_tree
+```
+
+The Divan matrix compares ordered `FenwickTree::from_slice` construction with the explicitly regrouped O(n) `FenwickTree::from_slice_linear` path at 256, 4,096, and 65,536 items. Input generation is excluded from the measured region. The ordinary constructor preserves repeated-point-update addition order for non-associative arithmetic; the linear constructor is a separate API because its regrouping can change floating-point results.
+
+A deterministic unit-level work check complements the timing benchmark by counting `AddAssign` operations on a 64-item fixture. It locks the linear constructor to 127 additions and verifies that it performs less addition work than the ordered constructor without using a wall-clock threshold.
 
 ## Deterministic smoke gate
 

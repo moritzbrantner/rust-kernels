@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "suite": "rust-kernels",
+  "description": "Deterministic performance contracts for representative kernel workloads. Blocking evidence uses operation or instruction counts; ordinary shared-runner wall-clock timings remain informational.",
+  "scenarios": [
+    {
+      "id": "radix-sort-4096",
+      "kind": "micro",
+      "description": "Sort 4,096 deterministic u32 values with radix_sort_u32.",
+      "dimensions": {
+        "items": 4096,
+        "valueBits": 32
+      },
+      "correctnessEvidence": [
+        "crates/search-kernels/benches/performance_smoke.rs::radix_4096",
+        "search-kernels correctness tests"
+      ],
+      "metrics": [
+        {
+          "name": "callgrind-ir",
+          "unit": "instructions",
+          "direction": "lower",
+          "signal": "instruction-count",
+          "blocking": true,
+          "budget": {
+            "relativeRegressionPercent": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "quickselect-middle-4096",
+      "kind": "micro",
+      "description": "Select the middle element from 4,096 deterministic u32 values.",
+      "dimensions": {
+        "items": 4096,
+        "rank": 2048
+      },
+      "correctnessEvidence": [
+        "crates/search-kernels/benches/performance_smoke.rs::middle_4096",
+        "search-kernels correctness tests"
+      ],
+      "metrics": [
+        {
+          "name": "callgrind-ir",
+          "unit": "instructions",
+          "direction": "lower",
+          "signal": "instruction-count",
+          "blocking": true,
+          "budget": {
+            "relativeRegressionPercent": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "top-k-40-of-4096",
+      "kind": "micro",
+      "description": "Select the 40 smallest values from 4,096 deterministic u32 values.",
+      "dimensions": {
+        "items": 4096,
+        "k": 40
+      },
+      "correctnessEvidence": [
+        "crates/search-kernels/benches/performance_smoke.rs::top_40_of_4096",
+        "search-kernels correctness tests"
+      ],
+      "metrics": [
+        {
+          "name": "callgrind-ir",
+          "unit": "instructions",
+          "direction": "lower",
+          "signal": "instruction-count",
+          "blocking": true,
+          "budget": {
+            "relativeRegressionPercent": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "ranked-top-k-40-of-4096",
+      "kind": "micro",
+      "description": "Select 40 ranked values from 4,096 deterministic u32 values through top_k_by.",
+      "dimensions": {
+        "items": 4096,
+        "k": 40
+      },
+      "correctnessEvidence": [
+        "crates/search-kernels/benches/performance_smoke.rs::ranked_top_40_of_4096",
+        "search-kernels correctness tests"
+      ],
+      "metrics": [
+        {
+          "name": "callgrind-ir",
+          "unit": "instructions",
+          "direction": "lower",
+          "signal": "instruction-count",
+          "blocking": true,
+          "budget": {
+            "relativeRegressionPercent": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "bloom-insert-4096",
+      "kind": "micro",
+      "description": "Insert 4,096 deterministic bytes into a 512-bit Bloom filter with five hash probes.",
+      "dimensions": {
+        "items": 4096,
+        "filterBits": 512,
+        "hashes": 5
+      },
+      "correctnessEvidence": [
+        "crates/search-kernels/benches/performance_smoke.rs::bloom_insert_4096",
+        "search-kernels correctness tests"
+      ],
+      "metrics": [
+        {
+          "name": "callgrind-ir",
+          "unit": "instructions",
+          "direction": "lower",
+          "signal": "instruction-count",
+          "blocking": true,
+          "budget": {
+            "relativeRegressionPercent": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "fenwick-linear-build-64",
+      "kind": "micro",
+      "description": "Construct a 64-item Fenwick tree with the explicitly regrouped O(n) builder.",
+      "dimensions": {
+        "items": 64
+      },
+      "correctnessEvidence": [
+        "crates/collection-kernels/src/fenwick_tree.rs::linear_construction_matches_ordered_updates_for_associative_fixture",
+        "crates/collection-kernels/src/fenwick_tree.rs::ordered_construction_preserves_floating_point_update_order"
+      ],
+      "metrics": [
+        {
+          "name": "add-assign-operations",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 127
+          },
+          "notes": "The deterministic CountingValue regression fixes the 64-item linear builder at exactly 2n-1 AddAssign operations."
+        }
+      ]
+    }
+  ]
+}
