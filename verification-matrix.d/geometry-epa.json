@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "issue": 52,
+  "kernels": [
+    {
+      "id": "planar-epa-penetration",
+      "crate": "geometry-kernels",
+      "module": "crate::epa",
+      "sources": [
+        "crates/geometry-kernels/src/epa.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "Tests cover known square penetration depth/normal, swapped-shape symmetry, fail-closed separated input, deterministic trace equality, and result/trace parity.",
+        "Regression coverage keeps hull turn tolerances scale-aware, strips synthetic planar-GJK extrusion witnesses from EPA evidence, and marks iteration-capped traces terminal."
+      ]
+    }
+  ]
+}
