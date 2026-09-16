@@ -25,21 +25,13 @@ jobs:
           from pathlib import Path
           path = Path('crates/graph-kernels/src/topology.rs')
           text = path.read_text()
-          old = '''        let node = nodes[cursor].clone();
-        let outgoing_nodes = neighbors(&node).into_iter();
-'''
-          new = '''        let outgoing_nodes = neighbors(&nodes[cursor]).into_iter();
-'''
+          old = "        let node = nodes[cursor].clone();\n        let outgoing_nodes = neighbors(&node).into_iter();\n"
+          new = "        let outgoing_nodes = neighbors(&nodes[cursor]).into_iter();\n"
           if text.count(old) != 1:
               raise SystemExit('expected exactly one cursor-clone sequence')
           text = text.replace(old, new)
-          marker = '''        assert!(sparse.adjacency.iter().all(Vec::is_empty));
-        drop(sparse);
-'''
-          replacement = '''        assert!(sparse.adjacency.iter().all(Vec::is_empty));
-        assert_eq!(sparse_clones, NODE_COUNT);
-        drop(sparse);
-'''
+          marker = "        assert!(sparse.adjacency.iter().all(Vec::is_empty));\n        drop(sparse);\n"
+          replacement = "        assert!(sparse.adjacency.iter().all(Vec::is_empty));\n        assert_eq!(sparse_clones, NODE_COUNT);\n        drop(sparse);\n"
           if text.count(marker) != 1:
               raise SystemExit('expected exactly one sparse materialization assertion block')
           path.write_text(text.replace(marker, replacement))
