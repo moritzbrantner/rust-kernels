@@ -220,12 +220,12 @@ pub fn sorted_unique_union_count<T: Ord>(left: &[T], right: &[T]) -> usize {
 /// Two empty sets are defined as identical and therefore have similarity `1.0`.
 #[must_use]
 pub fn jaccard_similarity_sorted_unique<T: Ord>(left: &[T], right: &[T]) -> f64 {
-    let union = sorted_unique_union_count(left, right);
-    if union == 0 {
+    if left.is_empty() && right.is_empty() {
         return 1.0;
     }
 
     let intersection = sorted_unique_intersection_count(left, right);
+    let union = left.len() + right.len() - intersection;
     intersection as f64 / union as f64
 }
 
@@ -237,13 +237,33 @@ pub fn jaccard_distance_sorted_unique<T: Ord>(left: &[T], right: &[T]) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use std::cmp::Ordering;
     use std::collections::BTreeSet;
+    use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 
     use super::{
         jaccard_distance_sorted_unique, jaccard_similarity_sorted_unique, levenshtein,
         sorted_unique_difference, sorted_unique_intersection, sorted_unique_intersection_count,
         sorted_unique_symmetric_difference, sorted_unique_union, sorted_unique_union_count,
     };
+
+    static COMPARISON_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    #[derive(Eq, PartialEq)]
+    struct CountingOrd(u8);
+
+    impl Ord for CountingOrd {
+        fn cmp(&self, other: &Self) -> Ordering {
+            COMPARISON_COUNT.fetch_add(1, AtomicOrdering::Relaxed);
+            self.0.cmp(&other.0)
+        }
+    }
+
+    impl PartialOrd for CountingOrd {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            Some(self.cmp(other))
+        }
+    }
 
     #[test]
     fn levenshtein_matches_known_examples_and_generic_sequences() {
@@ -314,6 +334,16 @@ mod tests {
                 assert_eq!(sorted_unique_union_count(&left, &right), union.len());
             }
         }
+    }
+
+    #[test]
+    fn jaccard_uses_one_sorted_merge_pass() {
+        let left = [0_u8, 2, 4, 6].map(CountingOrd);
+        let right = [1_u8, 3, 5, 7].map(CountingOrd);
+
+        COMPARISON_COUNT.store(0, AtomicOrdering::Relaxed);
+        assert_eq!(jaccard_similarity_sorted_unique(&left, &right), 0.0);
+        assert_eq!(COMPARISON_COUNT.load(AtomicOrdering::Relaxed), 7);
     }
 
     #[test]
