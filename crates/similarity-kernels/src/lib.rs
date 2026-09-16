@@ -22,7 +22,7 @@ pub use shingling::{RollingHashes, Shingles, rolling_hashes, shingles};
 /// Computes Levenshtein edit distance between two generic sequences.
 ///
 /// Insertions, deletions, and substitutions each cost one. The implementation
-/// keeps only two rows whose width is the shorter input, so auxiliary memory is
+/// keeps one row whose width is the shorter input, so auxiliary memory is
 /// `O(min(left.len(), right.len()))`.
 #[must_use]
 pub fn levenshtein<T: Eq>(left: &[T], right: &[T]) -> usize {
@@ -39,21 +39,23 @@ pub fn levenshtein<T: Eq>(left: &[T], right: &[T]) -> usize {
         (right, left)
     };
 
-    let mut previous = (0..=shorter.len()).collect::<Vec<_>>();
-    let mut current = vec![0_usize; shorter.len() + 1];
+    let mut row = (0..=shorter.len()).collect::<Vec<_>>();
 
     for (long_index, long_value) in longer.iter().enumerate() {
-        current[0] = long_index + 1;
+        let mut diagonal = row[0];
+        row[0] = long_index + 1;
+
         for (short_index, short_value) in shorter.iter().enumerate() {
-            let substitution = previous[short_index] + usize::from(long_value != short_value);
-            let deletion = previous[short_index + 1] + 1;
-            let insertion = current[short_index] + 1;
-            current[short_index + 1] = substitution.min(deletion).min(insertion);
+            let above = row[short_index + 1];
+            let substitution = diagonal + usize::from(long_value != short_value);
+            let deletion = above + 1;
+            let insertion = row[short_index] + 1;
+            row[short_index + 1] = substitution.min(deletion).min(insertion);
+            diagonal = above;
         }
-        std::mem::swap(&mut previous, &mut current);
     }
 
-    previous[shorter.len()]
+    row[shorter.len()]
 }
 
 /// Returns the union of two strictly sorted, duplicate-free slices.
