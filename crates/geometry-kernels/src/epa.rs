@@ -217,6 +217,8 @@ where
         }
 
         polytope.insert(edge.end, support);
+        let terminal_status =
+            (iteration == config.max_iterations).then_some(EpaStatus::IterationLimit);
         push_trace(
             &mut trace,
             EpaTraceStep {
@@ -228,7 +230,7 @@ where
                 support_distance,
                 gap,
                 polytope: polytope.clone(),
-                terminal_status: None,
+                terminal_status,
             },
         );
     }
@@ -238,6 +240,13 @@ where
         iterations: config.max_iterations,
         penetration: None,
     }
+}
+
+fn project_support_to_xy(mut support: MinkowskiSupportPoint) -> MinkowskiSupportPoint {
+    support.left[2] = 0.0;
+    support.right[2] = 0.0;
+    support.point = sub(support.left, support.right);
+    support
 }
 
 fn initial_polytope<L, R>(
@@ -250,7 +259,11 @@ where
     L: SupportMap3 + ?Sized,
     R: SupportMap3 + ?Sized,
 {
-    let mut seeds = gjk.simplex[..gjk.simplex_len].to_vec();
+    let mut seeds = gjk.simplex[..gjk.simplex_len]
+        .iter()
+        .copied()
+        .map(project_support_to_xy)
+        .collect::<Vec<_>>();
     let mut hull = convex_hull_xy(&seeds, epsilon);
     if hull.len() >= 3 && contains_origin_xy(&hull, epsilon) {
         return hull;
@@ -345,6 +358,11 @@ fn closest_edge(polytope: &[MinkowskiSupportPoint], epsilon: f64) -> Option<Clos
     best
 }
 
+fn scaled_cross_tolerance_xy(start: Vec3, end: Vec3, epsilon: f64) -> f64 {
+    let edge = sub(end, start);
+    epsilon * (edge[0] * edge[0] + edge[1] * edge[1]).sqrt()
+}
+
 fn convex_hull_xy(points: &[MinkowskiSupportPoint], epsilon: f64) -> Vec<MinkowskiSupportPoint> {
     let epsilon_squared = epsilon * epsilon;
     let mut unique = Vec::new();
@@ -371,7 +389,11 @@ fn convex_hull_xy(points: &[MinkowskiSupportPoint], epsilon: f64) -> Vec<Minkows
                 lower[lower.len() - 2].point,
                 lower[lower.len() - 1].point,
                 point.point,
-            ) <= epsilon
+            ) <= scaled_cross_tolerance_xy(
+                lower[lower.len() - 2].point,
+                lower[lower.len() - 1].point,
+                epsilon,
+            )
         {
             lower.pop();
         }
@@ -385,7 +407,11 @@ fn convex_hull_xy(points: &[MinkowskiSupportPoint], epsilon: f64) -> Vec<Minkows
                 upper[upper.len() - 2].point,
                 upper[upper.len() - 1].point,
                 point.point,
-            ) <= epsilon
+            ) <= scaled_cross_tolerance_xy(
+                upper[upper.len() - 2].point,
+                upper[upper.len() - 1].point,
+                epsilon,
+            )
         {
             upper.pop();
         }
@@ -404,7 +430,8 @@ fn contains_origin_xy(polytope: &[MinkowskiSupportPoint], epsilon: f64) -> bool 
         let b = polytope[end].point;
         let edge = [b[0] - a[0], b[1] - a[1], 0.0];
         let to_origin = [-a[0], -a[1], 0.0];
-        edge[0] * to_origin[1] - edge[1] * to_origin[0] >= -epsilon
+        let signed_area = edge[0] * to_origin[1] - edge[1] * to_origin[0];
+        signed_area >= -scaled_cross_tolerance_xy(a, b, epsilon)
     })
 }
 
@@ -423,8 +450,15 @@ fn distance_squared_xy(left: Vec3, right: Vec3) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{EpaStatus, epa_penetration_planar_xy, epa_penetration_trace_planar_xy};
-    use crate::{gjk::GjkStatus, planar::gjk_intersection_planar_xy, support::ConvexHull3};
+    use super::{
+        EpaConfig, EpaStatus, epa_penetration_planar_xy, epa_penetration_trace_planar_xy,
+        epa_penetration_trace_planar_xy_with_config,
+    };
+    use crate::{
+        gjk::GjkStatus,
+        planar::gjk_intersection_planar_xy,
+        support::{ConvexHull3, MinkowskiSupportPoint},
+    };
 
     fn square(center_x: f64, center_y: f64, half: f64) -> [[f64; 3]; 4] {
         [
@@ -433,6 +467,12 @@ mod tests {
             [center_x + half, center_y + half, 0.0],
             [center_x - half, center_y + half, 0.0],
         ]
+    }
+
+    fn assert_planar_support(point: &MinkowskiSupportPoint) {
+        assert_eq!(point.point[2], 0.0);
+        assert_eq!(point.left[2], 0.0);
+        assert_eq!(point.right[2], 0.0);
     }
 
     #[test]
@@ -453,6 +493,59 @@ mod tests {
         assert!((penetration.normal[0] - 1.0).abs() <= 1.0e-9);
         assert!(penetration.normal[1].abs() <= 1.0e-9);
         assert_eq!(penetration.normal[2], 0.0);
+    }
+
+    #[test]
+    fn small_overlapping_squares_preserve_valid_hull_turns() {
+        let half = 1.0e-7;
+        let left_points = square(0.0, 0.0, half);
+        let right_points = square(1.5e-7, 0.0, half);
+        let left = ConvexHull3::new(&left_points);
+        let right = ConvexHull3::new(&right_points);
+        let gjk = gjk_intersection_planar_xy(&left, &right);
+        assert_eq!(gjk.status, GjkStatus::Intersecting);
+
+        let result = epa_penetration_planar_xy(&left, &right, &gjk);
+        let penetration = result.penetration.expect("small overlap must converge");
+
+        assert_eq!(result.status, EpaStatus::Converged);
+        assert!((penetration.depth - 0.5e-7).abs() <= 1.0e-12);
+        assert!((penetration.normal[0] - 1.0).abs() <= 1.0e-9);
+        assert!(penetration.normal[1].abs() <= 1.0e-9);
+    }
+
+    #[test]
+    fn planar_epa_sanitizes_extruded_gjk_witnesses() {
+        let left_points = square(0.0, 0.0, 1.0);
+        let right_points = square(1.5, 0.0, 1.0);
+        let left = ConvexHull3::new(&left_points);
+        let right = ConvexHull3::new(&right_points);
+        let gjk = gjk_intersection_planar_xy(&left, &right);
+        assert!(
+            gjk.simplex[..gjk.simplex_len]
+                .iter()
+                .any(|point| point.left[2] != 0.0 || point.right[2] != 0.0),
+            "planar GJK must expose its synthetic extrusion witnesses for this regression"
+        );
+
+        let trace = epa_penetration_trace_planar_xy(&left, &right, &gjk);
+        for step in &trace.steps {
+            for point in &step.edge {
+                assert_planar_support(point);
+            }
+            assert_planar_support(&step.support);
+            for point in &step.polytope {
+                assert_planar_support(point);
+            }
+        }
+        for point in &trace
+            .result
+            .penetration
+            .expect("overlap must converge")
+            .edge
+        {
+            assert_planar_support(point);
+        }
     }
 
     #[test]
@@ -487,6 +580,44 @@ mod tests {
         assert_eq!(result.status, EpaStatus::NotIntersecting);
         assert_eq!(result.iterations, 0);
         assert_eq!(result.penetration, None);
+    }
+
+    #[test]
+    fn iteration_limit_marks_the_final_trace_step_terminal() {
+        let left_points = [
+            [-1.2, -0.7, 0.0],
+            [1.0, -0.9, 0.0],
+            [1.25, 0.6, 0.0],
+            [-0.8, 1.1, 0.0],
+        ];
+        let right_points = [
+            [0.1, -0.8, 0.0],
+            [1.6, -0.3, 0.0],
+            [1.2, 1.0, 0.0],
+            [-0.1, 0.7, 0.0],
+        ];
+        let left = ConvexHull3::new(&left_points);
+        let right = ConvexHull3::new(&right_points);
+        let gjk = gjk_intersection_planar_xy(&left, &right);
+        assert_eq!(gjk.status, GjkStatus::Intersecting);
+
+        let trace = epa_penetration_trace_planar_xy_with_config(
+            &left,
+            &right,
+            &gjk,
+            EpaConfig {
+                max_iterations: 1,
+                tolerance: 0.0,
+                ..EpaConfig::default()
+            },
+        );
+
+        assert_eq!(trace.result.status, EpaStatus::IterationLimit);
+        assert_eq!(trace.steps.len(), 1);
+        assert_eq!(
+            trace.steps[0].terminal_status,
+            Some(EpaStatus::IterationLimit)
+        );
     }
 
     #[test]
