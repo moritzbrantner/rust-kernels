@@ -364,7 +364,7 @@ fn convex_hull_xy(points: &[MinkowskiSupportPoint], epsilon: f64) -> Vec<Minkows
         return unique;
     }
 
-    let mut lower = Vec::new();
+    let mut lower: Vec<MinkowskiSupportPoint> = Vec::new();
     for &point in &unique {
         while lower.len() >= 2
             && cross_xy(
@@ -378,7 +378,7 @@ fn convex_hull_xy(points: &[MinkowskiSupportPoint], epsilon: f64) -> Vec<Minkows
         lower.push(point);
     }
 
-    let mut upper = Vec::new();
+    let mut upper: Vec<MinkowskiSupportPoint> = Vec::new();
     for &point in unique.iter().rev() {
         while upper.len() >= 2
             && cross_xy(
