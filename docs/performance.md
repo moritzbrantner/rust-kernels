@@ -2,6 +2,12 @@
 
 `rust-kernels` treats execution cost as an explicit engineering contract for performance-sensitive kernels.
 
+## Machine-readable contract
+
+`.performance/contract.json` is the repository-owned machine-readable summary of representative performance scenarios and their deterministic budgets. It follows coding-tooling performance-contract schema v1. The repository owns scenario dimensions, correctness evidence, metrics, and budgets; coding-tooling owns the shared schema and discovery contract; runtime-profiler owns runtime captures; Moonlight/evaluators own cross-revision verdicts.
+
+The contract intentionally records only evidence that can be interpreted deterministically. Shared-runner wall-clock measurements are not blocking performance evidence.
+
 ## Evidence layers
 
 - Correctness remains owned by tests and property/reference-model checks.
