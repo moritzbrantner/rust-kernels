@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::hash::Hash;
 
 #[derive(Clone, Debug)]
@@ -89,34 +90,71 @@ where
             return None;
         }
 
-        if let Some(&index) = self.indices.get(&key) {
-            self.promote(index);
-            let node = self.nodes[index]
-                .as_mut()
-                .expect("LRU index must be occupied");
-            return Some(std::mem::replace(&mut node.value, value));
+        if self.len() < self.capacity {
+            return match self.indices.entry(key) {
+                Entry::Occupied(entry) => {
+                    let index = *entry.get();
+                    self.promote(index);
+                    let node = self.nodes[index]
+                        .as_mut()
+                        .expect("LRU index must be occupied");
+                    Some(std::mem::replace(&mut node.value, value))
+                }
+                Entry::Vacant(entry) => {
+                    let node_key = entry.key().clone();
+                    let index = if let Some(index) = self.free.pop() {
+                        index
+                    } else {
+                        self.nodes.push(None);
+                        self.nodes.len() - 1
+                    };
+
+                    self.nodes[index] = Some(Node {
+                        key: node_key,
+                        value,
+                        previous: None,
+                        next: None,
+                    });
+                    entry.insert(index);
+                    self.attach_front(index);
+                    None
+                }
+            };
         }
 
-        if self.len() == self.capacity {
-            self.evict_least_recent();
+        let victim_index = self
+            .least_recent
+            .expect("full LRU cache must have a least-recent entry");
+        match self.indices.entry(key) {
+            Entry::Occupied(entry) => {
+                let index = *entry.get();
+                self.promote(index);
+                let node = self.nodes[index]
+                    .as_mut()
+                    .expect("LRU index must be occupied");
+                Some(std::mem::replace(&mut node.value, value))
+            }
+            Entry::Vacant(entry) => {
+                let node_key = entry.key().clone();
+                entry.insert(victim_index);
+
+                self.detach(victim_index);
+                let evicted = self.nodes[victim_index]
+                    .take()
+                    .expect("LRU index must be occupied");
+                let removed = self.indices.remove(&evicted.key);
+                debug_assert_eq!(removed, Some(victim_index));
+
+                self.nodes[victim_index] = Some(Node {
+                    key: node_key,
+                    value,
+                    previous: None,
+                    next: None,
+                });
+                self.attach_front(victim_index);
+                None
+            }
         }
-
-        let index = if let Some(index) = self.free.pop() {
-            index
-        } else {
-            self.nodes.push(None);
-            self.nodes.len() - 1
-        };
-
-        self.nodes[index] = Some(Node {
-            key: key.clone(),
-            value,
-            previous: None,
-            next: None,
-        });
-        self.indices.insert(key, index);
-        self.attach_front(index);
-        None
     }
 
     pub fn remove(&mut self, key: &K) -> Option<V> {
@@ -205,18 +243,6 @@ where
         node.previous = None;
         node.next = None;
     }
-
-    fn evict_least_recent(&mut self) {
-        let Some(index) = self.least_recent else {
-            return;
-        };
-        self.detach(index);
-        let node = self.nodes[index]
-            .take()
-            .expect("LRU index must be occupied");
-        self.indices.remove(&node.key);
-        self.free.push(index);
-    }
 }
 
 struct LruIter<'a, K, V> {
@@ -237,7 +263,22 @@ impl<'a, K, V> Iterator for LruIter<'a, K, V> {
 
 #[cfg(test)]
 mod tests {
+    use std::hash::{Hash, Hasher};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use super::LruCache;
+
+    static HASH_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    struct CountingKey(u64);
+
+    impl Hash for CountingKey {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            HASH_CALLS.fetch_add(1, Ordering::Relaxed);
+            self.0.hash(state);
+        }
+    }
 
     #[derive(Default)]
     struct Model {
@@ -331,6 +372,34 @@ mod tests {
             cache.iter().map(|(key, _)| *key).collect::<Vec<_>>(),
             vec!["b", "a"]
         );
+    }
+
+    #[test]
+    fn under_capacity_insert_and_update_hash_once() {
+        let mut cache = LruCache::new(4);
+
+        HASH_CALLS.store(0, Ordering::Relaxed);
+        assert_eq!(cache.insert(CountingKey(1), 10), None);
+        assert_eq!(HASH_CALLS.load(Ordering::Relaxed), 1);
+
+        HASH_CALLS.store(0, Ordering::Relaxed);
+        assert_eq!(cache.insert(CountingKey(1), 20), Some(10));
+        assert_eq!(HASH_CALLS.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn full_capacity_eviction_hashes_incoming_key_once() {
+        let mut cache = LruCache::new(4);
+        for key in 0..4_u64 {
+            assert_eq!(cache.insert(CountingKey(key), key), None);
+        }
+
+        HASH_CALLS.store(0, Ordering::Relaxed);
+        assert_eq!(cache.insert(CountingKey(4), 4), None);
+        assert_eq!(HASH_CALLS.load(Ordering::Relaxed), 2);
+        assert_eq!(cache.len(), 4);
+        assert!(!cache.contains_key(&CountingKey(0)));
+        assert!(cache.contains_key(&CountingKey(4)));
     }
 
     #[test]

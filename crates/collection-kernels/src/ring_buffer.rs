@@ -47,7 +47,7 @@ impl<T> RingBuffer<T> {
 
         let capacity = self.capacity();
         debug_assert!(capacity > 0);
-        let tail = (self.head + self.len) % capacity;
+        let tail = ring_index(self.head, self.len, capacity);
         debug_assert!(self.slots[tail].is_none());
         self.slots[tail] = Some(value);
         self.len += 1;
@@ -66,7 +66,10 @@ impl<T> RingBuffer<T> {
         if self.len == 0 {
             self.head = 0;
         } else {
-            self.head = (self.head + 1) % capacity;
+            self.head += 1;
+            if self.head == capacity {
+                self.head = 0;
+            }
         }
         value
     }
@@ -86,13 +89,19 @@ impl<T> RingBuffer<T> {
             return None;
         }
 
-        let index = (self.head + self.len - 1) % self.capacity();
+        let index = ring_index(self.head, self.len - 1, self.capacity());
         self.slots[index].as_ref()
     }
 
+    /// Drops all occupied entries while retaining the fixed backing storage.
+    ///
+    /// Work is proportional to the number of stored entries rather than the
+    /// configured capacity.
     pub fn clear(&mut self) {
-        for slot in &mut self.slots {
-            *slot = None;
+        let capacity = self.capacity();
+        for offset in 0..self.len {
+            let index = ring_index(self.head, offset, capacity);
+            self.slots[index] = None;
         }
         self.head = 0;
         self.len = 0;
@@ -101,9 +110,22 @@ impl<T> RingBuffer<T> {
     pub fn iter(&self) -> impl Iterator<Item = &T> {
         let capacity = self.capacity();
         (0..self.len).filter_map(move |offset| {
-            let index = (self.head + offset) % capacity;
+            let index = ring_index(self.head, offset, capacity);
             self.slots[index].as_ref()
         })
+    }
+}
+
+fn ring_index(head: usize, offset: usize, capacity: usize) -> usize {
+    debug_assert!(capacity > 0);
+    debug_assert!(head < capacity);
+    debug_assert!(offset < capacity);
+
+    let remaining = capacity - head;
+    if offset < remaining {
+        head + offset
+    } else {
+        offset - remaining
     }
 }
 

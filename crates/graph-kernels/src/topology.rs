@@ -157,6 +157,7 @@ where
 
     let node_count_f64 = node_count as f64;
     let mut scores = vec![1.0 / node_count_f64; node_count];
+    let mut next = vec![0.0; node_count];
     let base = (1.0 - config.damping) / node_count_f64;
     let mut residual = f64::INFINITY;
 
@@ -169,7 +170,7 @@ where
             .map(|(index, _)| scores[index])
             .sum();
         let dangling_share = config.damping * dangling_mass / node_count_f64;
-        let mut next = vec![base + dangling_share; node_count];
+        next.fill(base + dangling_share);
 
         for (source, outgoing) in graph.adjacency.iter().enumerate() {
             if outgoing.is_empty() {
@@ -186,7 +187,7 @@ where
             .zip(&next)
             .map(|(left, right)| (left - right).abs())
             .sum();
-        scores = next;
+        std::mem::swap(&mut scores, &mut next);
 
         if residual <= config.tolerance {
             return Ok(PageRank {
@@ -294,27 +295,27 @@ where
     let mut indices = HashMap::new();
 
     for node in seeds {
-        if let Entry::Vacant(entry) = indices.entry(node.clone()) {
+        if let Entry::Vacant(entry) = indices.entry(node) {
             let index = nodes.len();
+            nodes.push(entry.key().clone());
             entry.insert(index);
-            nodes.push(node);
         }
     }
 
     let mut adjacency = Vec::new();
     let mut cursor = 0;
     while cursor < nodes.len() {
-        let node = nodes[cursor].clone();
-        let outgoing_nodes: Vec<_> = neighbors(&node).into_iter().collect();
-        let mut outgoing = Vec::with_capacity(outgoing_nodes.len());
+        let outgoing_nodes = neighbors(&nodes[cursor]).into_iter();
+        let (minimum_outgoing, _) = outgoing_nodes.size_hint();
+        let mut outgoing = Vec::with_capacity(minimum_outgoing);
 
         for next in outgoing_nodes {
-            let next_index = match indices.entry(next.clone()) {
+            let next_index = match indices.entry(next) {
                 Entry::Occupied(entry) => *entry.get(),
                 Entry::Vacant(entry) => {
                     let discovered = nodes.len();
+                    nodes.push(entry.key().clone());
                     entry.insert(discovered);
-                    nodes.push(next);
                     discovered
                 }
             };
@@ -330,10 +331,52 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        CycleDetected, PageRankConfig, PageRankError, page_rank, strongly_connected_components,
-        topological_sort,
+    use std::hash::{Hash, Hasher};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
     };
+
+    use super::{
+        CycleDetected, PageRankConfig, PageRankError, materialize_graph, page_rank,
+        strongly_connected_components, topological_sort,
+    };
+
+    #[derive(Debug)]
+    struct CountedNode {
+        id: usize,
+        clones: Arc<AtomicUsize>,
+    }
+
+    impl CountedNode {
+        fn new(id: usize, clones: &Arc<AtomicUsize>) -> Self {
+            Self {
+                id,
+                clones: Arc::clone(clones),
+            }
+        }
+    }
+
+    impl Clone for CountedNode {
+        fn clone(&self) -> Self {
+            self.clones.fetch_add(1, Ordering::Relaxed);
+            Self::new(self.id, &self.clones)
+        }
+    }
+
+    impl PartialEq for CountedNode {
+        fn eq(&self, other: &Self) -> bool {
+            self.id == other.id
+        }
+    }
+
+    impl Eq for CountedNode {}
+
+    impl Hash for CountedNode {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.id.hash(state);
+        }
+    }
 
     #[test]
     fn topological_sort_orders_dependencies_before_dependents() {
@@ -360,6 +403,43 @@ mod tests {
         };
 
         assert_eq!(topological_sort([0], neighbors), Err(CycleDetected));
+    }
+
+    #[test]
+    fn materialization_does_not_clone_already_known_neighbors() {
+        const NODE_COUNT: usize = 16;
+
+        let clones = Arc::new(AtomicUsize::new(0));
+        let make_seeds = || {
+            (0..NODE_COUNT)
+                .map(|id| CountedNode::new(id, &clones))
+                .collect::<Vec<_>>()
+        };
+
+        clones.store(0, Ordering::Relaxed);
+        let mut sparse_neighbors = |_node: &CountedNode| Vec::<CountedNode>::new();
+        let sparse = materialize_graph(make_seeds(), &mut sparse_neighbors);
+        let sparse_clones = clones.load(Ordering::Relaxed);
+        assert_eq!(sparse.nodes.len(), NODE_COUNT);
+        assert!(sparse.adjacency.iter().all(Vec::is_empty));
+        assert_eq!(sparse_clones, NODE_COUNT);
+        drop(sparse);
+
+        clones.store(0, Ordering::Relaxed);
+        let dense_clones = Arc::clone(&clones);
+        let mut dense_neighbors = move |node: &CountedNode| {
+            ((node.id + 1)..NODE_COUNT)
+                .map(|id| CountedNode::new(id, &dense_clones))
+                .collect::<Vec<_>>()
+        };
+        let dense = materialize_graph(make_seeds(), &mut dense_neighbors);
+        let dense_clone_count = clones.load(Ordering::Relaxed);
+
+        assert_eq!(
+            dense.adjacency.iter().map(Vec::len).sum::<usize>(),
+            NODE_COUNT * (NODE_COUNT - 1) / 2
+        );
+        assert_eq!(dense_clone_count, sparse_clones);
     }
 
     #[test]

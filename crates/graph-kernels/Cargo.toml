@@ -8,3 +8,22 @@ description = "Small deterministic graph and path-search kernels"
 
 [dependencies]
 collection-kernels = { path = "../collection-kernels" }
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "minimum_spanning"
+harness = false
+
+[[bench]]
+name = "page_rank"
+harness = false
+
+[[bench]]
+name = "topology"
+harness = false
+
+[[bench]]
+name = "shortest_path"
+harness = false

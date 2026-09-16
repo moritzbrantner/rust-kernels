@@ -22,6 +22,12 @@ where
         }
     }
 
+    /// Builds the tree in the same addition order as repeated point updates.
+    ///
+    /// This preserves the historical construction semantics for values whose
+    /// addition is not associative, including floating-point values. The
+    /// construction cost is O(n log n). Use [`Self::from_slice_linear`] only
+    /// when regrouping additions is acceptable for the value type and caller.
     #[must_use]
     pub fn from_slice(values: &[T]) -> Self {
         let mut tree = Self::new(values.len());
@@ -29,6 +35,28 @@ where
             tree.add(index, value);
         }
         tree
+    }
+
+    /// Builds the tree in O(n) by regrouping additions along Fenwick parents.
+    ///
+    /// Regrouping can change observable results for non-associative arithmetic
+    /// such as floating-point addition. Callers that require the exact ordered
+    /// point-update semantics should use [`Self::from_slice`] instead.
+    #[must_use]
+    pub fn from_slice_linear(values: &[T]) -> Self {
+        let mut tree = vec![T::default(); values.len() + 1];
+        for (zero_index, &value) in values.iter().enumerate() {
+            let index = zero_index + 1;
+            tree[index] += value;
+
+            let parent = index + lowbit(index);
+            if parent < tree.len() {
+                let subtotal = tree[index];
+                tree[parent] += subtotal;
+            }
+        }
+
+        Self { tree }
     }
 
     #[must_use]
@@ -47,7 +75,7 @@ where
         let mut cursor = index + 1;
         while cursor < self.tree.len() {
             self.tree[cursor] += delta;
-            cursor += cursor & (!cursor + 1);
+            cursor += lowbit(cursor);
         }
     }
 
@@ -73,9 +101,49 @@ where
     }
 }
 
+fn lowbit(index: usize) -> usize {
+    debug_assert!(index > 0);
+    index & index.wrapping_neg()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::FenwickTree;
+    use std::{
+        cell::Cell,
+        ops::{AddAssign, Sub},
+    };
+
+    use super::{FenwickTree, lowbit};
+
+    thread_local! {
+        static ADD_ASSIGN_COUNT: Cell<usize> = const { Cell::new(0) };
+    }
+
+    #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+    struct CountingValue(i64);
+
+    impl AddAssign for CountingValue {
+        fn add_assign(&mut self, rhs: Self) {
+            ADD_ASSIGN_COUNT.with(|count| count.set(count.get() + 1));
+            self.0 += rhs.0;
+        }
+    }
+
+    impl Sub for CountingValue {
+        type Output = Self;
+
+        fn sub(self, rhs: Self) -> Self::Output {
+            Self(self.0 - rhs.0)
+        }
+    }
+
+    fn reset_add_assign_count() {
+        ADD_ASSIGN_COUNT.with(|count| count.set(0));
+    }
+
+    fn add_assign_count() -> usize {
+        ADD_ASSIGN_COUNT.with(Cell::get)
+    }
 
     #[test]
     fn builds_and_queries_half_open_ranges() {
@@ -156,6 +224,65 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn linear_construction_matches_ordered_updates_for_associative_fixture() {
+        let values = (0_i64..257)
+            .map(|value| (value * 17) % 31 - 15)
+            .collect::<Vec<_>>();
+        let ordered = FenwickTree::from_slice(&values);
+        let linear = FenwickTree::from_slice_linear(&values);
+
+        assert_eq!(linear, ordered);
+    }
+
+    #[test]
+    fn ordered_construction_preserves_floating_point_update_order() {
+        let values = [1e20_f64, 1e20, -1e20, 1.0, -1e20, 1.0, 1.0, 1.0];
+        let ordered = FenwickTree::from_slice(&values);
+        let linear = FenwickTree::from_slice_linear(&values);
+        let mut incremental = FenwickTree::new(values.len());
+        for (index, value) in values.into_iter().enumerate() {
+            incremental.add(index, value);
+        }
+
+        assert_eq!(ordered.prefix_sum(values.len()), 3.0);
+        assert_eq!(linear.prefix_sum(values.len()), 2.0);
+        assert_eq!(
+            ordered.prefix_sum(values.len()),
+            incremental.prefix_sum(values.len())
+        );
+    }
+
+    #[test]
+    fn linear_construction_uses_bounded_addition_work() {
+        const LEN: usize = 64;
+        let values = vec![CountingValue(1); LEN];
+
+        reset_add_assign_count();
+        let linear = FenwickTree::from_slice_linear(&values);
+        let linear_adds = add_assign_count();
+
+        reset_add_assign_count();
+        let ordered = FenwickTree::from_slice(&values);
+        let ordered_adds = add_assign_count();
+
+        let expected_ordered_adds = (1..=LEN)
+            .map(|mut cursor| {
+                let mut count = 0;
+                while cursor <= LEN {
+                    count += 1;
+                    cursor += lowbit(cursor);
+                }
+                count
+            })
+            .sum::<usize>();
+
+        assert_eq!(linear, ordered);
+        assert_eq!(linear_adds, 2 * LEN - 1);
+        assert_eq!(ordered_adds, expected_ordered_adds);
+        assert!(linear_adds < ordered_adds);
     }
 
     #[test]

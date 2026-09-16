@@ -12,3 +12,11 @@ divan = "0.1.21"
 [[bench]]
 name = "fuzzy"
 harness = false
+
+[[bench]]
+name = "shingling"
+harness = false
+
+[[bench]]
+name = "set_similarity"
+harness = false
