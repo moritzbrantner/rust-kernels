@@ -239,14 +239,16 @@ mod tests {
 
     #[test]
     fn ordered_construction_preserves_floating_point_update_order() {
-        let values = [1e20_f64, 0.0, -1e20, 1.0];
+        let values = [1e20_f64, 1e20, -1e20, 1.0, -1e20, 1.0, 1.0, 1.0];
         let ordered = FenwickTree::from_slice(&values);
+        let linear = FenwickTree::from_slice_linear(&values);
         let mut incremental = FenwickTree::new(values.len());
         for (index, value) in values.into_iter().enumerate() {
             incremental.add(index, value);
         }
 
-        assert_eq!(ordered.prefix_sum(values.len()), 1.0);
+        assert_eq!(ordered.prefix_sum(values.len()), 3.0);
+        assert_eq!(linear.prefix_sum(values.len()), 2.0);
         assert_eq!(
             ordered.prefix_sum(values.len()),
             incremental.prefix_sum(values.len())
