@@ -305,8 +305,7 @@ where
     let mut adjacency = Vec::new();
     let mut cursor = 0;
     while cursor < nodes.len() {
-        let node = nodes[cursor].clone();
-        let outgoing_nodes = neighbors(&node).into_iter();
+        let outgoing_nodes = neighbors(&nodes[cursor]).into_iter();
         let (minimum_outgoing, _) = outgoing_nodes.size_hint();
         let mut outgoing = Vec::with_capacity(minimum_outgoing);
 
@@ -423,6 +422,7 @@ mod tests {
         let sparse_clones = clones.load(Ordering::Relaxed);
         assert_eq!(sparse.nodes.len(), NODE_COUNT);
         assert!(sparse.adjacency.iter().all(Vec::is_empty));
+        assert_eq!(sparse_clones, NODE_COUNT);
         drop(sparse);
 
         clones.store(0, Ordering::Relaxed);
