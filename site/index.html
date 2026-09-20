@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Interactive, browser-runnable demonstrations of the small deterministic algorithms and data structures in rust-kernels."
+      content="Interactive browser examples for rust-kernels algorithms, with their runtime and space complexity explained next to live Rust/WebAssembly output."
     />
-    <title>rust-kernels — small algorithms, real Rust, live in the browser</title>
+    <title>rust-kernels — interactive algorithm laboratory</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -16,79 +16,244 @@
         <p class="eyebrow">Algorithm laboratory · Rust → WebAssembly</p>
         <h1>rust-kernels</h1>
         <p class="lede">
-          Small, deterministic algorithm and data-structure kernels with explicit behavior, strong
-          oracle tests, and browser demos that execute the same Rust code.
+          Explore small deterministic algorithms by changing their inputs and watching the repository's
+          actual Rust implementations run in your browser. Each lab explains what the algorithm does,
+          what its asymptotic cost means, and which operation is being exercised.
         </p>
         <nav class="actions" aria-label="Project links">
-          <a class="button primary" href="#fenwick-demo">Run the WASM demo</a>
+          <a class="button primary" href="#labs">Explore the algorithms</a>
           <a class="button" href="https://github.com/moritzbrantner/rust-kernels">Source on GitHub</a>
         </nav>
+        <p class="runtime-status" id="runtime-status" aria-live="polite">Loading WebAssembly module…</p>
       </header>
 
-      <section class="demo" id="fenwick-demo" aria-labelledby="fenwick-title">
-        <div class="section-heading">
-          <p class="eyebrow">Live kernel 01</p>
-          <h2 id="fenwick-title">Fenwick tree prefix sums</h2>
+      <section class="complexity-guide" aria-labelledby="complexity-guide-title">
+        <div class="section-heading compact-heading">
+          <p class="eyebrow">Reading the labels</p>
+          <h2 id="complexity-guide-title">Big-O describes growth, not a stopwatch</h2>
           <p>
-            A Fenwick tree answers additive prefix and range queries in O(log n). The controls below
-            call the compiled <code>collection-kernels::FenwickTree&lt;i64&gt;</code> through a tiny
-            WebAssembly adapter.
+            The complexity labels describe how work or memory grows as the input gets larger. They are
+            properties of the algorithmic path shown here, not browser benchmark measurements.
+          </p>
+        </div>
+        <dl class="complexity-legend">
+          <div><dt>O(1)</dt><dd>Fixed work as input grows.</dd></div>
+          <div><dt>O(log n)</dt><dd>Work grows with the number of times the input can be divided.</dd></div>
+          <div><dt>O(n)</dt><dd>Work grows proportionally with input size.</dd></div>
+          <div><dt>O(n²)</dt><dd>Worst-case pairwise-style growth.</dd></div>
+          <div><dt>α(n)</dt><dd>Inverse Ackermann; effectively constant for practical union-find sizes.</dd></div>
+        </dl>
+      </section>
+
+      <section class="labs" id="labs" aria-labelledby="labs-title">
+        <div class="section-heading">
+          <p class="eyebrow">Live kernels</p>
+          <h2 id="labs-title">Five algorithms, five different cost shapes</h2>
+          <p>
+            Every result below crosses the same WebAssembly boundary into the repository crates. The
+            page owns the visualization; the Rust crates remain authoritative for algorithm behavior.
           </p>
         </div>
 
-        <div class="demo-card">
-          <div>
-            <p class="label">Fixture values</p>
-            <div class="bars" id="value-bars" aria-label="Fenwick tree input values"></div>
+        <article class="kernel" id="fenwick-demo" aria-labelledby="fenwick-title">
+          <div class="kernel-copy">
+            <p class="eyebrow">Collections · Range aggregation</p>
+            <h3 id="fenwick-title">Fenwick tree</h3>
+            <p>
+              A Fenwick tree stores partial sums in a compact binary-indexed layout. A prefix query
+              repeatedly clears the lowest set bit of an index, so it touches only logarithmically many
+              entries instead of scanning the whole prefix.
+            </p>
+            <dl class="complexity-list">
+              <div><dt>Point update</dt><dd>O(log n)</dd></div>
+              <div><dt>Prefix / range query</dt><dd>O(log n)</dd></div>
+              <div><dt>Linear builder</dt><dd>O(n)</dd></div>
+              <div><dt>Space</dt><dd>O(n)</dd></div>
+            </dl>
           </div>
-
-          <div class="controls">
-            <label for="prefix-end">Prefix end: <strong id="prefix-label">4</strong></label>
-            <input id="prefix-end" type="range" min="0" max="8" value="4" step="1" />
+          <div class="playground">
+            <div>
+              <p class="label">Fixture values</p>
+              <div class="bars" id="fenwick-bars" aria-label="Fenwick tree input values"></div>
+            </div>
+            <fieldset class="controls" data-wasm-control disabled>
+              <legend>Choose a half-open range</legend>
+              <label for="fenwick-start">Start: <strong id="fenwick-start-label">0</strong></label>
+              <input id="fenwick-start" type="range" min="0" max="8" value="0" step="1" />
+              <label for="fenwick-end">End: <strong id="fenwick-end-label">4</strong></label>
+              <input id="fenwick-end" type="range" min="0" max="8" value="4" step="1" />
+            </fieldset>
+            <div class="result" aria-live="polite">
+              <span>sum(<span id="fenwick-result-start">0</span>..<span id="fenwick-result-end">4</span>)</span>
+              <strong id="fenwick-result">—</strong>
+            </div>
           </div>
+        </article>
 
-          <div class="result" aria-live="polite">
-            <span>sum(0..<span id="result-end">4</span>)</span>
-            <strong id="prefix-result">Loading Rust…</strong>
+        <article class="kernel" id="union-find-demo" aria-labelledby="union-find-title">
+          <div class="kernel-copy">
+            <p class="eyebrow">Collections · Dynamic connectivity</p>
+            <h3 id="union-find-title">Union-find</h3>
+            <p>
+              Union-find tracks disjoint components. Union by size keeps trees shallow and path
+              compression shortens future searches, producing an amortized inverse-Ackermann cost per
+              operation after initialization.
+            </p>
+            <dl class="complexity-list">
+              <div><dt>Initialize</dt><dd>O(n)</dd></div>
+              <div><dt>Find / union</dt><dd>O(α(n)) amortized</dd></div>
+              <div><dt>Space</dt><dd>O(n)</dd></div>
+            </dl>
           </div>
+          <div class="playground">
+            <div class="union-nodes" id="union-nodes" aria-label="Union-find nodes"></div>
+            <fieldset class="controls" data-wasm-control disabled>
+              <legend>Toggle edges to merge components</legend>
+              <div class="edge-options" id="union-edges"></div>
+            </fieldset>
+            <div class="result compact-result" aria-live="polite">
+              <span>Connected components</span>
+              <strong id="union-result">—</strong>
+            </div>
+          </div>
+        </article>
 
-          <p class="runtime-status" id="runtime-status">Loading WebAssembly module…</p>
-        </div>
+        <article class="kernel" id="quickselect-demo" aria-labelledby="quickselect-title">
+          <div class="kernel-copy">
+            <p class="eyebrow">Search · Selection</p>
+            <h3 id="quickselect-title">Quickselect</h3>
+            <p>
+              Quickselect partitions values around a pivot and continues only in the partition that
+              contains the requested rank. This implementation uses deterministic median-of-three pivot
+              selection and three-way partitioning, which handles repeated values without fully sorting.
+            </p>
+            <dl class="complexity-list">
+              <div><dt>Balanced partitions</dt><dd>O(n)</dd></div>
+              <div><dt>Worst case</dt><dd>O(n²)</dd></div>
+              <div><dt>Auxiliary space</dt><dd>O(1)</dd></div>
+            </dl>
+          </div>
+          <div class="playground">
+            <div>
+              <p class="label">Partition after selection</p>
+              <div class="value-strip" id="quickselect-values" aria-label="Quickselect partition"></div>
+            </div>
+            <fieldset class="controls" data-wasm-control disabled>
+              <legend>Select a zero-based rank</legend>
+              <label for="quickselect-rank">nth: <strong id="quickselect-rank-label">5</strong></label>
+              <input id="quickselect-rank" type="range" min="0" max="11" value="5" step="1" />
+            </fieldset>
+            <div class="result" aria-live="polite">
+              <span>Value at rank <span id="quickselect-result-rank">5</span></span>
+              <strong id="quickselect-result">—</strong>
+            </div>
+          </div>
+        </article>
+
+        <article class="kernel" id="morton-demo" aria-labelledby="morton-title">
+          <div class="kernel-copy">
+            <p class="eyebrow">Spatial · Integer encoding</p>
+            <h3 id="morton-title">Morton / Z-order encoding</h3>
+            <p>
+              Morton encoding interleaves coordinate bits into one integer key. Nearby grid cells tend
+              to remain near each other in key space, which makes the representation useful for compact
+              spatial indexing and traversal schemes.
+            </p>
+            <dl class="complexity-list">
+              <div><dt>Encode / decode</dt><dd>O(1) for fixed-width integers</dd></div>
+              <div><dt>Space</dt><dd>O(1)</dd></div>
+            </dl>
+          </div>
+          <div class="playground">
+            <div>
+              <p class="label">8 × 8 grid · tap a cell</p>
+              <div class="morton-grid" id="morton-grid" aria-label="Morton codes for an 8 by 8 grid"></div>
+            </div>
+            <fieldset class="controls two-column-controls" data-wasm-control disabled>
+              <legend>Coordinates</legend>
+              <div>
+                <label for="morton-x">x: <strong id="morton-x-label">3</strong></label>
+                <input id="morton-x" type="range" min="0" max="7" value="3" step="1" />
+              </div>
+              <div>
+                <label for="morton-y">y: <strong id="morton-y-label">2</strong></label>
+                <input id="morton-y" type="range" min="0" max="7" value="2" step="1" />
+              </div>
+            </fieldset>
+            <div class="result" aria-live="polite">
+              <span>Morton key for (<span id="morton-result-x">3</span>, <span id="morton-result-y">2</span>)</span>
+              <strong id="morton-result">—</strong>
+            </div>
+          </div>
+        </article>
+
+        <article class="kernel" id="stats-demo" aria-labelledby="stats-title">
+          <div class="kernel-copy">
+            <p class="eyebrow">Statistics · Streaming aggregation</p>
+            <h3 id="stats-title">Welford running statistics</h3>
+            <p>
+              Welford's update keeps count, mean, and a variance accumulator without replaying prior
+              observations. It is numerically stable for streaming data and two accumulators can be
+              merged in constant time.
+            </p>
+            <dl class="complexity-list">
+              <div><dt>Push one sample</dt><dd>O(1)</dd></div>
+              <div><dt>Process n samples</dt><dd>O(n)</dd></div>
+              <div><dt>Merge accumulators</dt><dd>O(1)</dd></div>
+              <div><dt>State</dt><dd>O(1)</dd></div>
+            </dl>
+          </div>
+          <div class="playground">
+            <div>
+              <p class="label">Streaming prefix</p>
+              <div class="value-strip" id="stats-values" aria-label="Running statistics input values"></div>
+            </div>
+            <fieldset class="controls" data-wasm-control disabled>
+              <legend>Choose how many samples have arrived</legend>
+              <label for="stats-count">Samples: <strong id="stats-count-label">4</strong></label>
+              <input id="stats-count" type="range" min="1" max="8" value="4" step="1" />
+            </fieldset>
+            <div class="stat-results" aria-live="polite">
+              <div><span>Mean</span><strong id="stats-mean">—</strong></div>
+              <div><span>Population variance</span><strong id="stats-variance">—</strong></div>
+            </div>
+          </div>
+        </article>
       </section>
 
       <section class="catalog" aria-labelledby="catalog-title">
         <div class="section-heading">
-          <p class="eyebrow">Kernel families</p>
-          <h2 id="catalog-title">A reusable algorithm shelf</h2>
+          <p class="eyebrow">Beyond the live labs</p>
+          <h2 id="catalog-title">The repository stays broader than the demo</h2>
           <p>
-            The repository is organized by domain so applications can depend on focused crates instead
-            of a single all-purpose utility package.
+            The same focused-crate model also covers geometry, graphs, similarity, broad-phase spatial
+            search, caches, queues, bit sets, sparse storage, sorting, and more. The live examples are a
+            browser-facing teaching layer over those reusable kernels, not a replacement API.
           </p>
         </div>
         <div class="grid">
-          <article><h3>Collections</h3><p>Bit sets, Fenwick trees, arenas, LRU caches, ring buffers, sparse sets, union-find.</p></article>
-          <article><h3>Geometry</h3><p>Small geometry operations intended to compose into rendering, collision, and spatial systems.</p></article>
-          <article><h3>Spatial</h3><p>Broad-phase and spatial indexing kernels designed for deterministic parity checks.</p></article>
-          <article><h3>Graphs</h3><p>Graph algorithms and structures kept independent from application-specific graph models.</p></article>
-          <article><h3>Search</h3><p>Reusable search primitives with explicit semantics and testable reference behavior.</p></article>
-          <article><h3>Statistics</h3><p>Numerical building blocks intended for profiling, analysis, and data-processing pipelines.</p></article>
+          <article><h3>Collections</h3><p>Bit sets, arenas, caches, queues, sparse sets, heaps, Fenwick trees, union-find.</p></article>
+          <article><h3>Search</h3><p>Selection, ranked top-k, Bloom filters, and stable integer radix sorting.</p></article>
+          <article><h3>Spatial & geometry</h3><p>Morton keys, spatial hashing, broad phase, BVH, octrees, SAT, GJK/EPA.</p></article>
+          <article><h3>Graphs & similarity</h3><p>Traversal, shortest paths, topology, PageRank, edit distance, fuzzy indexes.</p></article>
         </div>
       </section>
 
       <section class="contract" aria-labelledby="contract-title">
         <div class="section-heading">
           <p class="eyebrow">Repository contract</p>
-          <h2 id="contract-title">Why these kernels exist</h2>
+          <h2 id="contract-title">What the browser demo is allowed to claim</h2>
         </div>
         <ol>
-          <li><strong>Correctness first.</strong> New optimized implementations are checked against simple oracles.</li>
-          <li><strong>Determinism by default.</strong> Reproducible inputs and outputs make performance work debuggable.</li>
-          <li><strong>Small boundaries.</strong> Kernels stay usable from native Rust, WASM, benchmarks, and higher-level applications.</li>
-          <li><strong>Performance with evidence.</strong> Optimization claims belong next to repeatable measurements.</li>
+          <li><strong>Rust owns behavior.</strong> Live results come from the same crates used by native consumers.</li>
+          <li><strong>Big-O is explanatory.</strong> Complexity labels describe algorithm growth; they are not wall-clock benchmark claims.</li>
+          <li><strong>Correctness remains test-owned.</strong> The interactive page demonstrates behavior but does not replace oracle and differential tests.</li>
+          <li><strong>Performance evidence remains separate.</strong> Deterministic benchmarks and regression sentinels stay in the repository performance contract.</li>
         </ol>
       </section>
     </main>
 
+    <noscript>This page needs JavaScript to load the Rust WebAssembly examples.</noscript>
     <script type="module" src="./app.js"></script>
   </body>
 </html>
