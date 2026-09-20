@@ -222,10 +222,16 @@ mod tests {
             .map(|index| quickselect_partition_value(nth, index))
             .collect::<Vec<_>>();
         assert_eq!(partition[nth as usize], selected);
-        assert!(partition[..nth as usize].iter().all(|&value| value <= selected));
-        assert!(partition[(nth as usize + 1)..]
-            .iter()
-            .all(|&value| value >= selected));
+        assert!(
+            partition[..nth as usize]
+                .iter()
+                .all(|&value| value <= selected)
+        );
+        assert!(
+            partition[(nth as usize + 1)..]
+                .iter()
+                .all(|&value| value >= selected)
+        );
     }
 
     #[test]
