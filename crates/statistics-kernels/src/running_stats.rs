@@ -39,9 +39,20 @@ impl RunningStats {
             .checked_add(1)
             .expect("running statistics count overflow");
         let delta = value - self.mean;
-        self.mean += delta / new_count as f64;
-        let delta_after = value - self.mean;
-        self.m2 += delta * delta_after;
+        if delta.is_finite() {
+            // Preserve the ordinary Welford evaluation order.
+            self.mean += delta / new_count as f64;
+            let delta_after = value - self.mean;
+            self.m2 += delta * delta_after;
+        } else {
+            // Finite opposite-sign endpoints can overflow their difference,
+            // although their convex weighted mean is still representable.
+            let count = new_count as f64;
+            self.mean = self.mean * (self.count as f64 / count) + value / count;
+            // An overflowing delta between finite observations implies an
+            // unrepresentable second moment, not zero or NaN variance.
+            self.m2 = f64::INFINITY;
+        }
         self.count = new_count;
     }
 

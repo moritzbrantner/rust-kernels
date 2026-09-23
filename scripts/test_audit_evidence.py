@@ -93,5 +93,50 @@ class NativeEvidenceTests(unittest.TestCase):
             audit.duration_ns("2 ticks")
 
 
+class BoundaryEvidenceTests(unittest.TestCase):
+    def test_boundary_inventory_requires_every_known_case(self):
+        suite = audit.SUITES["boundary"]
+        expected = suite["failures"] | suite["controls"]
+        text = "\n".join(f"test {name} ... ok" for name in sorted(expected))
+        self.assertEqual(len(audit.parse_tests(text, "boundary")), 11)
+        with self.assertRaisesRegex(RuntimeError, "inventory"):
+            audit.parse_tests("\n".join(text.splitlines()[1:]), "boundary")
+        with self.assertRaisesRegex(RuntimeError, "compile errors"):
+            audit.parse_tests("error: missing spatial_kernels dependency", "boundary")
+
+    def test_boundary_workloads_cannot_disappear_from_both_revisions(self):
+        expected = audit.SUITES["boundary"]["benchmarks"]
+        self.assertEqual(len(expected), 26)
+        audit.validate_inventory(dict.fromkeys(expected), "boundary")
+        with self.assertRaisesRegex(RuntimeError, "26 benchmark"):
+            audit.validate_inventory(dict.fromkeys(expected - {"octree/detect_pairs/256"}), "boundary")
+
+    def test_nan_failure_is_serializable_evidence_not_zero(self):
+        import json
+        probes = audit.parse_probes("AUDIT\tpush\tmean\tNaN\nAUDIT\tpush\tvariance\tinf")
+        self.assertEqual(probes["push"], {"mean": "NaN", "variance": "inf"})
+        json.dumps(probes, allow_nan=False)
+
+    def test_boundary_manifest_includes_public_spatial_types(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = audit.write_manifest(root / "build", root / "source", root / "candidate", "boundary").read_text()
+            self.assertIn(str(root / "source/crates/spatial-kernels"), manifest)
+            self.assertIn(str(root / "candidate/crates/graph-kernels/tests/boundary_regressions.rs"), manifest)
+            self.assertNotIn("audit_regressions.rs", manifest)
+
+    def test_boundary_allocation_gates_reject_eager_and_copy_regressions(self):
+        rows = {"search/empty_limit/65536": {"alloc_calls": 0},
+                "octree/detect_pairs/256": {"alloc_calls": 239}}
+        audit.validate_allocations(rows, "boundary")
+        rows["search/empty_limit/65536"]["alloc_calls"] = 1
+        with self.assertRaisesRegex(RuntimeError, "empty top-k"):
+            audit.validate_allocations(rows, "boundary")
+        rows["search/empty_limit/65536"]["alloc_calls"] = 0
+        rows["octree/detect_pairs/256"]["alloc_calls"] = 240
+        with self.assertRaisesRegex(RuntimeError, "octree"):
+            audit.validate_allocations(rows, "boundary")
+
+
 if __name__ == "__main__":
     unittest.main()

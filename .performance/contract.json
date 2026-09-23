@@ -227,6 +227,79 @@
           "notes": "Pinned Divan 0.1.21 counts alloc calls per invocation. Reallocations are reported separately; wall time is informational only."
         }
       ]
+    },
+    {
+      "id": "scc-cycle-edge-visits-4096",
+      "kind": "micro",
+      "description": "Heap-backed Tarjan visits each stored edge once on a 4096-node cycle with self-loops.",
+      "dimensions": {
+        "vertices": 4096,
+        "edges": 8192
+      },
+      "correctnessEvidence": [
+        "crates/graph-kernels/src/topology.rs::iterative_tarjan_visits_each_edge_once_and_reuses_frames"
+      ],
+      "metrics": [
+        {
+          "name": "visited-edges",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 8192
+          }
+        }
+      ]
+    },
+    {
+      "id": "top-k-empty-oversized-limit",
+      "kind": "micro",
+      "description": "Empty iterator must not allocate from a requested result limit of 65536.",
+      "dimensions": {
+        "items": 0,
+        "limit": 65536
+      },
+      "correctnessEvidence": [
+        "scripts/audit-evidence.py::validate_allocations"
+      ],
+      "metrics": [
+        {
+          "name": "allocator-alloc-calls",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "octree-paired-256-allocations",
+      "kind": "micro",
+      "description": "Octree control returns 128 overlaps from 256 bodies without redundant subdivision copies.",
+      "dimensions": {
+        "bodies": 256,
+        "leafCapacity": 4,
+        "maxDepth": 6
+      },
+      "correctnessEvidence": [
+        "scripts/audit-evidence.py::validate_allocations"
+      ],
+      "metrics": [
+        {
+          "name": "allocator-alloc-calls",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 239
+          }
+        }
+      ]
     }
   ]
 }

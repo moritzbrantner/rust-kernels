@@ -87,8 +87,10 @@ where
 
 /// Computes strongly connected components with Tarjan's algorithm.
 ///
-/// Component members and the component list are normalized by first discovery
-/// order so deterministic input iteration yields deterministic output.
+/// Component members and the component list are normalized by materialization
+/// order (unique seeds first, then newly discovered neighbors), preserving the
+/// existing deterministic output contract. DFS frames live on the heap, so a
+/// long path does not consume one native stack frame per vertex.
 pub fn strongly_connected_components<N, Nodes, I, Neighbors>(
     nodes: Nodes,
     mut neighbors: Neighbors,
@@ -220,7 +222,19 @@ fn validate_page_rank_config(config: PageRankConfig) -> Result<(), PageRankError
     Ok(())
 }
 
+#[derive(Clone, Copy)]
+struct DfsFrame {
+    node: usize,
+    next_edge: usize,
+}
+
 struct TarjanState {
+    // Reuse frame storage across disconnected components.
+    frames: Vec<DfsFrame>,
+    #[cfg(test)]
+    edge_visits: usize,
+    #[cfg(test)]
+    max_frames: usize,
     next_index: usize,
     indices: Vec<Option<usize>>,
     lowlink: Vec<usize>,
@@ -232,6 +246,11 @@ struct TarjanState {
 impl TarjanState {
     fn new(len: usize) -> Self {
         Self {
+            frames: Vec::new(),
+            #[cfg(test)]
+            edge_visits: 0,
+            #[cfg(test)]
+            max_frames: 0,
             next_index: 0,
             indices: vec![None; len],
             lowlink: vec![0; len],
@@ -241,38 +260,57 @@ impl TarjanState {
         }
     }
 
-    fn strong_connect(&mut self, node: usize, adjacency: &[Vec<usize>]) {
+    fn discover(&mut self, node: usize) {
         let node_index = self.next_index;
         self.next_index += 1;
         self.indices[node] = Some(node_index);
         self.lowlink[node] = node_index;
         self.stack.push(node);
         self.on_stack[node] = true;
+        self.frames.push(DfsFrame { node, next_edge: 0 });
+        #[cfg(test)]
+        {
+            self.max_frames = self.max_frames.max(self.frames.len());
+        }
+    }
 
-        for &next in &adjacency[node] {
-            if self.indices[next].is_none() {
-                self.strong_connect(next, adjacency);
-                self.lowlink[node] = self.lowlink[node].min(self.lowlink[next]);
-            } else if self.on_stack[next] {
-                if let Some(next_discovery_index) = self.indices[next] {
-                    self.lowlink[node] = self.lowlink[node].min(next_discovery_index);
+    fn strong_connect(&mut self, root: usize, adjacency: &[Vec<usize>]) {
+        self.discover(root);
+        while let Some(frame) = self.frames.last_mut() {
+            let node = frame.node;
+            if let Some(&next) = adjacency[node].get(frame.next_edge) {
+                frame.next_edge += 1;
+                #[cfg(test)]
+                {
+                    self.edge_visits += 1;
                 }
+                if let Some(next_index) = self.indices[next] {
+                    if self.on_stack[next] {
+                        self.lowlink[node] = self.lowlink[node].min(next_index);
+                    }
+                } else {
+                    self.discover(next);
+                }
+                continue;
+            }
+
+            // Resume exactly where recursive Tarjan would return to its caller.
+            self.frames.pop();
+            if self.indices[node] == Some(self.lowlink[node]) {
+                let mut component = Vec::new();
+                while let Some(member) = self.stack.pop() {
+                    self.on_stack[member] = false;
+                    component.push(member);
+                    if member == node {
+                        break;
+                    }
+                }
+                self.components.push(component);
+            }
+            if let Some(parent) = self.frames.last() {
+                self.lowlink[parent.node] = self.lowlink[parent.node].min(self.lowlink[node]);
             }
         }
-
-        if self.lowlink[node] != node_index {
-            return;
-        }
-
-        let mut component = Vec::new();
-        while let Some(member) = self.stack.pop() {
-            self.on_stack[member] = false;
-            component.push(member);
-            if member == node {
-                break;
-            }
-        }
-        self.components.push(component);
     }
 }
 
@@ -376,6 +414,32 @@ mod tests {
         fn hash<H: Hasher>(&self, state: &mut H) {
             self.id.hash(state);
         }
+    }
+
+    #[test]
+    fn iterative_tarjan_visits_each_edge_once_and_reuses_frames() {
+        for n in [64, 512, 4096] {
+            let graph: Vec<Vec<usize>> = (0..n).map(|v| vec![(v + 1) % n, v]).collect();
+            let mut state = super::TarjanState::new(n);
+            state.strong_connect(0, &graph);
+            assert_eq!(state.edge_visits, 2 * n);
+            assert_eq!(state.next_index, n);
+            assert_eq!(state.max_frames, n);
+            assert!(state.frames.is_empty());
+            assert!(state.stack.is_empty());
+            assert_eq!(state.components.len(), 1);
+            assert_eq!(state.components[0].len(), n);
+        }
+        let graph = vec![Vec::new(); 1024];
+        let mut state = super::TarjanState::new(graph.len());
+        state.strong_connect(0, &graph);
+        let frame_capacity = state.frames.capacity();
+        for root in 1..graph.len() {
+            state.strong_connect(root, &graph);
+        }
+        assert_eq!(state.frames.capacity(), frame_capacity);
+        assert_eq!(state.max_frames, 1);
+        assert_eq!(state.edge_visits, 0);
     }
 
     #[test]

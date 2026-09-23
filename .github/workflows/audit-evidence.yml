@@ -1,9 +1,12 @@
-name: Numerical audit evidence
+name: Kernel audit evidence
 
 on:
   pull_request:
     paths:
       - 'crates/geometry-kernels/**'
+      - 'crates/graph-kernels/**'
+      - 'crates/octree-kernels/**'
+      - 'crates/search-kernels/**'
       - 'crates/statistics-kernels/**'
       - 'crates/spatial-kernels/**'
       - 'scripts/audit-evidence.py'
@@ -13,6 +16,9 @@ on:
     branches: [main]
     paths:
       - 'crates/geometry-kernels/**'
+      - 'crates/graph-kernels/**'
+      - 'crates/octree-kernels/**'
+      - 'crates/search-kernels/**'
       - 'crates/statistics-kernels/**'
       - 'crates/spatial-kernels/**'
       - 'scripts/audit-evidence.py'
@@ -29,7 +35,7 @@ concurrency:
 
 jobs:
   audit:
-    name: Numerical correctness and work evidence
+    name: Kernel correctness and work evidence
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -43,12 +49,16 @@ jobs:
         run: python3 scripts/test_audit_evidence.py
       - name: Reproduce audited failures and compare fixed native kernels
         run: python3 scripts/audit-evidence.py --output target/audit-evidence
+      - name: Compare lifecycle and input-boundary repairs
+        run: python3 scripts/audit-evidence.py --suite boundary --output target/boundary-audit-evidence
       - name: Publish before and after evidence
         if: always()
         run: |
-          if [ -f target/audit-evidence/summary.md ]; then
-            cat target/audit-evidence/summary.md >> "$GITHUB_STEP_SUMMARY"
-          fi
+          for report in target/audit-evidence/summary.md target/boundary-audit-evidence/summary.md; do
+            if [ -f "$report" ]; then
+              cat "$report" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
       - name: Retain measurements, probes and fingerprints (not build artifacts)
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -66,3 +76,14 @@ jobs:
             target/audit-evidence/candidate/*.log
             target/audit-evidence/candidate/*.tsv
             target/audit-evidence/candidate/*.txt
+
+            target/boundary-audit-evidence/results.json
+            target/boundary-audit-evidence/summary.md
+            target/boundary-audit-evidence/*.txt
+            target/boundary-audit-evidence/Cargo.lock
+            target/boundary-audit-evidence/baseline/*.log
+            target/boundary-audit-evidence/baseline/*.tsv
+            target/boundary-audit-evidence/baseline/*.txt
+            target/boundary-audit-evidence/candidate/*.log
+            target/boundary-audit-evidence/candidate/*.tsv
+            target/boundary-audit-evidence/candidate/*.txt

@@ -38,7 +38,7 @@ successful evidence. The nine expected baseline failures are explicitly named.
 
 `summary.md` shows the before/after comparison. `results.json` contains all
 27 workloads and their individual trials, allocation/reallocation counts and
-correctness probes. The path-scoped **Numerical audit evidence** workflow
+correctness probes. The path-scoped **Kernel audit evidence** workflow
 publishes the table in its job summary and retains the report and logs as an
 artifact. It does not upload compiler binaries or build caches.
 

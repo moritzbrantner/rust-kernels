@@ -75,3 +75,18 @@ limit easy GJK queries to eight iterations, require zero disabled-trace snapshot
 copies, and cap the equivalent-result EPA control at four allocations. The
 path-scoped evidence workflow publishes measured before/after tables with full
 fingerprints; wall-clock timing remains informational.
+
+## Input-boundary and lifecycle evidence
+
+The same comparison runner also covers octree enclosure/allocation, deep SCC
+traversal, oversized top-k limits and extreme streaming observations:
+
+```sh
+python3 scripts/audit-evidence.py --suite boundary
+cargo bench -p graph-kernels -p octree-kernels -p search-kernels -p statistics-kernels --bench boundary_cases
+```
+
+See [the boundary audit](boundary-audit.md) for the native seven-failure baseline,
+26 additional Divan workloads, deterministic edge/allocation budgets and numerical
+contracts. Both audit suites share one reporting implementation and CI job;
+wall-clock times remain informational.

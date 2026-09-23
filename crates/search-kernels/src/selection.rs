@@ -74,8 +74,13 @@ where
         return Vec::new();
     }
 
-    let mut heap = Vec::with_capacity(k);
-    for (sequence, value) in values.into_iter().enumerate() {
+    let values = values.into_iter();
+    // A result limit is not an input cardinality. In particular, k=usize::MAX
+    // is a valid request for every available value, even for an empty stream.
+    // Reserve only the guaranteed input prefix; unknown-length iterators grow
+    // amortized as candidates arrive, while exact-size inputs avoid reallocations.
+    let mut heap = Vec::with_capacity(k.min(values.size_hint().0));
+    for (sequence, value) in values.enumerate() {
         let candidate = Ranked { value, sequence };
         if heap.len() < k {
             heap.push(candidate);
