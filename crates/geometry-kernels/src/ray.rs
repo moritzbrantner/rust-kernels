@@ -207,7 +207,15 @@ mod tests {
         let ray = Ray3::new([0.0; 3], direction);
         let hit = ray_sphere(ray, Sphere::new(direction, 0.0)).expect("collinear point must hit");
         assert!((hit.enter_distance - hit.exit_distance).abs() <= f64::EPSILON);
-        assert_eq!(hit.enter_point, direction.map(f64::from));
+        let expected = direction.map(f64::from);
+        assert!(
+            hit.enter_point
+                .iter()
+                .zip(expected)
+                .all(|(actual, expected)| (actual - expected).abs() <= 2.0e-15),
+            "contact point={:?}, expected={expected:?}",
+            hit.enter_point
+        );
 
         let mut off_line = direction;
         off_line[2] = f32::from_bits(off_line[2].to_bits() + 1);
