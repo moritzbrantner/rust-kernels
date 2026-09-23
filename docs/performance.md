@@ -64,14 +64,32 @@ Geometry and statistics have a shared native before/after harness for the
 numerical/trace-cost repairs described in [the numerical audit](numerical-audit.md):
 
 ```sh
-python3 scripts/audit-evidence.py
-cargo bench -p geometry-kernels -p statistics-kernels --bench audit_numerics
+cargo test -p geometry-kernels -p statistics-kernels
+cargo bench -p geometry-kernels --bench audit_numerics
+cargo bench -p statistics-kernels --bench audit_numerics
 ```
 
-It compiles the same 12 original regression/control tests and 27 Divan workloads
-against the audited base and current source in isolated target directories.
-Expanded ordinary tests cover scale/oracle/trace parity. Deterministic gates
+The Rust test suites keep the original failing fixtures as permanent regressions
+and expand them with scale/oracle/trace-parity coverage. Deterministic gates
 limit easy GJK queries to eight iterations, require zero disabled-trace snapshot
-copies, and cap the equivalent-result EPA control at four allocations. The
-path-scoped evidence workflow publishes measured before/after tables with full
-fingerprints; wall-clock timing remains informational.
+copies, and cap the equivalent-result EPA control at four allocations. Divan is
+invoked directly by Cargo in CI and its raw output is retained; wall-clock timing
+remains informational.
+
+## Input-boundary and lifecycle evidence
+
+The same comparison runner also covers octree enclosure/allocation, deep SCC
+traversal, oversized top-k limits and extreme streaming observations:
+
+```sh
+cargo test -p graph-kernels -p octree-kernels -p search-kernels -p statistics-kernels
+cargo bench -p graph-kernels --bench boundary_cases
+cargo bench -p octree-kernels --bench boundary_cases
+cargo bench -p search-kernels --bench boundary_cases
+cargo bench -p statistics-kernels --bench boundary_cases
+```
+
+See [the boundary audit](boundary-audit.md) for the historical failure fixtures,
+26 additional Divan workloads, deterministic edge/allocation budgets and numerical
+contracts. Allocation budgets are asserted in Rust tests; Divan runs directly
+through Cargo and wall-clock times remain informational.

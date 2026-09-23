@@ -10,6 +10,7 @@ description = "Small deterministic graph and path-search kernels"
 collection-kernels = { path = "../collection-kernels" }
 
 [dev-dependencies]
+divan = "=0.1.21"
 criterion = "0.5.1"
 
 [[bench]]
@@ -26,4 +27,8 @@ harness = false
 
 [[bench]]
 name = "shortest_path"
+harness = false
+
+[[bench]]
+name = "boundary_cases"
 harness = false

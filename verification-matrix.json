@@ -177,13 +177,16 @@
         "crates/octree-kernels/src/lib.rs"
       ],
       "oracleDifferential": "present",
-      "propertyMetamorphic": "partial",
+      "propertyMetamorphic": "present",
       "coverage": "present",
       "mutation": "missing",
       "deterministicPerformance": "present",
-      "criterion": "missing",
+      "criterion": "n/a",
       "runtimeProfiler": "missing",
-      "notes": []
+      "notes": [
+        "Finite generated scenes check root/child enclosure, exact leaf membership, input-order independence and pair parity with NaiveBroadPhase in tests/boundary_regressions.rs.",
+        "criterion: New Divan boundary_cases benches measure normal/trace allocation cost for 64, 256 and 1024 bodies. The shared boundary evidence runner caps the 256-body control at 239 allocation calls."
+      ]
     },
     {
       "id": "addressable-priority-queue",
@@ -360,10 +363,13 @@
       "propertyMetamorphic": "partial",
       "coverage": "present",
       "mutation": "missing",
-      "deterministicPerformance": "missing",
+      "deterministicPerformance": "partial",
       "criterion": "missing",
       "runtimeProfiler": "missing",
-      "notes": []
+      "notes": [
+        "SCCs: exhaustive four-vertex reachability oracle, deep chain/cycle subprocess on a 64 KiB stack, explicit seed ordering and test-only once-per-edge traversal counters. Topological-sort evidence is unchanged.",
+        "New SCC Divan workloads in benches/boundary_cases.rs cover chains, cycles and disconnected graphs at 64, 512 and 2048 vertices; no claim that heap frames universally improve latency."
+      ]
     },
     {
       "id": "minimum-spanning-forest",
@@ -384,7 +390,7 @@
     {
       "id": "selection",
       "crate": "search-kernels",
-      "module": "crate::quickselect / top_k_smallest",
+      "module": "crate::quickselect / top_k_smallest / top_k_by",
       "sources": [
         "crates/search-kernels/src/selection.rs"
       ],
@@ -392,11 +398,13 @@
       "propertyMetamorphic": "present",
       "coverage": "present",
       "mutation": "missing",
-      "deterministicPerformance": "missing",
+      "deterministicPerformance": "partial",
       "criterion": "missing",
       "runtimeProfiler": "planned",
       "notes": [
-        "runtimeProfiler: Open PR #48 proposes a deterministic quickselect runtime-profiler workload; it is not evidence on main yet."
+        "runtimeProfiler: Open PR #48 proposes a deterministic quickselect runtime-profiler workload; it is not evidence on main yet.",
+        "top_k_by: empty/short usize::MAX limits, unknown-length stable sort oracle and zero-limit nonconsumption; defined eight-result descending scans use at most 8n comparisons.",
+        "Divan boundary_cases measures exact/unknown-length streams and ordinary 4096-candidate selection; empty input must allocate zero times."
       ]
     },
     {
@@ -451,7 +459,8 @@
       "runtimeProfiler": "missing",
       "notes": [
         "crates/statistics-kernels/tests/audit_regressions.rs checks finite extreme singleton/chunk merges, partition/reversal invariance and unbalanced counts; an internal test protects representable subnormal m2.",
-        "criterion: New ordinary, extreme and chunk-count workloads use Divan in crates/statistics-kernels/benches/audit_numerics.rs; scripts/audit-evidence.py reproduces overflow on the audited base."
+        "criterion: New ordinary, extreme and chunk-count workloads use Divan in crates/statistics-kernels/benches/audit_numerics.rs; Cargo-native allocation regression tests and Divan benches reproduces overflow on the audited base.",
+        "tests/boundary_regressions.rs covers overflow-safe push, continued use after opposite finite extremes, push/merge agreement, non-finite rejection atomicity and bit-identical ordinary evaluation order. Divan boundary_cases compares ordinary/extreme push."
       ]
     },
     {
@@ -486,7 +495,7 @@
       "runtimeProfiler": "missing",
       "notes": [
         "Scale-sweep sphere, OBB SAT and planar-adapter tests in crates/geometry-kernels/tests/audit_regressions.rs preserve outcome and trace parity; deterministic easy-sphere cases have an eight-iteration upper bound.",
-        "criterion: New scaled GJK workloads use Divan in crates/geometry-kernels/benches/audit_numerics.rs; scripts/audit-evidence.py keeps before/after outcomes separate from timings."
+        "criterion: New scaled GJK workloads use Divan in crates/geometry-kernels/benches/audit_numerics.rs; Cargo-native allocation regression tests and Divan benches keeps before/after outcomes separate from timings."
       ]
     },
     {

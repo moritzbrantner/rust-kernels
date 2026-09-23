@@ -20,3 +20,7 @@ harness = false
 [[bench]]
 name = "performance_smoke"
 harness = false
+
+[[bench]]
+name = "boundary_cases"
+harness = false

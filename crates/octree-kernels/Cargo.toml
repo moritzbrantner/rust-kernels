@@ -8,3 +8,10 @@ description = "Deterministic octree broad-phase and spatial partition kernels"
 
 [dependencies]
 spatial-kernels = { path = "../spatial-kernels" }
+
+[dev-dependencies]
+divan = "=0.1.21"
+
+[[bench]]
+name = "boundary_cases"
+harness = false

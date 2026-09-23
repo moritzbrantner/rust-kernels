@@ -31,6 +31,30 @@ jobs:
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo test --workspace --all-features
 
+  cargo-benchmarks:
+    name: Cargo-native benchmark evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run numerical and boundary Divan suites
+        run: |
+          mkdir -p target/cargo-benchmark-evidence
+          cargo bench -p geometry-kernels --bench audit_numerics -- --bench --sample-count 50 --sample-size 8 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/geometry-audit.txt
+          cargo bench -p statistics-kernels --bench audit_numerics -- --bench --sample-count 50 --sample-size 8 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/statistics-audit.txt
+          cargo bench -p graph-kernels --bench boundary_cases -- --bench --sample-count 30 --sample-size 4 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/graph-boundary.txt
+          cargo bench -p octree-kernels --bench boundary_cases -- --bench --sample-count 30 --sample-size 4 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/octree-boundary.txt
+          cargo bench -p search-kernels --bench boundary_cases -- --bench --sample-count 30 --sample-size 4 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/search-boundary.txt
+          cargo bench -p statistics-kernels --bench boundary_cases -- --bench --sample-count 30 --sample-size 4 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/statistics-boundary.txt
+      - name: Upload raw Cargo benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: cargo-benchmark-evidence-${{ github.sha }}
+          path: target/cargo-benchmark-evidence/
+          if-no-files-found: warn
+
   performance-smoke:
     runs-on: ubuntu-24.04
     steps:
@@ -70,12 +94,9 @@ jobs:
       - name: Capture workspace coverage baseline
         run: |
           mkdir -p target/llvm-cov-baseline
-          cargo llvm-cov --workspace --all-features --json --summary-only \
-            --output-path target/llvm-cov-baseline/summary.json
-          cargo llvm-cov report --workspace \
-            | tee target/llvm-cov-baseline/summary.txt
-          cargo llvm-cov report --workspace --lcov \
-            --output-path target/llvm-cov-baseline/lcov.info
+          cargo llvm-cov --workspace --all-features --json --summary-only --output-path target/llvm-cov-baseline/summary.json
+          cargo llvm-cov report --workspace | tee target/llvm-cov-baseline/summary.txt
+          cargo llvm-cov report --workspace --lcov --output-path target/llvm-cov-baseline/lcov.info
       - name: Publish coverage summary
         if: success()
         run: |

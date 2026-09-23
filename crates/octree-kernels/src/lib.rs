@@ -56,6 +56,9 @@ pub struct OctreeTrace {
     pub occupied_leaf_count: usize,
 }
 
+/// Deterministic broad phase with a conservatively rounded root cube.
+/// At f32 range limits where a finite cube cannot fit, its padded axes are
+/// clamped to finite bounds while still enclosing every input AABB.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct OctreeBroadPhase {
     config: OctreeConfig,
@@ -86,7 +89,7 @@ impl BroadPhase for OctreeBroadPhase {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct Node {
     bounds: Aabb,
     depth: u8,
@@ -182,49 +185,41 @@ fn run_octree(config: OctreeConfig, bodies: &[Body], trace: bool) -> OctreeTrace
 }
 
 fn subdivide(index: usize, config: OctreeConfig, bodies: &[Body], nodes: &mut Vec<Node>) {
-    let node = nodes[index].clone();
+    let node = &nodes[index];
     if node.depth >= config.max_depth || node.members.len() <= config.leaf_capacity {
         return;
     }
 
+    let child_depth = node.depth + 1;
     let child_bounds = split_bounds(node.bounds);
-    let child_members: Vec<Vec<usize>> = child_bounds
-        .iter()
-        .map(|bounds| {
-            node.members
-                .iter()
-                .copied()
-                .filter(|&member| bounds.overlaps(bodies[member].aabb))
-                .collect()
-        })
-        .collect();
-
-    let non_empty: Vec<_> = child_members
-        .iter()
-        .filter(|members| !members.is_empty())
-        .collect();
-    if non_empty.is_empty()
-        || non_empty
+    let child_members: [Vec<usize>; 8] = std::array::from_fn(|child| {
+        node.members
             .iter()
-            .all(|members| members.len() == node.members.len())
+            .copied()
+            .filter(|&member| child_bounds[child].overlaps(bodies[member].aabb))
+            .collect()
+    });
+    // A subdivision must actually reduce at least one occupied child's set.
+    if !child_members
+        .iter()
+        .any(|members| !members.is_empty() && members.len() < node.members.len())
     {
         return;
     }
 
-    let mut child_indices = Vec::with_capacity(8);
-    for child in 0..8 {
-        let child_index = nodes.len();
+    // Child slots are contiguous: move their member buffers once and walk the
+    // index range without cloning parent nodes, member vectors or child lists.
+    let first_child = nodes.len();
+    nodes[index].children = (first_child..first_child + 8).collect();
+    for (bounds, members) in child_bounds.into_iter().zip(child_members) {
         nodes.push(Node {
-            bounds: child_bounds[child],
-            depth: node.depth + 1,
-            members: child_members[child].clone(),
+            bounds,
+            depth: child_depth,
+            members,
             children: Vec::new(),
         });
-        child_indices.push(child_index);
     }
-    nodes[index].children = child_indices.clone();
-
-    for child_index in child_indices {
+    for child_index in first_child..first_child + 8 {
         if !nodes[child_index].members.is_empty() {
             subdivide(child_index, config, bodies, nodes);
         }
@@ -237,28 +232,59 @@ fn enclosing_cube(bodies: &[Body]) -> Aabb {
         bounds = bounds.union(body.aabb);
     }
 
-    let center = [
-        (bounds.min[0] + bounds.max[0]) * 0.5,
-        (bounds.min[1] + bounds.max[1]) * 0.5,
-        (bounds.min[2] + bounds.max[2]) * 0.5,
-    ];
-    let side = [
-        bounds.max[0] - bounds.min[0],
-        bounds.max[1] - bounds.min[1],
-        bounds.max[2] - bounds.min[2],
-    ]
-    .into_iter()
-    .fold(0.0_f32, f32::max)
-    .max(1.0);
-    Aabb::from_center_half_extents(center, [side * 0.5; 3])
+    // Compute in f64 so finite f32 endpoints cannot overflow sums or spans.
+    // The final min/max against the source union is intentional: even f64 may
+    // lose the small endpoint of an extremely asymmetric interval.
+    let half_side = (0..3)
+        .map(|axis| f64::from(bounds.max[axis]) - f64::from(bounds.min[axis]))
+        .fold(1.0_f64, f64::max)
+        * 0.5;
+    let centers: [f64; 3] = std::array::from_fn(|axis| {
+        (f64::from(bounds.min[axis]) + f64::from(bounds.max[axis])) * 0.5
+    });
+    Aabb::new(
+        std::array::from_fn(|axis| {
+            round_outward(centers[axis] - half_side, false).min(bounds.min[axis])
+        }),
+        std::array::from_fn(|axis| {
+            round_outward(centers[axis] + half_side, true).max(bounds.max[axis])
+        }),
+    )
+}
+
+// Directed rounding without next_up/next_down, which are newer than our MSRV.
+// At f32's extremes a finite cube may not fit: clamp only the padded part and
+// retain a conservative finite root box rather than panicking or losing bodies.
+fn round_outward(value: f64, up: bool) -> f32 {
+    let value = value.clamp(f64::from(f32::MIN), f64::from(f32::MAX));
+    let rounded = value as f32;
+    let needs_step = if up {
+        f64::from(rounded) < value
+    } else {
+        f64::from(rounded) > value
+    };
+    if !needs_step {
+        return rounded;
+    }
+    if rounded == 0.0 {
+        return if up {
+            f32::from_bits(1)
+        } else {
+            -f32::from_bits(1)
+        };
+    }
+    let bits = if up == rounded.is_sign_positive() {
+        rounded.to_bits() + 1
+    } else {
+        rounded.to_bits() - 1
+    };
+    f32::from_bits(bits)
 }
 
 fn split_bounds(bounds: Aabb) -> [Aabb; 8] {
-    let mid = [
-        (bounds.min[0] + bounds.max[0]) * 0.5,
-        (bounds.min[1] + bounds.max[1]) * 0.5,
-        (bounds.min[2] + bounds.max[2]) * 0.5,
-    ];
+    let mid: [f32; 3] = std::array::from_fn(|axis| {
+        ((f64::from(bounds.min[axis]) + f64::from(bounds.max[axis])) * 0.5) as f32
+    });
     std::array::from_fn(|child| {
         let high_x = child & 1 != 0;
         let high_y = child & 2 != 0;
@@ -304,6 +330,35 @@ mod tests {
             body(50, [3.5, -3.0, 2.0], 0.5),
             body(60, [-3.5, 3.0, -2.0], 0.5),
         ]
+    }
+
+    #[test]
+    fn directed_rounding_is_finite_and_outward() {
+        for x in [
+            -f32::MAX,
+            -1e30,
+            -1.0,
+            -f32::from_bits(1),
+            0.0,
+            f32::from_bits(1),
+            1.0,
+            1e30,
+            f32::MAX,
+        ] {
+            for value in [
+                f64::from(x),
+                f64::from(x) * (1.0 + 1e-10),
+                f64::from(x) * (1.0 - 1e-10),
+            ] {
+                let lo = super::round_outward(value, false);
+                let hi = super::round_outward(value, true);
+                let clamped = value.clamp(f64::from(f32::MIN), f64::from(f32::MAX));
+                assert!(lo.is_finite() && hi.is_finite());
+                assert!(f64::from(lo) <= clamped && f64::from(hi) >= clamped);
+            }
+        }
+        assert_eq!(super::round_outward(1e100, true), f32::MAX);
+        assert_eq!(super::round_outward(-1e100, false), f32::MIN);
     }
 
     #[test]

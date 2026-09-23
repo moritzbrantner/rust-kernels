@@ -14,3 +14,7 @@ divan = "=0.1.21"
 [[bench]]
 name = "audit_numerics"
 harness = false
+
+[[bench]]
+name = "boundary_cases"
+harness = false
