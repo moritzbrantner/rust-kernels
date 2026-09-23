@@ -177,6 +177,26 @@
         {
           "path": "crates/collection-kernels/src/union_find.rs",
           "target": "crates/collection-kernels/src/union_find.rs"
+        },
+        {
+          "path": "crates/collection-kernels/src/addressable_priority_queue.rs",
+          "target": "crates/collection-kernels/src/addressable_priority_queue.rs"
+        },
+        {
+          "path": "crates/collection-kernels/benches/addressable_priority_queue.rs",
+          "target": "crates/collection-kernels/benches/addressable_priority_queue.rs"
+        },
+        {
+          "path": "crates/collection-kernels/benches/fenwick_tree.rs",
+          "target": "crates/collection-kernels/benches/fenwick_tree.rs"
+        },
+        {
+          "path": "crates/collection-kernels/benches/lru_cache.rs",
+          "target": "crates/collection-kernels/benches/lru_cache.rs"
+        },
+        {
+          "path": "crates/collection-kernels/benches/ring_buffer.rs",
+          "target": "crates/collection-kernels/benches/ring_buffer.rs"
         }
       ],
       "provides": [
@@ -250,7 +270,11 @@
         "topology",
         "minimum-spanning-tree",
         "kruskal",
-        "pagerank"
+        "pagerank",
+        "flow",
+        "min-cut",
+        "bipartite-matching",
+        "assignment"
       ],
       "dependencies": [],
       "registryDependencies": [
@@ -280,6 +304,42 @@
         {
           "path": "crates/graph-kernels/src/traversal.rs",
           "target": "crates/graph-kernels/src/traversal.rs"
+        },
+        {
+          "path": "crates/graph-kernels/src/assignment.rs",
+          "target": "crates/graph-kernels/src/assignment.rs"
+        },
+        {
+          "path": "crates/graph-kernels/src/flow.rs",
+          "target": "crates/graph-kernels/src/flow.rs"
+        },
+        {
+          "path": "crates/graph-kernels/src/matching.rs",
+          "target": "crates/graph-kernels/src/matching.rs"
+        },
+        {
+          "path": "crates/graph-kernels/benches/minimum_spanning.rs",
+          "target": "crates/graph-kernels/benches/minimum_spanning.rs"
+        },
+        {
+          "path": "crates/graph-kernels/benches/page_rank.rs",
+          "target": "crates/graph-kernels/benches/page_rank.rs"
+        },
+        {
+          "path": "crates/graph-kernels/benches/topology.rs",
+          "target": "crates/graph-kernels/benches/topology.rs"
+        },
+        {
+          "path": "crates/graph-kernels/benches/shortest_path.rs",
+          "target": "crates/graph-kernels/benches/shortest_path.rs"
+        },
+        {
+          "path": "crates/graph-kernels/benches/boundary_cases.rs",
+          "target": "crates/graph-kernels/benches/boundary_cases.rs"
+        },
+        {
+          "path": "crates/graph-kernels/benches/optimization.rs",
+          "target": "crates/graph-kernels/benches/optimization.rs"
         }
       ],
       "provides": [
@@ -346,6 +406,37 @@
             "WeightedEdge",
             "SpanningForest"
           ]
+        },
+        {
+          "name": "maximum-flow-minimum-cut",
+          "type": "algorithm",
+          "symbols": [
+            "dinic_max_flow",
+            "CapacityEdge",
+            "MaxFlow",
+            "FlowError",
+            "FlowWork"
+          ]
+        },
+        {
+          "name": "bipartite-matching",
+          "type": "algorithm",
+          "symbols": [
+            "hopcroft_karp",
+            "BipartiteMatching",
+            "MatchingError",
+            "MatchingWork"
+          ]
+        },
+        {
+          "name": "minimum-cost-assignment",
+          "type": "algorithm",
+          "symbols": [
+            "hungarian_assignment",
+            "Assignment",
+            "AssignmentError",
+            "AssignmentWork"
+          ]
         }
       ]
     },
@@ -392,6 +483,18 @@
         {
           "path": "crates/search-kernels/src/selection.rs",
           "target": "crates/search-kernels/src/selection.rs"
+        },
+        {
+          "path": "crates/search-kernels/benches/search.rs",
+          "target": "crates/search-kernels/benches/search.rs"
+        },
+        {
+          "path": "crates/search-kernels/benches/performance_smoke.rs",
+          "target": "crates/search-kernels/benches/performance_smoke.rs"
+        },
+        {
+          "path": "crates/search-kernels/benches/boundary_cases.rs",
+          "target": "crates/search-kernels/benches/boundary_cases.rs"
         }
       ],
       "provides": [
@@ -429,6 +532,173 @@
           "symbols": [
             "radix_sort_u64"
           ]
+        },
+        {
+          "name": "ranked-top-k",
+          "type": "algorithm",
+          "symbols": [
+            "top_k_by"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "similarity-kernels",
+      "type": "registry:crate",
+      "title": "Similarity Kernels",
+      "description": "Exact and bounded generic edit distance, sorted sets, shingling, fingerprints and metric fuzzy search. Normalization and ranking stay with callers.",
+      "crate": {
+        "package": "similarity-kernels",
+        "manifest": "crates/similarity-kernels/Cargo.toml"
+      },
+      "tags": [
+        "similarity",
+        "edit-distance",
+        "bounded-levenshtein",
+        "sorted-sets",
+        "jaccard",
+        "shingling",
+        "minhash",
+        "simhash",
+        "bk-tree",
+        "myers"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/similarity-kernels/Cargo.toml",
+          "target": "crates/similarity-kernels/Cargo.toml"
+        },
+        {
+          "path": "crates/similarity-kernels/src/bounded.rs",
+          "target": "crates/similarity-kernels/src/bounded.rs"
+        },
+        {
+          "path": "crates/similarity-kernels/src/fingerprint.rs",
+          "target": "crates/similarity-kernels/src/fingerprint.rs"
+        },
+        {
+          "path": "crates/similarity-kernels/src/fuzzy.rs",
+          "target": "crates/similarity-kernels/src/fuzzy.rs"
+        },
+        {
+          "path": "crates/similarity-kernels/src/lib.rs",
+          "target": "crates/similarity-kernels/src/lib.rs"
+        },
+        {
+          "path": "crates/similarity-kernels/src/merge.rs",
+          "target": "crates/similarity-kernels/src/merge.rs"
+        },
+        {
+          "path": "crates/similarity-kernels/src/shingling.rs",
+          "target": "crates/similarity-kernels/src/shingling.rs"
+        },
+        {
+          "path": "crates/similarity-kernels/benches/fuzzy.rs",
+          "target": "crates/similarity-kernels/benches/fuzzy.rs"
+        },
+        {
+          "path": "crates/similarity-kernels/benches/shingling.rs",
+          "target": "crates/similarity-kernels/benches/shingling.rs"
+        },
+        {
+          "path": "crates/similarity-kernels/benches/set_similarity.rs",
+          "target": "crates/similarity-kernels/benches/set_similarity.rs"
+        },
+        {
+          "path": "crates/similarity-kernels/benches/expansion.rs",
+          "target": "crates/similarity-kernels/benches/expansion.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "levenshtein",
+          "type": "algorithm",
+          "symbols": [
+            "levenshtein"
+          ]
+        },
+        {
+          "name": "bounded-levenshtein",
+          "type": "algorithm",
+          "symbols": [
+            "levenshtein_bounded",
+            "LevenshteinWorkspace"
+          ]
+        },
+        {
+          "name": "sorted-unique-sets",
+          "type": "algorithm",
+          "symbols": [
+            "sorted_unique_union",
+            "sorted_unique_intersection",
+            "sorted_unique_difference",
+            "sorted_unique_symmetric_difference",
+            "sorted_unique_intersection_count",
+            "sorted_unique_union_count"
+          ]
+        },
+        {
+          "name": "jaccard",
+          "type": "algorithm",
+          "symbols": [
+            "jaccard_similarity_sorted_unique",
+            "jaccard_distance_sorted_unique"
+          ]
+        },
+        {
+          "name": "sorted-k-way-merge",
+          "type": "algorithm",
+          "symbols": [
+            "merge_sorted_unique_many"
+          ]
+        },
+        {
+          "name": "shingles-rolling-hash",
+          "type": "algorithm",
+          "symbols": [
+            "Shingles",
+            "RollingHashes",
+            "shingles",
+            "rolling_hashes"
+          ]
+        },
+        {
+          "name": "minhash",
+          "type": "algorithm",
+          "symbols": [
+            "MinHashSignature",
+            "MinHashError",
+            "minhash_signature",
+            "minhash_jaccard_estimate"
+          ]
+        },
+        {
+          "name": "simhash",
+          "type": "algorithm",
+          "symbols": [
+            "simhash64",
+            "simhash64_weighted",
+            "hamming_distance64"
+          ]
+        },
+        {
+          "name": "bk-tree",
+          "type": "data-structure",
+          "symbols": [
+            "BkTree",
+            "BkMatch",
+            "BkSearchReport"
+          ]
+        },
+        {
+          "name": "myers-distance",
+          "type": "algorithm",
+          "symbols": [
+            "myers_levenshtein_bytes",
+            "MyersError"
+          ]
         }
       ]
     },
@@ -462,6 +732,14 @@
         {
           "path": "crates/statistics-kernels/src/running_stats.rs",
           "target": "crates/statistics-kernels/src/running_stats.rs"
+        },
+        {
+          "path": "crates/statistics-kernels/benches/audit_numerics.rs",
+          "target": "crates/statistics-kernels/benches/audit_numerics.rs"
+        },
+        {
+          "path": "crates/statistics-kernels/benches/boundary_cases.rs",
+          "target": "crates/statistics-kernels/benches/boundary_cases.rs"
         }
       ],
       "provides": [
@@ -792,7 +1070,7 @@
       "name": "selection",
       "type": "registry:algorithm",
       "title": "Selection Algorithms",
-      "description": "Standalone deterministic quickselect and top-k-smallest algorithms for ordered values.",
+      "description": "Standalone deterministic quickselect, sorted top-k and bounded stable ranked stream selection.",
       "integration": {
         "mode": "standalone-module",
         "module": "selection"
@@ -824,6 +1102,13 @@
           "type": "algorithm",
           "symbols": [
             "top_k_smallest"
+          ]
+        },
+        {
+          "name": "ranked-top-k",
+          "type": "algorithm",
+          "symbols": [
+            "top_k_by"
           ]
         }
       ]

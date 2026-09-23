@@ -32,3 +32,7 @@ harness = false
 [[bench]]
 name = "boundary_cases"
 harness = false
+
+[[bench]]
+name = "optimization"
+harness = false

@@ -299,6 +299,127 @@
           }
         }
       ]
+    },
+    {
+      "id": "bounded-edit-1024-comparisons",
+      "kind": "micro",
+      "description": "Width-five band for a distance-two query; the full oracle performs 1048576 element comparisons.",
+      "dimensions": {
+        "elements": 1024,
+        "limit": 2
+      },
+      "correctnessEvidence": [
+        "crates/similarity-kernels/src/bounded.rs::narrow_band_work_is_linear_and_reuse_does_not_grow_storage"
+      ],
+      "metrics": [
+        {
+          "name": "equality-calls",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 5124
+          }
+        }
+      ]
+    },
+    {
+      "id": "bounded-edit-warm-allocations",
+      "kind": "micro",
+      "description": "Repeated bounded queries reuse both rows after warm-up.",
+      "dimensions": {
+        "elements": 1024,
+        "limit": 2
+      },
+      "correctnessEvidence": [
+        "crates/similarity-kernels/tests/allocation_regressions.rs::warmed_bounded_queries_allocate_nothing"
+      ],
+      "metrics": [
+        {
+          "name": "allocator-calls",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "dinic-disjoint-512-edge-scans",
+      "kind": "micro",
+      "description": "512 disjoint capacity-three paths resolved in a single blocking phase.",
+      "dimensions": {
+        "paths": 512,
+        "edges": 1024
+      },
+      "correctnessEvidence": [
+        "crates/graph-kernels/src/flow.rs::blocking_flow_uses_one_phase_for_disjoint_paths"
+      ],
+      "metrics": [
+        {
+          "name": "residual-edge-scans",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 12288
+          }
+        }
+      ]
+    },
+    {
+      "id": "hopcroft-alternating-2048-edge-scans",
+      "kind": "micro",
+      "description": "Long alternating-path fixture is matched in two phases without recursion.",
+      "dimensions": {
+        "left": 2048,
+        "right": 2048,
+        "edges": 4095
+      },
+      "correctnessEvidence": [
+        "crates/graph-kernels/src/matching.rs::long_alternating_path_uses_two_phases_and_linear_work"
+      ],
+      "metrics": [
+        {
+          "name": "edge-scans",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 49140
+          }
+        }
+      ]
+    },
+    {
+      "id": "hungarian-dense-128-column-scans",
+      "kind": "micro",
+      "description": "Exact signed assignment with primal/dual certificates on a tied 128-by-129 matrix.",
+      "dimensions": {
+        "rows": 128,
+        "columns": 129
+      },
+      "correctnessEvidence": [
+        "crates/graph-kernels/src/assignment.rs::dense_work_is_bounded_and_large_extremes_do_not_overflow"
+      ],
+      "metrics": [
+        {
+          "name": "column-scans",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 2113536
+          }
+        }
+      ]
     }
   ]
 }
