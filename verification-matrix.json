@@ -459,7 +459,7 @@
       "runtimeProfiler": "missing",
       "notes": [
         "crates/statistics-kernels/tests/audit_regressions.rs checks finite extreme singleton/chunk merges, partition/reversal invariance and unbalanced counts; an internal test protects representable subnormal m2.",
-        "criterion: New ordinary, extreme and chunk-count workloads use Divan in crates/statistics-kernels/benches/audit_numerics.rs; scripts/audit-evidence.py reproduces overflow on the audited base.",
+        "criterion: New ordinary, extreme and chunk-count workloads use Divan in crates/statistics-kernels/benches/audit_numerics.rs; Cargo-native allocation regression tests and Divan benches reproduces overflow on the audited base.",
         "tests/boundary_regressions.rs covers overflow-safe push, continued use after opposite finite extremes, push/merge agreement, non-finite rejection atomicity and bit-identical ordinary evaluation order. Divan boundary_cases compares ordinary/extreme push."
       ]
     },
@@ -495,7 +495,7 @@
       "runtimeProfiler": "missing",
       "notes": [
         "Scale-sweep sphere, OBB SAT and planar-adapter tests in crates/geometry-kernels/tests/audit_regressions.rs preserve outcome and trace parity; deterministic easy-sphere cases have an eight-iteration upper bound.",
-        "criterion: New scaled GJK workloads use Divan in crates/geometry-kernels/benches/audit_numerics.rs; scripts/audit-evidence.py keeps before/after outcomes separate from timings."
+        "criterion: New scaled GJK workloads use Divan in crates/geometry-kernels/benches/audit_numerics.rs; Cargo-native allocation regression tests and Divan benches keeps before/after outcomes separate from timings."
       ]
     },
     {

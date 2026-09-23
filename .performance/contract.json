@@ -211,8 +211,7 @@
         "tracing": false
       },
       "correctnessEvidence": [
-        "scripts/audit-evidence.py::validate_probes",
-        "crates/geometry-kernels/benches/audit_numerics.rs::epa_no_trace"
+        "crates/geometry-kernels/tests/allocation_regressions.rs::no_trace_quad_epa_uses_at_most_four_allocations"
       ],
       "metrics": [
         {
@@ -261,7 +260,7 @@
         "limit": 65536
       },
       "correctnessEvidence": [
-        "scripts/audit-evidence.py::validate_allocations"
+        "crates/search-kernels/tests/allocation_regressions.rs::empty_oversized_top_k_allocates_nothing"
       ],
       "metrics": [
         {
@@ -286,7 +285,7 @@
         "maxDepth": 6
       },
       "correctnessEvidence": [
-        "scripts/audit-evidence.py::validate_allocations"
+        "crates/octree-kernels/tests/allocation_regressions.rs::paired_256_scene_keeps_the_allocation_budget"
       ],
       "metrics": [
         {

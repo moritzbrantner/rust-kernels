@@ -14,33 +14,20 @@ complete validation contract.
 cargo test -p geometry-kernels -p statistics-kernels
 cargo test -p geometry-kernels -p statistics-kernels --release
 
-# The same current native test/benchmark source against base and candidate.
-python3 scripts/test_audit_evidence.py
-python3 scripts/audit-evidence.py
-
-# Developer-facing allocation-profiled Divan matrices, current revision only.
-cargo bench -p geometry-kernels -p statistics-kernels --bench audit_numerics
+# Developer-facing allocation-profiled Divan matrices.
+cargo bench -p geometry-kernels --bench audit_numerics
+cargo bench -p statistics-kernels --bench audit_numerics
 ```
 
-The comparison creates a detached worktree for the base and separate build
-outputs for the two revisions. It does not check out over, overwrite, or clean
-up the caller's working tree. An existing source directory can instead be
-supplied with `--baseline-root /path/to/baseline`. The default output is
-`target/audit-evidence/`.
+The audited failures are retained as ordinary Rust regression tests, so the
+current implementation is validated without checking out historical source in
+the test path. Workload v1 contains 27 Divan cases. CI invokes those benches
+directly through Cargo and retains their raw text output as an artifact.
 
-Both builds use the identical current test and benchmark harness, the same
-Rust executable and a copied dependency lock. The report records source and
-harness SHA-256 fingerprints, Rust/Cargo versions, host details, optimization
-profile, `RUSTFLAGS`, allocation-profiler version, dependency lock, and raw
-per-trial output. Workload v1 contains **27 timed cases**; missing workloads,
-compiler failures, missing tests and duplicated observations are errors, not
-successful evidence. The nine expected baseline failures are explicitly named.
-
-`summary.md` shows the before/after comparison. `results.json` contains all
-27 workloads and their individual trials, allocation/reallocation counts and
-correctness probes. The path-scoped **Kernel audit evidence** workflow
-publishes the table in its job summary and retains the report and logs as an
-artifact. It does not upload compiler binaries or build caches.
+Blocking contracts are expressed in Rust tests and deterministic work counters,
+not by parsing benchmark output: allocation tests use a thread-local counting
+allocator, while iteration/snapshot checks live beside the authoritative kernels.
+This keeps correctness and performance ratchets Cargo-native.
 
 ## 1. Segment and capsule distance
 
@@ -163,11 +150,10 @@ are explicitly not labeled equivalent-result speedups.
 
 ## Interpreting timings
 
-The runner alternates baseline/candidate order across three trials; each trial
-uses 200 Divan samples of 64 calls with one thread. It reports the median of the
-trial medians. Divan's allocation profiler is active on both revisions, so
-these timings include profiler overhead. Raw wall-clock results on a shared
-runner are informational; **no nanosecond or percentage timing gate is added**.
+Divan's allocation profiler is enabled in the benchmark suites. Raw wall-clock
+results on a shared runner are informational; **no nanosecond or percentage
+timing gate is added**. CI runs the suites directly with `cargo bench` and
+retains the raw output.
 
 Use the correctness outcomes, GJK iteration counts, zero-snapshot tests and
 allocator counts as the deterministic evidence. Consult the generated table

@@ -99,29 +99,19 @@ unrepresentable results may be infinite.
 ```sh
 cargo test --workspace --all-features
 cargo test -p graph-kernels -p octree-kernels -p search-kernels -p statistics-kernels --release
-python3 scripts/test_audit_evidence.py
-python3 scripts/audit-evidence.py --suite boundary
-cargo bench -p graph-kernels -p octree-kernels -p search-kernels -p statistics-kernels --bench boundary_cases
+cargo test -p graph-kernels -p octree-kernels -p search-kernels -p statistics-kernels
+cargo bench -p graph-kernels --bench boundary_cases
+cargo bench -p octree-kernels --bench boundary_cases
+cargo bench -p search-kernels --bench boundary_cases
+cargo bench -p statistics-kernels --bench boundary_cases
 ```
 
-The shared runner's `--suite numerical` (default) retains the original 12-test /
-27-benchmark contract. `--suite boundary` selects the new 11-test / 26-benchmark
-contract. Both build identical current harness sources against separate base
-and candidate libraries using isolated target directories and one copied
-dependency lock. A supplied `--baseline-root` can replace the detached worktree.
-Missing tests, compilation failures, dropped workloads and inconsistent
-allocation counts fail the runner. NaN/Infinity observations are serialized as
-explicit strings rather than invalid JSON or invented finite values.
+The boundary contract is entirely Cargo-native: the Rust test binaries own the
+correctness, stack-depth, work-count and allocation assertions, while the 26
+Divan cases run directly through `cargo bench`. CI uploads the raw Divan output
+rather than parsing it into a second test framework.
 
-Boundary results go to `target/boundary-audit-evidence/summary.md` and
-`results.json`, with raw per-trial logs and fingerprints. The existing **Kernel
-audit evidence** CI job runs both suites and publishes both summaries; no second
-full Rust/registry validation workflow is added.
-
-Boundary timings use three alternating-order trials, each with 50 Divan samples
-of four invocations and allocation profiling on both revisions. New blocking
-budgets cover zero eager allocations for empty top-k, at most 239 allocation
-calls for the 256-body octree control, and SCC edge-visit counts. Shared-runner
-latency remains informational; the old wrong-answer and aborting cases are
-correctness evidence, not equivalent-result speed baselines. Raw results retain
-all 26 cases, including slower controls, rather than only favorable ratios.
+Blocking budgets cover zero eager allocations for empty top-k, at most 239
+allocation calls for the 256-body octree control, and SCC edge-visit counts.
+Shared-runner latency remains informational; the old wrong-answer and aborting
+cases are regression fixtures, not equivalent-result speed baselines.
