@@ -40,11 +40,7 @@ fn allocation_counts<T>(f: impl FnOnce() -> T) -> (T, usize, usize) {
     ENABLED.with(|enabled| enabled.set(true));
     let result = f();
     ENABLED.with(|enabled| enabled.set(false));
-    (
-        result,
-        ALLOCS.with(Cell::get),
-        REALLOCS.with(Cell::get),
-    )
+    (result, ALLOCS.with(Cell::get), REALLOCS.with(Cell::get))
 }
 
 #[test]
