@@ -20,3 +20,7 @@ harness = false
 [[bench]]
 name = "set_similarity"
 harness = false
+
+[[bench]]
+name = "expansion"
+harness = false

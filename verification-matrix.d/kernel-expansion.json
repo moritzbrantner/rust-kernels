@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "issue": 52,
+  "kernels": [
+    {
+      "id": "bounded-edit-distance",
+      "crate": "similarity-kernels",
+      "module": "crate::LevenshteinWorkspace / levenshtein_bounded",
+      "sources": [
+        "crates/similarity-kernels/src/bounded.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "Exhaustive ternary sequences through length five and varying limits match the unrestricted oracle; tests also cover generic tokens, common affixes, usize::MAX and reused dirty rows.",
+        "Counted Eq operations cap the width-five band at 5n+4 comparisons. Warm scratch and length rejection have zero allocation/reallocation calls in the expansion evidence runner.",
+        "criterion: Allocation-profiled Divan suites run directly through cargo bench; deterministic work/allocation gates are ordinary Rust tests and wall-clock time is informational."
+      ]
+    },
+    {
+      "id": "dinic-flow-min-cut",
+      "crate": "graph-kernels",
+      "module": "crate::dinic_max_flow",
+      "sources": [
+        "crates/graph-kernels/src/flow.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "All 4096 four-vertex directed unit networks match an exhaustive cut oracle; weighted cases certify capacity limits, conservation and cut equality, including parallel/reverse/self edges and widened totals.",
+        "Disjoint path families require one blocking phase and linear edge scans. The public integration test runs a 20000-vertex path on a 64 KiB thread stack.",
+        "criterion: Allocation-profiled Divan suites run directly through cargo bench; deterministic work/allocation gates are ordinary Rust tests and wall-clock time is informational."
+      ]
+    },
+    {
+      "id": "hopcroft-karp-matching",
+      "crate": "graph-kernels",
+      "module": "crate::hopcroft_karp",
+      "sources": [
+        "crates/graph-kernels/src/matching.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "All 65536 four-by-four bipartite graphs match independent matching enumeration and a minimum-cover certificate; tests cover rectangular, duplicate, empty and invalid inputs.",
+        "Long alternating paths require two phases with linear edge scans, including a 20000-vertex 64 KiB-stack regression.",
+        "criterion: Allocation-profiled Divan suites run directly through cargo bench; deterministic work/allocation gates are ordinary Rust tests and wall-clock time is informational."
+      ]
+    },
+    {
+      "id": "hungarian-assignment",
+      "crate": "graph-kernels",
+      "module": "crate::hungarian_assignment",
+      "sources": [
+        "crates/graph-kernels/src/assignment.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "Exhaustive small signed matrices and deterministic rectangular matrices match assignment enumeration and independent primal/dual certificates. Tests cover i64 extrema, widened totals, ties and shape errors.",
+        "Dense scaled fixtures bound column scans by rows squared times columns.",
+        "criterion: Allocation-profiled Divan suites run directly through cargo bench; deterministic work/allocation gates are ordinary Rust tests and wall-clock time is informational."
+      ]
+    }
+  ]
+}

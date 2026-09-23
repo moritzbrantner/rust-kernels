@@ -4,6 +4,7 @@
 //! interpretation, ranking policy, and approximate-index policy remain with
 //! callers.
 
+mod bounded;
 mod fingerprint;
 mod fuzzy;
 mod merge;
@@ -11,6 +12,7 @@ mod shingling;
 
 use std::cmp::Ordering;
 
+pub use bounded::{LevenshteinWorkspace, levenshtein_bounded};
 pub use fingerprint::{
     MinHashError, MinHashSignature, hamming_distance64, minhash_jaccard_estimate,
     minhash_signature, simhash64, simhash64_weighted,

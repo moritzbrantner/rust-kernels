@@ -24,7 +24,7 @@ The repository starts with spatial/collision kernels and expands into small gene
 - deterministic AABB queries
 - `StaticBvhBroadPhase`, differential-tested against `NaiveBroadPhase`
 
-SAT, GJK/EPA, sweep-and-prune, dynamic AABB trees, rays, and CCD remain future kernels rather than being hidden inside the current broad-phase implementations.
+`geometry-kernels` supplies analytical relations, OBB/SAT, GJK and planar EPA. `octree-kernels` provides conservative hierarchical broad-phase detection; `spatial-kernels` also supplies sweep-and-prune and `bvh-kernels` has dynamic trees. Rays and continuous collision detection remain separate future work.
 
 ### Collections
 
@@ -52,6 +52,11 @@ The collection kernels deliberately stop before lock-free queues or a full ECS f
 - Tarjan strongly connected components with deterministic normalized output
 - deterministic PageRank with bounded convergence, explicit damping/tolerance policy, and dangling-node redistribution
 - Kruskal minimum spanning forests, reusing `UnionFind` for connectivity
+- `dinic_max_flow`, exact directed flow with per-edge flows and a minimum-cut certificate
+- `hopcroft_karp`, bipartite matching with a minimum vertex cover
+- `hungarian_assignment`, rectangular signed-integer assignment with primal/dual certificates
+
+Flow and matching augmentation are iterative, including for long paths. Network optimization uses caller-owned dense indices and edge lists; products still own mapping, eligibility, costs and allocation rules. See [the search and network guide](docs/search-and-network-kernels.md) for API contracts and runnable examples.
 
 ### Search, selection, and sorting
 
@@ -59,10 +64,21 @@ The collection kernels deliberately stop before lock-free queues or a full ECS f
 
 - `quickselect`, an in-place deterministic three-way selection algorithm
 - `top_k_smallest`, which combines selection with sorting only the requested result set
+- `top_k_by`, stable ranked stream selection without materializing the entire input
 - `BloomFilter`, deterministic probabilistic membership over byte-oriented keys using the shared `BitSet` primitive
 - stable LSD radix-sort kernels for `u32` and `u64`, checked against Rust's stable sort
 
 Selection and sorting results are checked against simple standard-library oracles. Bloom-filter tests enforce the no-false-negative contract while keeping false-positive behavior explicit.
+
+### Similarity and bounded search
+
+`similarity-kernels` provides exact Levenshtein, sorted-set operations/Jaccard,
+k-way merging, shingles/rolling hashes, MinHash/SimHash, Hamming distance,
+BK-tree search and single-word byte-oriented Myers distance.
+`levenshtein_bounded` returns the exact distance up to a caller-selected limit;
+`LevenshteinWorkspace` reuses narrow scratch rows for repeated bounded queries.
+Tokenization, normalization, approximate-index policy and ranking remain outside
+these kernels. The complete crate is also available through the source registry.
 
 ### Statistics
 
@@ -82,8 +98,8 @@ Standalone status is verified, not assumed: CI invokes `rustc` directly on every
 For example, consumers can choose the integration boundary they actually want:
 
 ```bash
-# Copy the coherent search crate source set.
-python3 scripts/source_registry.py install search-kernels --root ../consumer
+# Copy complete search and similarity source sets.
+python3 scripts/source_registry.py install search-kernels similarity-kernels --root ../consumer
 
 # Or own only one algorithm module.
 python3 scripts/source_registry.py install radix-sort --root ../consumer
@@ -91,6 +107,8 @@ python3 scripts/source_registry.py install selection --root ../consumer
 ```
 
 The granular install lands source under `src/kernels/`; the consumer remains responsible for wiring that module into its own `lib.rs`, `main.rs`, or public API. See [`docs/granular-registry.md`](docs/granular-registry.md) for the standalone-module contract and the initial granular catalog.
+
+Crate source sets include declared benchmark targets because Cargo validates their paths even for `--lib` builds. The consumer supplies workspace/package metadata for inherited manifest fields; installed manifests are not rewritten. Fresh-consumer compilation and provenance lifecycle tests protect this contract.
 
 Each registry item also describes tags and the algorithms or data structures it provides. Agents or external tooling can use that metadata to discover and copy a kernel while Cargo consumers can continue depending on the workspace crates normally.
 
@@ -130,6 +148,7 @@ See [`docs/provenance.md`](docs/provenance.md) for the lock and update contract 
 python3 scripts/validate_registry.py
 python3 scripts/test_standalone_registry.py
 python3 scripts/test_source_registry.py
+python3 scripts/test_catalog_install.py
 python3 scripts/test_source_update.py
 python3 scripts/test_source_resolution.py
 cargo fmt --all --check
