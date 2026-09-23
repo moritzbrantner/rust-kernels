@@ -1,9 +1,10 @@
 use geometry_kernels::{
-    epa::epa_penetration_planar_xy,
-    planar::gjk_intersection_planar_xy,
-    support::ConvexHull3,
+    epa::epa_penetration_planar_xy, planar::gjk_intersection_planar_xy, support::ConvexHull3,
 };
-use std::{alloc::{GlobalAlloc, Layout, System}, cell::Cell};
+use std::{
+    alloc::{GlobalAlloc, Layout, System},
+    cell::Cell,
+};
 
 struct CountingAllocator;
 thread_local! {
@@ -12,12 +13,22 @@ thread_local! {
 }
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        ENABLED.with(|enabled| if enabled.get() { ALLOCS.with(|count| count.set(count.get() + 1)); });
+        ENABLED.with(|enabled| {
+            if enabled.get() {
+                ALLOCS.with(|count| count.set(count.get() + 1));
+            }
+        });
         unsafe { System.alloc(layout) }
     }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) { unsafe { System.dealloc(ptr, layout) } }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        unsafe { System.dealloc(ptr, layout) }
+    }
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        ENABLED.with(|enabled| if enabled.get() { ALLOCS.with(|count| count.set(count.get() + 1)); });
+        ENABLED.with(|enabled| {
+            if enabled.get() {
+                ALLOCS.with(|count| count.set(count.get() + 1));
+            }
+        });
         unsafe { System.realloc(ptr, layout, new_size) }
     }
 }
@@ -26,8 +37,18 @@ static ALLOCATOR: CountingAllocator = CountingAllocator;
 
 #[test]
 fn no_trace_quad_epa_uses_at_most_four_allocations() {
-    let left_points = [[-1.0,-1.0,0.0],[1.0,-1.0,0.0],[1.0,1.0,0.0],[-1.0,1.0,0.0]];
-    let right_points = [[0.25,-0.8,0.0],[1.75,-0.8,0.0],[1.75,0.8,0.0],[0.25,0.8,0.0]];
+    let left_points = [
+        [-1.0, -1.0, 0.0],
+        [1.0, -1.0, 0.0],
+        [1.0, 1.0, 0.0],
+        [-1.0, 1.0, 0.0],
+    ];
+    let right_points = [
+        [0.25, -0.8, 0.0],
+        [1.75, -0.8, 0.0],
+        [1.75, 0.8, 0.0],
+        [0.25, 0.8, 0.0],
+    ];
     let left = ConvexHull3::new(&left_points);
     let right = ConvexHull3::new(&right_points);
     let gjk = gjk_intersection_planar_xy(&left, &right);

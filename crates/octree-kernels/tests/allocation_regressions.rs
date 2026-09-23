@@ -1,6 +1,9 @@
 use octree_kernels::OctreeBroadPhase;
 use spatial_kernels::{Aabb, Body, BroadPhase, NaiveBroadPhase};
-use std::{alloc::{GlobalAlloc, Layout, System}, cell::Cell};
+use std::{
+    alloc::{GlobalAlloc, Layout, System},
+    cell::Cell,
+};
 
 struct CountingAllocator;
 thread_local! {
@@ -9,12 +12,22 @@ thread_local! {
 }
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        ENABLED.with(|enabled| if enabled.get() { ALLOCS.with(|count| count.set(count.get() + 1)); });
+        ENABLED.with(|enabled| {
+            if enabled.get() {
+                ALLOCS.with(|count| count.set(count.get() + 1));
+            }
+        });
         unsafe { System.alloc(layout) }
     }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) { unsafe { System.dealloc(ptr, layout) } }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        unsafe { System.dealloc(ptr, layout) }
+    }
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        ENABLED.with(|enabled| if enabled.get() { ALLOCS.with(|count| count.set(count.get() + 1)); });
+        ENABLED.with(|enabled| {
+            if enabled.get() {
+                ALLOCS.with(|count| count.set(count.get() + 1));
+            }
+        });
         unsafe { System.realloc(ptr, layout, new_size) }
     }
 }
@@ -22,11 +35,17 @@ unsafe impl GlobalAlloc for CountingAllocator {
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 
 fn scene(n: usize) -> Vec<Body> {
-    (0..n).map(|id| {
-        let cell = id / 2;
-        let center = [(cell % 8) as f32 * 4.0, ((cell / 8) % 8) as f32 * 4.0, (cell / 64) as f32 * 4.0];
-        Body::new(id as u32, Aabb::from_center_half_extents(center, [0.5; 3]))
-    }).collect()
+    (0..n)
+        .map(|id| {
+            let cell = id / 2;
+            let center = [
+                (cell % 8) as f32 * 4.0,
+                ((cell / 8) % 8) as f32 * 4.0,
+                (cell / 64) as f32 * 4.0,
+            ];
+            Body::new(id as u32, Aabb::from_center_half_extents(center, [0.5; 3]))
+        })
+        .collect()
 }
 
 #[test]

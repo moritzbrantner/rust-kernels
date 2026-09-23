@@ -1,5 +1,8 @@
 use search_kernels::top_k_by;
-use std::{alloc::{GlobalAlloc, Layout, System}, cell::Cell};
+use std::{
+    alloc::{GlobalAlloc, Layout, System},
+    cell::Cell,
+};
 
 struct CountingAllocator;
 thread_local! {
@@ -9,14 +12,20 @@ thread_local! {
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         ENABLED.with(|enabled| {
-            if enabled.get() { ALLOCS.with(|count| count.set(count.get() + 1)); }
+            if enabled.get() {
+                ALLOCS.with(|count| count.set(count.get() + 1));
+            }
         });
         unsafe { System.alloc(layout) }
     }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) { unsafe { System.dealloc(ptr, layout) } }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        unsafe { System.dealloc(ptr, layout) }
+    }
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
         ENABLED.with(|enabled| {
-            if enabled.get() { ALLOCS.with(|count| count.set(count.get() + 1)); }
+            if enabled.get() {
+                ALLOCS.with(|count| count.set(count.get() + 1));
+            }
         });
         unsafe { System.realloc(ptr, layout, new_size) }
     }
@@ -43,5 +52,9 @@ fn empty_oversized_top_k_allocates_nothing() {
 fn tiny_result_does_not_reserve_the_requested_limit() {
     let result = top_k_by([3_u64, 1, 2, 0], 65_536, Ord::cmp);
     assert_eq!(result, [0, 1, 2, 3]);
-    assert!(result.capacity() <= 8, "retained capacity={}", result.capacity());
+    assert!(
+        result.capacity() <= 8,
+        "retained capacity={}",
+        result.capacity()
+    );
 }
