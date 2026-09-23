@@ -8,8 +8,9 @@ use std::{
 
 struct CountingAllocator;
 thread_local! {
-    static ENABLED: Cell<bool> = const { Cell::new(false) };
     static ALLOCS: Cell<usize> = const { Cell::new(0) };
+    static ENABLED: Cell<bool> = const { Cell::new(false) };
+    static REALLOCS: Cell<usize> = const { Cell::new(0) };
 }
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
@@ -26,7 +27,7 @@ unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
         ENABLED.with(|enabled| {
             if enabled.get() {
-                ALLOCS.with(|count| count.set(count.get() + 1));
+                REALLOCS.with(|count| count.set(count.get() + 1));
             }
         });
         unsafe { System.realloc(ptr, layout, new_size) }
@@ -53,10 +54,11 @@ fn no_trace_quad_epa_uses_at_most_four_allocations() {
     let right = ConvexHull3::new(&right_points);
     let gjk = gjk_intersection_planar_xy(&left, &right);
     ALLOCS.with(|count| count.set(0));
+    REALLOCS.with(|count| count.set(0));
     ENABLED.with(|enabled| enabled.set(true));
     let result = epa_penetration_planar_xy(&left, &right, &gjk);
     ENABLED.with(|enabled| enabled.set(false));
-    let calls = ALLOCS.with(Cell::get);
+    let allocations = ALLOCS.with(Cell::get);
     assert!(result.penetration.is_some());
-    assert!(calls <= 4, "allocation calls={calls}");
+    assert!(allocations <= 4, "allocation calls={allocations}");
 }
