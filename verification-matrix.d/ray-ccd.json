@@ -6,7 +6,9 @@
       "id": "ray-queries",
       "crate": "geometry-kernels",
       "module": "crate::ray",
-      "sources": ["crates/geometry-kernels/src/ray.rs"],
+      "sources": [
+        "crates/geometry-kernels/src/ray.rs"
+      ],
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
@@ -15,6 +17,7 @@
       "criterion": "n/a",
       "runtimeProfiler": "missing",
       "notes": [
+        "deterministicPerformance: Per-query algorithmic work is constant with fixed dimensionality; size-scaled wall-clock batches are informational rather than a blocking complexity gate.",
         "Ray/AABB slab queries are checked against independent face-plane enumeration on generated fixtures.",
         "Ray/sphere cross-product line-distance queries are checked against an independent quadratic oracle.",
         "Direction magnitude is metamorphically tested from subnormal through maximum finite f32 values.",
@@ -25,7 +28,9 @@
       "id": "sphere-sphere-time-of-impact",
       "crate": "geometry-kernels",
       "module": "crate::continuous",
-      "sources": ["crates/geometry-kernels/src/continuous.rs"],
+      "sources": [
+        "crates/geometry-kernels/src/continuous.rs"
+      ],
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
@@ -34,6 +39,7 @@
       "criterion": "n/a",
       "runtimeProfiler": "missing",
       "notes": [
+        "deterministicPerformance: Per-query algorithmic work is constant with fixed dimensionality; size-scaled wall-clock batches are informational rather than a blocking complexity gate.",
         "Generated sweeps compare with an independent time-domain quadratic oracle.",
         "Velocity scaling preserves contact position while inversely scaling time.",
         "Starts-overlapping, stationary, receding and bounded-window cases are explicit.",
