@@ -280,7 +280,7 @@ mod tests {
         let origin = ray.origin64();
         let direction = ray.direction();
         let center = sphere.center.map(f64::from);
-        let oc = std::array::from_fn(|axis| origin[axis] - center[axis]);
+        let oc: [f64; 3] = std::array::from_fn(|axis| origin[axis] - center[axis]);
         let b = 2.0 * (0..3).map(|axis| oc[axis] * direction[axis]).sum::<f64>();
         let c = oc.into_iter().map(|v| v * v).sum::<f64>() - f64::from(sphere.radius).powi(2);
         let discriminant = b * b - 4.0 * c;

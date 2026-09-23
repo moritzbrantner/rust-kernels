@@ -78,7 +78,7 @@ fn robust_length(value: [f32; 3]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::sphere_sphere_time_of_impact;
-    use crate::{Sphere, math3::sub};
+    use crate::{Sphere, math3::{length_squared, sub}};
 
     #[test]
     fn reports_contact_time_inside_window_and_respects_limit() {
