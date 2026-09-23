@@ -9,6 +9,7 @@ use crate::{
 pub struct Ray3 {
     pub origin: [f32; 3],
     direction: Vec3,
+    raw_direction: Vec3,
 }
 
 impl Ray3 {
@@ -33,6 +34,7 @@ impl Ray3 {
         Self {
             origin,
             direction: scale(scaled, inverse_length),
+            raw_direction: direction.map(f64::from),
         }
     }
 
@@ -44,6 +46,10 @@ impl Ray3 {
     #[must_use]
     pub fn origin64(self) -> Vec3 {
         self.origin.map(f64::from)
+    }
+
+    fn raw_direction(self) -> Vec3 {
+        self.raw_direction
     }
 
     #[must_use]
@@ -122,14 +128,17 @@ pub(crate) fn ray_sphere_radius(ray: Ray3, center: Vec3, radius: f64) -> Option<
     debug_assert!(radius.is_finite() && radius >= 0.0);
     let origin = ray.origin64();
     let direction = ray.direction();
+    let raw_direction = ray.raw_direction();
     let to_center = sub(center, origin);
     let radius_squared = radius * radius;
     let starts_inside = length_squared(to_center) <= radius_squared;
 
-    // For a unit direction, |to_center × direction|² is the squared distance
-    // from the sphere center to the infinite ray line. This avoids subtracting
-    // two nearly equal large squared lengths near tangency.
-    let perpendicular_squared = length_squared(cross(to_center, direction));
+    // Compute line distance from the original f32 direction widened to f64.
+    // This preserves exact collinearity for point-sphere queries instead of
+    // injecting a tiny cross product through unit-vector normalization.
+    // Full-range f32 products remain finite in f64.
+    let perpendicular_squared =
+        length_squared(cross(to_center, raw_direction)) / length_squared(raw_direction);
     if perpendicular_squared > radius_squared {
         return None;
     }
@@ -190,6 +199,19 @@ mod tests {
         let touching = ray_aabb(Ray3::new([-3.0, 1.0, 0.0], [1.0, 0.0, 0.0]), aabb).unwrap();
         assert_eq!(touching.enter_distance, 2.0);
         assert!(ray_aabb(Ray3::new([-3.0, 2.0, 0.0], [1.0, 0.0, 0.0]), aabb).is_none());
+    }
+
+    #[test]
+    fn point_sphere_preserves_exact_non_axis_aligned_collinearity() {
+        let direction = [0.3847446, 9.175763, -3.0520046];
+        let ray = Ray3::new([0.0; 3], direction);
+        let hit = ray_sphere(ray, Sphere::new(direction, 0.0)).expect("collinear point must hit");
+        assert!((hit.enter_distance - hit.exit_distance).abs() <= f64::EPSILON);
+        assert_eq!(hit.enter_point, direction.map(f64::from));
+
+        let mut off_line = direction;
+        off_line[2] = f32::from_bits(off_line[2].to_bits() + 1);
+        assert!(ray_sphere(ray, Sphere::new(off_line, 0.0)).is_none());
     }
 
     #[test]
