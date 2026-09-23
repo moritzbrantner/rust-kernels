@@ -1,6 +1,6 @@
 use crate::{
     Sphere,
-    math3::{Vec3, length_squared, sub},
+    math3::{Vec3, length_squared},
     ray::{Ray3, ray_sphere_radius},
     sphere_sphere,
 };
@@ -78,7 +78,7 @@ fn robust_length(value: [f32; 3]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::sphere_sphere_time_of_impact;
-    use crate::Sphere;
+    use crate::{Sphere, math3::sub};
 
     #[test]
     fn reports_contact_time_inside_window_and_respects_limit() {
