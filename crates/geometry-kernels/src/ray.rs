@@ -115,18 +115,10 @@ pub fn ray_aabb(ray: Ray3, aabb: Aabb) -> Option<RayIntervalHit> {
 
 #[must_use]
 pub fn ray_sphere(ray: Ray3, sphere: Sphere) -> Option<RayIntervalHit> {
-    ray_sphere_radius(
-        ray,
-        sphere.center.map(f64::from),
-        f64::from(sphere.radius),
-    )
+    ray_sphere_radius(ray, sphere.center.map(f64::from), f64::from(sphere.radius))
 }
 
-pub(crate) fn ray_sphere_radius(
-    ray: Ray3,
-    center: Vec3,
-    radius: f64,
-) -> Option<RayIntervalHit> {
+pub(crate) fn ray_sphere_radius(ray: Ray3, center: Vec3, radius: f64) -> Option<RayIntervalHit> {
     debug_assert!(radius.is_finite() && radius >= 0.0);
     let origin = ray.origin64();
     let direction = ray.direction();
@@ -195,8 +187,7 @@ mod tests {
         assert_eq!(inside.exit_distance, 1.0);
         assert!(inside.starts_inside);
 
-        let touching =
-            ray_aabb(Ray3::new([-3.0, 1.0, 0.0], [1.0, 0.0, 0.0]), aabb).unwrap();
+        let touching = ray_aabb(Ray3::new([-3.0, 1.0, 0.0], [1.0, 0.0, 0.0]), aabb).unwrap();
         assert_eq!(touching.enter_distance, 2.0);
         assert!(ray_aabb(Ray3::new([-3.0, 2.0, 0.0], [1.0, 0.0, 0.0]), aabb).is_none());
     }
@@ -204,8 +195,7 @@ mod tests {
     #[test]
     fn ray_sphere_handles_tangent_inside_and_behind() {
         let sphere = Sphere::new([0.0; 3], 1.0);
-        let tangent =
-            ray_sphere(Ray3::new([-2.0, 1.0, 0.0], [1.0, 0.0, 0.0]), sphere).unwrap();
+        let tangent = ray_sphere(Ray3::new([-2.0, 1.0, 0.0], [1.0, 0.0, 0.0]), sphere).unwrap();
         assert_eq!(tangent.enter_distance, 2.0);
         assert_eq!(tangent.exit_distance, 2.0);
 
@@ -221,8 +211,7 @@ mod tests {
         let origin = ray.origin64();
         let direction = ray.direction();
         let inside = (0..3).all(|axis| {
-            origin[axis] >= f64::from(aabb.min[axis])
-                && origin[axis] <= f64::from(aabb.max[axis])
+            origin[axis] >= f64::from(aabb.min[axis]) && origin[axis] <= f64::from(aabb.max[axis])
         });
         let mut distances = Vec::new();
         if inside {
@@ -275,7 +264,11 @@ mod tests {
             let ray = Ray3::new(origin, direction);
             let expected = face_oracle(ray, aabb);
             let actual = ray_aabb(ray, aabb);
-            assert_eq!(actual.is_some(), expected.is_some(), "ray={ray:?}, aabb={aabb:?}");
+            assert_eq!(
+                actual.is_some(),
+                expected.is_some(),
+                "ray={ray:?}, aabb={aabb:?}"
+            );
             if let (Some(actual), Some((enter, exit))) = (actual, expected) {
                 assert!((actual.enter_distance - enter).abs() <= 1.0e-8);
                 assert!((actual.exit_distance - exit).abs() <= 1.0e-8);
@@ -308,10 +301,7 @@ mod tests {
             (state >> 8) as f32 / (1_u32 << 24) as f32
         };
         for _ in 0..4096 {
-            let sphere = Sphere::new(
-                std::array::from_fn(|_| next() * 20.0 - 10.0),
-                next() * 4.0,
-            );
+            let sphere = Sphere::new(std::array::from_fn(|_| next() * 20.0 - 10.0), next() * 4.0);
             let origin = std::array::from_fn(|_| next() * 30.0 - 15.0);
             let mut direction = std::array::from_fn(|_| next() * 2.0 - 1.0);
             if direction == [0.0; 3] {

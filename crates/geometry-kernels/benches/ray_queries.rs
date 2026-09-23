@@ -1,7 +1,5 @@
 use divan::{Bencher, black_box};
-use geometry_kernels::{
-    Ray3, Sphere, ray_aabb, ray_sphere, sphere_sphere_time_of_impact,
-};
+use geometry_kernels::{Ray3, Sphere, ray_aabb, ray_sphere, sphere_sphere_time_of_impact};
 use spatial_kernels::Aabb;
 
 fn main() {

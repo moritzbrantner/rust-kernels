@@ -115,10 +115,7 @@ mod tests {
         target: Sphere,
         max_time: f64,
     ) -> Option<f64> {
-        let relative = sub(
-            moving.center.map(f64::from),
-            target.center.map(f64::from),
-        );
+        let relative = sub(moving.center.map(f64::from), target.center.map(f64::from));
         let velocity = velocity.map(f64::from);
         let radius = f64::from(moving.radius) + f64::from(target.radius);
         let c = length_squared(relative) - radius * radius;
@@ -129,9 +126,10 @@ mod tests {
         if a == 0.0 {
             return None;
         }
-        let b = 2.0 * (0..3)
-            .map(|axis| relative[axis] * velocity[axis])
-            .sum::<f64>();
+        let b = 2.0
+            * (0..3)
+                .map(|axis| relative[axis] * velocity[axis])
+                .sum::<f64>();
         let discriminant = b * b - 4.0 * a * c;
         if discriminant < 0.0 {
             return None;
@@ -148,19 +146,17 @@ mod tests {
             (state >> 8) as f32 / (1_u32 << 24) as f32
         };
         for _ in 0..4096 {
-            let moving = Sphere::new(
-                std::array::from_fn(|_| next() * 20.0 - 10.0),
-                next() * 2.0,
-            );
-            let target = Sphere::new(
-                std::array::from_fn(|_| next() * 20.0 - 10.0),
-                next() * 2.0,
-            );
+            let moving = Sphere::new(std::array::from_fn(|_| next() * 20.0 - 10.0), next() * 2.0);
+            let target = Sphere::new(std::array::from_fn(|_| next() * 20.0 - 10.0), next() * 2.0);
             let velocity = std::array::from_fn(|_| next() * 8.0 - 4.0);
             let max_time = 5.0;
             let expected = quadratic_oracle(moving, velocity, target, max_time);
             let actual = sphere_sphere_time_of_impact(moving, velocity, target, max_time);
-            assert_eq!(actual.is_some(), expected.is_some(), "{moving:?} {velocity:?} {target:?}");
+            assert_eq!(
+                actual.is_some(),
+                expected.is_some(),
+                "{moving:?} {velocity:?} {target:?}"
+            );
             if let (Some(actual), Some(expected)) = (actual, expected) {
                 assert!((actual.time - expected).abs() <= 1.0e-9);
             }
