@@ -170,20 +170,17 @@ where
                 normal: edge.normal,
                 edge: edge_points,
             };
-            push_trace(
-                &mut trace,
-                EpaTraceStep {
-                    iteration,
-                    edge: edge_points,
-                    normal: edge.normal,
-                    edge_distance: edge.distance,
-                    support,
-                    support_distance,
-                    gap,
-                    polytope: polytope.clone(),
-                    terminal_status: Some(EpaStatus::Converged),
-                },
-            );
+            push_trace(&mut trace, || EpaTraceStep {
+                iteration,
+                edge: edge_points,
+                normal: edge.normal,
+                edge_distance: edge.distance,
+                support,
+                support_distance,
+                gap,
+                polytope: trace_snapshot(&polytope),
+                terminal_status: Some(EpaStatus::Converged),
+            });
             return EpaResult {
                 status: EpaStatus::Converged,
                 iterations: iteration,
@@ -195,33 +192,7 @@ where
             .iter()
             .any(|point| distance_squared_xy(point.point, support.point) <= epsilon_squared)
         {
-            push_trace(
-                &mut trace,
-                EpaTraceStep {
-                    iteration,
-                    edge: edge_points,
-                    normal: edge.normal,
-                    edge_distance: edge.distance,
-                    support,
-                    support_distance,
-                    gap,
-                    polytope: polytope.clone(),
-                    terminal_status: Some(EpaStatus::NoProgress),
-                },
-            );
-            return EpaResult {
-                status: EpaStatus::NoProgress,
-                iterations: iteration,
-                penetration: None,
-            };
-        }
-
-        polytope.insert(edge.end, support);
-        let terminal_status =
-            (iteration == config.max_iterations).then_some(EpaStatus::IterationLimit);
-        push_trace(
-            &mut trace,
-            EpaTraceStep {
+            push_trace(&mut trace, || EpaTraceStep {
                 iteration,
                 edge: edge_points,
                 normal: edge.normal,
@@ -229,16 +200,76 @@ where
                 support,
                 support_distance,
                 gap,
-                polytope: polytope.clone(),
-                terminal_status,
-            },
-        );
+                polytope: trace_snapshot(&polytope),
+                terminal_status: Some(EpaStatus::NoProgress),
+            });
+            return EpaResult {
+                status: EpaStatus::NoProgress,
+                iterations: iteration,
+                penetration: None,
+            };
+        }
+
+        expand_polytope(&mut polytope, edge.start, edge.end, support, config.epsilon);
+        let terminal_status =
+            (iteration == config.max_iterations).then_some(EpaStatus::IterationLimit);
+        push_trace(&mut trace, || EpaTraceStep {
+            iteration,
+            edge: edge_points,
+            normal: edge.normal,
+            edge_distance: edge.distance,
+            support,
+            support_distance,
+            gap,
+            polytope: trace_snapshot(&polytope),
+            terminal_status,
+        });
     }
 
     EpaResult {
         status: EpaStatus::IterationLimit,
         iterations: config.max_iterations,
         penetration: None,
+    }
+}
+
+/// Insert a new support point while removing the contiguous visible edge chain.
+/// Inserting only between the chosen edge's endpoints can retain vertices hidden
+/// by the new point, producing a non-convex boundary or even losing enclosure of
+/// the origin. Keep the existing Vec/capacity and the order of surviving points.
+fn expand_polytope(
+    polytope: &mut Vec<MinkowskiSupportPoint>,
+    mut start: usize,
+    mut end: usize,
+    support: MinkowskiSupportPoint,
+    epsilon: f64,
+) {
+    let len = polytope.len();
+    let visible = |a: usize, b: usize| {
+        cross_xy(polytope[a].point, polytope[b].point, support.point)
+            <= scaled_cross_tolerance_xy(polytope[a].point, polytope[b].point, epsilon)
+    };
+    loop {
+        let previous = (start + len - 1) % len;
+        if previous == end || !visible(previous, start) {
+            break;
+        }
+        start = previous;
+    }
+    loop {
+        let next = (end + 1) % len;
+        if next == start || !visible(end, next) {
+            break;
+        }
+        end = next;
+    }
+    if start < end {
+        polytope.drain((start + 1)..end);
+        polytope.insert(start + 1, support);
+    } else {
+        polytope.truncate(start + 1);
+        polytope.drain(..end);
+        polytope.insert(0, support);
     }
 }
 
@@ -314,9 +345,30 @@ fn validate_config(config: EpaConfig) {
     );
 }
 
-fn push_trace(trace: &mut Option<&mut Vec<EpaTraceStep>>, step: EpaTraceStep) {
+#[cfg(test)]
+std::thread_local! {
+    // Test-only work evidence: snapshot count and copied support-point count.
+    // Thread locality keeps ordinary parallel cargo test runs deterministic.
+    static SNAPSHOT_WORK: std::cell::Cell<(usize, usize)> = const {
+        std::cell::Cell::new((0, 0))
+    };
+}
+
+fn trace_snapshot(polytope: &[MinkowskiSupportPoint]) -> Vec<MinkowskiSupportPoint> {
+    #[cfg(test)]
+    SNAPSHOT_WORK.with(|work| {
+        let (snapshots, points) = work.get();
+        work.set((snapshots + 1, points + polytope.len()));
+    });
+    polytope.to_vec()
+}
+
+fn push_trace(
+    trace: &mut Option<&mut Vec<EpaTraceStep>>,
+    make_step: impl FnOnce() -> EpaTraceStep,
+) {
     if let Some(steps) = trace.as_deref_mut() {
-        steps.push(step);
+        steps.push(make_step());
     }
 }
 
@@ -473,6 +525,52 @@ mod tests {
         assert_eq!(point.point[2], 0.0);
         assert_eq!(point.left[2], 0.0);
         assert_eq!(point.right[2], 0.0);
+    }
+
+    #[test]
+    fn disabled_trace_never_evaluates_the_snapshot_factory() {
+        super::push_trace(&mut None, || panic!("disabled trace built a step"));
+    }
+
+    #[test]
+    fn normal_epa_copies_zero_trace_points_including_terminal_iterations() {
+        let left_points = [
+            [-1.2, -0.7, 0.0],
+            [1.0, -0.9, 0.0],
+            [1.25, 0.6, 0.0],
+            [-0.8, 1.1, 0.0],
+        ];
+        let right_points = [
+            [0.1, -0.8, 0.0],
+            [1.6, -0.3, 0.0],
+            [1.2, 1.0, 0.0],
+            [-0.1, 0.7, 0.0],
+        ];
+        let left = ConvexHull3::new(&left_points);
+        let right = ConvexHull3::new(&right_points);
+        let gjk = gjk_intersection_planar_xy(&left, &right);
+        for max_iterations in [1, 2, 32] {
+            let config = EpaConfig {
+                max_iterations,
+                ..EpaConfig::default()
+            };
+            super::SNAPSHOT_WORK.with(|work| work.set((0, 0)));
+            let result = super::epa_penetration_planar_xy_with_config(&left, &right, &gjk, config);
+            assert_eq!(super::SNAPSHOT_WORK.with(|work| work.get()), (0, 0));
+            let trace = epa_penetration_trace_planar_xy_with_config(&left, &right, &gjk, config);
+            assert_eq!(trace.result, result);
+            assert_eq!(
+                super::SNAPSHOT_WORK.with(|work| work.get()),
+                (
+                    trace.steps.len(),
+                    trace.steps.iter().map(|step| step.polytope.len()).sum()
+                )
+            );
+            assert_eq!(
+                trace.steps.last().unwrap().terminal_status,
+                Some(result.status)
+            );
+        }
     }
 
     #[test]

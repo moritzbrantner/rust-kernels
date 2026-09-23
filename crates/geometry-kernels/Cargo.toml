@@ -11,7 +11,12 @@ spatial-kernels = { path = "../spatial-kernels" }
 
 [dev-dependencies]
 criterion = "0.5.1"
+divan = "=0.1.21"
 
 [[bench]]
 name = "obb3_sat"
+harness = false
+
+[[bench]]
+name = "audit_numerics"
 harness = false

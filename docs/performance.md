@@ -57,3 +57,21 @@ When the base commit already contains the smoke benchmark, the script records th
 The script writes the candidate/base logs and an environment fingerprint to `.artifacts/performance-smoke/`. The fingerprint records the revisions, Rust/Cargo versions, `RUSTFLAGS`, Valgrind/Iai-Callgrind runner versions, and host architecture so incompatible evidence is not treated as directly comparable.
 
 The GitHub Actions smoke job uses `ubuntu-24.04`, Iai-Callgrind 0.16.1, and the distribution Valgrind package. Compiler/toolchain changes remain visible in the fingerprint and should be treated as an environment change when interpreting a baseline shift.
+
+## Numerical audit and allocation evidence
+
+Geometry and statistics have a shared native before/after harness for the
+numerical/trace-cost repairs described in [the numerical audit](numerical-audit.md):
+
+```sh
+python3 scripts/audit-evidence.py
+cargo bench -p geometry-kernels -p statistics-kernels --bench audit_numerics
+```
+
+It compiles the same 12 original regression/control tests and 27 Divan workloads
+against the audited base and current source in isolated target directories.
+Expanded ordinary tests cover scale/oracle/trace parity. Deterministic gates
+limit easy GJK queries to eight iterations, require zero disabled-trace snapshot
+copies, and cap the equivalent-result EPA control at four allocations. The
+path-scoped evidence workflow publishes measured before/after tables with full
+fingerprints; wall-clock timing remains informational.

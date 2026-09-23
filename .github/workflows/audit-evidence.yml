@@ -1,0 +1,68 @@
+name: Numerical audit evidence
+
+on:
+  pull_request:
+    paths:
+      - 'crates/geometry-kernels/**'
+      - 'crates/statistics-kernels/**'
+      - 'crates/spatial-kernels/**'
+      - 'scripts/audit-evidence.py'
+      - 'scripts/test_audit_evidence.py'
+      - '.github/workflows/audit-evidence.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'crates/geometry-kernels/**'
+      - 'crates/statistics-kernels/**'
+      - 'crates/spatial-kernels/**'
+      - 'scripts/audit-evidence.py'
+      - 'scripts/test_audit_evidence.py'
+      - '.github/workflows/audit-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: numerical-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Numerical correctness and work evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: '1.95.0'
+      - name: Check fail-closed evidence parsing
+        run: python3 scripts/test_audit_evidence.py
+      - name: Reproduce audited failures and compare fixed native kernels
+        run: python3 scripts/audit-evidence.py --output target/audit-evidence
+      - name: Publish before and after evidence
+        if: always()
+        run: |
+          if [ -f target/audit-evidence/summary.md ]; then
+            cat target/audit-evidence/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Retain measurements, probes and fingerprints (not build artifacts)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: numerical-audit-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            target/audit-evidence/results.json
+            target/audit-evidence/summary.md
+            target/audit-evidence/*.txt
+            target/audit-evidence/Cargo.lock
+            target/audit-evidence/baseline/*.log
+            target/audit-evidence/baseline/*.tsv
+            target/audit-evidence/baseline/*.txt
+            target/audit-evidence/candidate/*.log
+            target/audit-evidence/candidate/*.tsv
+            target/audit-evidence/candidate/*.txt

@@ -14,7 +14,8 @@ pub enum GjkStatus {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GjkConfig {
     pub max_iterations: usize,
-    /// Geometric tolerance used only for simplex degeneracy and repeated support points.
+    /// World-space distance tolerance for contact, simplex degeneracy and repeated
+    /// support points. Callers choose the tolerance appropriate to their units.
     pub epsilon: f64,
 }
 
@@ -146,9 +147,8 @@ where
         if process_simplex(&mut simplex, &mut direction, epsilon_squared) {
             return result(GjkStatus::Intersecting, iteration, simplex, direction);
         }
-        if length_squared(direction) <= epsilon_squared {
-            return result(GjkStatus::Intersecting, iteration, simplex, direction);
-        }
+        // Search vectors may be cross/triple-cross products, not distances.
+        // Only the simplex reducers may prove contact with a geometric epsilon.
         if repeated {
             return result(GjkStatus::NoProgress, iteration, simplex, direction);
         }
@@ -203,7 +203,9 @@ fn process_line(simplex: &mut Simplex, direction: &mut Vec3, epsilon_squared: f6
     }
 
     let perpendicular = triple_cross(ab, ao, ab);
-    if length_squared(perpendicular) > epsilon_squared {
+    let ab_squared = length_squared(ab);
+    // The triple cross is distance scaled by |ab|², not a distance itself.
+    if length_squared(perpendicular) > epsilon_squared * ab_squared * ab_squared {
         *direction = perpendicular;
         return false;
     }
@@ -225,7 +227,7 @@ fn process_triangle(simplex: &mut Simplex, direction: &mut Vec3, epsilon_squared
     let ac = sub(c, a);
     let abc = cross(ab, ac);
 
-    if length_squared(abc) <= epsilon_squared {
+    if triangle_is_degenerate(ab, ac, abc, epsilon_squared) {
         return reduce_degenerate_triangle(simplex, direction, epsilon_squared);
     }
 
@@ -293,21 +295,35 @@ fn process_tetrahedron(simplex: &mut Simplex, direction: &mut Vec3, epsilon_squa
     let d = simplex.points[3].point;
     let ao = neg(a);
 
-    if origin_outside_face(a, b, c, d, ao, epsilon_squared) {
+    let ab = sub(b, a);
+    let ac = sub(c, a);
+    let ad = sub(d, a);
+    let abc = cross(ab, ac);
+    if origin_outside_face(ab, ac, abc, ad, ao, epsilon_squared) {
         simplex.keep3(0, 1, 2);
         return process_triangle(simplex, direction, epsilon_squared);
     }
-    if origin_outside_face(a, c, d, b, ao, epsilon_squared) {
+    let acd = cross(ac, ad);
+    if origin_outside_face(ac, ad, acd, ab, ao, epsilon_squared) {
         simplex.keep3(0, 2, 3);
         return process_triangle(simplex, direction, epsilon_squared);
     }
-    if origin_outside_face(a, d, b, c, ao, epsilon_squared) {
+    let adb = cross(ad, ab);
+    if origin_outside_face(ad, ab, adb, ac, ao, epsilon_squared) {
         simplex.keep3(0, 3, 1);
         return process_triangle(simplex, direction, epsilon_squared);
     }
 
-    let volume_six = dot(cross(sub(b, a), sub(c, a)), sub(d, a)).abs();
-    if volume_six <= epsilon_squared {
+    // Reuse the face normals already needed for visibility; only the opposite
+    // face needs another cross product for the smallest-altitude bound.
+    let volume_six = dot(abc, ad).abs();
+    let largest_face_area_squared = [abc, acd, adb, cross(sub(c, b), sub(d, b))]
+        .into_iter()
+        .map(length_squared)
+        .fold(0.0, f64::max);
+    // Volume divided by face area is an altitude (a length). Compare like
+    // dimensions: volume² <= epsilon² * area², never volume <= epsilon².
+    if volume_six * volume_six <= epsilon_squared * largest_face_area_squared {
         simplex.keep3(0, 1, 2);
         return process_triangle(simplex, direction, epsilon_squared);
     }
@@ -316,21 +332,28 @@ fn process_tetrahedron(simplex: &mut Simplex, direction: &mut Vec3, epsilon_squa
 }
 
 fn origin_outside_face(
-    a: Vec3,
-    b: Vec3,
-    c: Vec3,
-    opposite: Vec3,
+    ab: Vec3,
+    ac: Vec3,
+    mut normal: Vec3,
+    toward_opposite: Vec3,
     ao: Vec3,
     epsilon_squared: f64,
 ) -> bool {
-    let mut normal = cross(sub(b, a), sub(c, a));
-    if length_squared(normal) <= epsilon_squared {
-        return false;
-    }
-    if dot(normal, sub(opposite, a)) > 0.0 {
+    if dot(normal, toward_opposite) > 0.0 {
         normal = neg(normal);
     }
-    dot(normal, ao) > 0.0
+    // An inside-facing origin cannot request a face reduction, degenerate or
+    // not. Defer the altitude calculation until it can affect that decision.
+    dot(normal, ao) > 0.0 && !triangle_is_degenerate(ab, ac, normal, epsilon_squared)
+}
+
+fn triangle_is_degenerate(ab: Vec3, ac: Vec3, normal: Vec3, epsilon_squared: f64) -> bool {
+    let longest_edge_squared = length_squared(ab)
+        .max(length_squared(ac))
+        .max(length_squared(sub(ac, ab)));
+    // |ab × ac| / longest_edge is the smallest triangle altitude. Squaring
+    // both sides keeps this geometric test independent of world-coordinate units.
+    length_squared(normal) <= epsilon_squared * longest_edge_squared
 }
 
 fn closest_point_on_segment_to_origin(start: Vec3, end: Vec3) -> Vec3 {

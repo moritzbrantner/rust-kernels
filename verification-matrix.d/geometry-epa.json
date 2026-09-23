@@ -13,12 +13,15 @@
       "propertyMetamorphic": "present",
       "coverage": "present",
       "mutation": "missing",
-      "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "n/a",
       "runtimeProfiler": "missing",
       "notes": [
         "Tests cover known square penetration depth/normal, swapped-shape symmetry, fail-closed separated input, deterministic trace equality, and result/trace parity.",
-        "Regression coverage keeps hull turn tolerances scale-aware, strips synthetic planar-GJK extrusion witnesses from EPA evidence, and marks iteration-capped traces terminal."
+        "Regression coverage keeps hull turn tolerances scale-aware, strips synthetic planar-GJK extrusion witnesses from EPA evidence, and marks iteration-capped traces terminal.",
+        "Whole-execution test-only counters require zero snapshot creation and zero support-point copies without tracing, including capped/terminal iterations; trace results and snapshot counts are checked separately.",
+        "crates/geometry-kernels/tests/audit_regressions.rs compares 4-64-vertex polygon penetration with an independent SAT oracle and verifies every expanded polytope is convex and encloses the origin.",
+        "criterion: New no-trace/trace workloads use Divan allocation profiling in crates/geometry-kernels/benches/audit_numerics.rs; scripts/audit-evidence.py gates the four-allocation no-trace control and reports informational timings."
       ]
     }
   ]
