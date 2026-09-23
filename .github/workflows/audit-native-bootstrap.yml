@@ -1,0 +1,36 @@
+name: Audit native bootstrap
+on:
+  push:
+    branches: [fix/audit-numerics-and-trace-evidence]
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: '1.95.0'
+          components: rustfmt, clippy
+      - name: Capture baseline validation
+        run: |
+          mkdir -p /tmp/kernel-audit-bootstrap
+          cargo test --workspace --all-features 2>&1 | tee /tmp/kernel-audit-bootstrap/baseline-tests.txt
+          cargo fetch
+      - name: Retain offline source and native toolchain for the audit
+        run: |
+          git archive HEAD | gzip > /tmp/kernel-audit-bootstrap/source.tar.gz
+          sysroot="$(rustc --print sysroot)"
+          tar -C "$sysroot" -czf /tmp/kernel-audit-bootstrap/toolchain.tar.gz bin lib --exclude=lib/rustlib/src --exclude=lib/rustlib/components || test -s /tmp/kernel-audit-bootstrap/toolchain.tar.gz
+          tar -C "$HOME/.cargo" -czf /tmp/kernel-audit-bootstrap/cargo-registry.tar.gz registry
+          rustc -vV > /tmp/kernel-audit-bootstrap/toolchain.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: kernel-audit-native-bootstrap
+          path: /tmp/kernel-audit-bootstrap/
+          retention-days: 2
+          compression-level: 0
