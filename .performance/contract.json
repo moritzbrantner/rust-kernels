@@ -153,6 +153,80 @@
           "notes": "The deterministic CountingValue regression fixes the 64-item linear builder at exactly 2n-1 AddAssign operations."
         }
       ]
+    },
+    {
+      "id": "gjk-scaled-sphere-convergence",
+      "kind": "micro",
+      "description": "Resolve easy overlapping sphere fixtures across coordinate scales without exhausting the iteration budget.",
+      "dimensions": {
+        "scaleExponents": "-30,-24,-10,0,10,24"
+      },
+      "correctnessEvidence": [
+        "crates/geometry-kernels/tests/audit_regressions.rs::gjk_sphere_oracle_and_work_budget_hold_across_scales"
+      ],
+      "metrics": [
+        {
+          "name": "support-query-iterations",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 8
+          },
+          "notes": "The correctness oracle must agree first; iteration limits and no-progress are not faster successes."
+        }
+      ]
+    },
+    {
+      "id": "epa-disabled-trace-copies",
+      "kind": "micro",
+      "description": "Ordinary EPA must never build discarded per-iteration snapshots.",
+      "dimensions": {
+        "iterationCaps": "1,2,32"
+      },
+      "correctnessEvidence": [
+        "crates/geometry-kernels/src/epa.rs::normal_epa_copies_zero_trace_points_including_terminal_iterations"
+      ],
+      "metrics": [
+        {
+          "name": "trace-support-point-copies",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 0
+          },
+          "notes": "Thread-local test-only counters surround actual snapshot construction; no instrumentation is present in production builds."
+        }
+      ]
+    },
+    {
+      "id": "epa-no-trace-quad-allocations",
+      "kind": "micro",
+      "description": "Planar EPA for a deterministic four-vertex pair with identical audited-base seed and result/witnesses.",
+      "dimensions": {
+        "verticesPerShape": 4,
+        "tracing": false
+      },
+      "correctnessEvidence": [
+        "scripts/audit-evidence.py::validate_probes",
+        "crates/geometry-kernels/benches/audit_numerics.rs::epa_no_trace"
+      ],
+      "metrics": [
+        {
+          "name": "allocator-alloc-calls",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 4
+          },
+          "notes": "Pinned Divan 0.1.21 counts alloc calls per invocation. Reallocations are reported separately; wall time is informational only."
+        }
+      ]
     }
   ]
 }

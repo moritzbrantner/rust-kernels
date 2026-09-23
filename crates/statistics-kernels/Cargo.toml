@@ -7,3 +7,10 @@ rust-version.workspace = true
 description = "Small numerically stable streaming statistics kernels"
 
 [dependencies]
+
+[dev-dependencies]
+divan = "=0.1.21"
+
+[[bench]]
+name = "audit_numerics"
+harness = false

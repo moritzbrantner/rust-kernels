@@ -2,7 +2,7 @@ use spatial_kernels::Aabb;
 
 use crate::{
     Sphere,
-    math3::{Vec3, add, dot, is_finite, neg, normalized, scale, sub},
+    math3::{Vec3, add, dot, is_finite, neg, scale, sub},
     obb3::Obb3,
     primitives::{Capsule, Segment3},
 };
@@ -14,7 +14,20 @@ pub trait SupportMap3 {
 
 fn unit_or_x(direction: Vec3) -> Vec3 {
     assert!(is_finite(direction), "support direction must be finite");
-    normalized(direction).unwrap_or([1.0, 0.0, 0.0])
+    // Keep the ordinary path inexpensive, but do not use a geometric epsilon:
+    // support(d) must equal support(k*d) for every positive, finite scale k.
+    let squared = crate::math3::length_squared(direction);
+    if squared.is_normal() {
+        return scale(direction, squared.sqrt().recip());
+    }
+    let largest = direction.into_iter().map(f64::abs).fold(0.0, f64::max);
+    if largest == 0.0 {
+        return [1.0, 0.0, 0.0];
+    }
+    // Division (not multiplication by largest.recip()) also handles the
+    // smallest subnormal direction without overflowing its reciprocal.
+    let scaled = direction.map(|component| component / largest);
+    scale(scaled, crate::math3::length_squared(scaled).sqrt().recip())
 }
 
 impl SupportMap3 for Sphere {
@@ -77,7 +90,7 @@ impl SupportMap3 for Capsule {
     fn support_point(&self, direction: Vec3) -> Vec3 {
         let unit = unit_or_x(direction);
         add(
-            self.segment.support_point(direction),
+            self.segment.support_point(unit),
             scale(unit, f64::from(self.radius)),
         )
     }

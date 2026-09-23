@@ -443,13 +443,16 @@
         "crates/statistics-kernels/src/running_stats.rs"
       ],
       "oracleDifferential": "present",
-      "propertyMetamorphic": "partial",
+      "propertyMetamorphic": "present",
       "coverage": "present",
       "mutation": "missing",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "criterion": "n/a",
       "runtimeProfiler": "missing",
-      "notes": []
+      "notes": [
+        "crates/statistics-kernels/tests/audit_regressions.rs checks finite extreme singleton/chunk merges, partition/reversal invariance and unbalanced counts; an internal test protects representable subnormal m2.",
+        "criterion: New ordinary, extreme and chunk-count workloads use Divan in crates/statistics-kernels/benches/audit_numerics.rs; scripts/audit-evidence.py reproduces overflow on the audited base."
+      ]
     },
     {
       "id": "analytical-overlap-kernels",
@@ -478,10 +481,13 @@
       "propertyMetamorphic": "present",
       "coverage": "present",
       "mutation": "missing",
-      "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "n/a",
       "runtimeProfiler": "missing",
-      "notes": []
+      "notes": [
+        "Scale-sweep sphere, OBB SAT and planar-adapter tests in crates/geometry-kernels/tests/audit_regressions.rs preserve outcome and trace parity; deterministic easy-sphere cases have an eight-iteration upper bound.",
+        "criterion: New scaled GJK workloads use Divan in crates/geometry-kernels/benches/audit_numerics.rs; scripts/audit-evidence.py keeps before/after outcomes separate from timings."
+      ]
     },
     {
       "id": "geometry-math3",
@@ -522,14 +528,17 @@
       "sources": [
         "crates/geometry-kernels/src/primitives.rs"
       ],
-      "oracleDifferential": "missing",
-      "propertyMetamorphic": "partial",
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
       "coverage": "present",
       "mutation": "missing",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "criterion": "n/a",
       "runtimeProfiler": "missing",
-      "notes": []
+      "notes": [
+        "crates/geometry-kernels/tests/audit_regressions.rs compares segment distance against independent convex one-dimensional minimization and covers scale, swap, reversal, crossing, skew, endpoint and capsule-oracle cases.",
+        "criterion: New segment/capsule workloads use Divan in crates/geometry-kernels/benches/audit_numerics.rs instead of adding another Criterion suite."
+      ]
     },
     {
       "id": "support-mapping",
@@ -539,13 +548,16 @@
         "crates/geometry-kernels/src/support.rs"
       ],
       "oracleDifferential": "partial",
-      "propertyMetamorphic": "partial",
+      "propertyMetamorphic": "present",
       "coverage": "present",
       "mutation": "missing",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "criterion": "n/a",
       "runtimeProfiler": "missing",
-      "notes": []
+      "notes": [
+        "crates/geometry-kernels/tests/audit_regressions.rs checks analytic support extrema and positive-direction rescaling from subnormal through overflow-prone finite vectors for spheres and capsules.",
+        "criterion: New ordinary/extreme-direction workloads use Divan in crates/geometry-kernels/benches/audit_numerics.rs."
+      ]
     }
   ]
 }

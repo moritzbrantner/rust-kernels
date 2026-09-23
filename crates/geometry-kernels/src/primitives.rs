@@ -2,7 +2,7 @@ use spatial_kernels::Aabb;
 
 use crate::{
     Sphere,
-    math3::{NORMALIZE_EPSILON_SQUARED, Vec3, add, clamp01, dot, length_squared, lerp, scale, sub},
+    math3::{Vec3, add, clamp01, cross, dot, length_squared, lerp, scale, sub},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -78,7 +78,7 @@ pub fn point_segment(point: Vec3, segment: Segment3) -> PointSegmentRelation {
     let end = segment.end64();
     let direction = sub(end, start);
     let direction_length_squared = length_squared(direction);
-    let parameter = if direction_length_squared <= NORMALIZE_EPSILON_SQUARED {
+    let parameter = if direction_length_squared == 0.0 {
         0.0
     } else {
         clamp01(dot(sub(point, start), direction) / direction_length_squared)
@@ -115,34 +115,42 @@ pub fn segment_segment(left: Segment3, right: Segment3) -> SegmentSegmentRelatio
     let left_length_squared = dot(left_direction, left_direction);
     let right_length_squared = dot(right_direction, right_direction);
 
-    let (left_parameter, right_parameter) = if left_length_squared <= NORMALIZE_EPSILON_SQUARED
-        && right_length_squared <= NORMALIZE_EPSILON_SQUARED
+    let (left_parameter, right_parameter) = if left_length_squared == 0.0
+        && right_length_squared == 0.0
     {
         (0.0, 0.0)
-    } else if left_length_squared <= NORMALIZE_EPSILON_SQUARED {
+    } else if left_length_squared == 0.0 {
         (
             0.0,
             clamp01(dot(right_direction, between_starts) / right_length_squared),
         )
     } else {
         let left_projection = dot(left_direction, between_starts);
-        if right_length_squared <= NORMALIZE_EPSILON_SQUARED {
+        if right_length_squared == 0.0 {
             (clamp01(-left_projection / left_length_squared), 0.0)
         } else {
             let cross_projection = dot(left_direction, right_direction);
             let right_projection = dot(right_direction, between_starts);
-            let denominator =
-                left_length_squared * right_length_squared - cross_projection * cross_projection;
-            let mut left_parameter = if denominator.abs() > NORMALIZE_EPSILON_SQUARED {
-                clamp01(
-                    (cross_projection * right_projection - left_projection * right_length_squared)
-                        / denominator,
-                )
+            // |u × v|² avoids cancellation in |u|²|v|² - (u·v)².
+            // All inputs originate as f32, so these f64 products cannot overflow
+            // or underflow for a nonzero segment. A nonzero cross product is not
+            // "parallel" merely because the segments are short.
+            let normal = cross(left_direction, right_direction);
+            let denominator = length_squared(normal);
+            let unconstrained_left = if denominator > 0.0 {
+                dot(cross(right_direction, between_starts), normal) / denominator
             } else {
                 0.0
             };
+            let mut left_parameter = clamp01(unconstrained_left);
             let mut right_parameter =
-                (cross_projection * left_parameter + right_projection) / right_length_squared;
+                if denominator > 0.0 && (0.0..=1.0).contains(&unconstrained_left) {
+                    // The cross-product form also preserves interior intersections
+                    // of long, almost parallel segments (the dot form can cancel).
+                    dot(cross(left_direction, between_starts), normal) / denominator
+                } else {
+                    (cross_projection * left_parameter + right_projection) / right_length_squared
+                };
 
             if right_parameter < 0.0 {
                 right_parameter = 0.0;

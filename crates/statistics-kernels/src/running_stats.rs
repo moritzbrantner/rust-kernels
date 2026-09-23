@@ -70,8 +70,19 @@ impl RunningStats {
         let combined_count = combined as f64;
         let delta = other.mean - self.mean;
 
-        self.mean += delta * right_count / combined_count;
-        self.m2 += other.m2 + delta * delta * left_count * right_count / combined_count;
+        let right_weight = right_count / combined_count;
+        self.mean = if delta.is_finite() {
+            self.mean + delta * right_weight
+        } else {
+            // Opposite finite endpoints can have an infinite difference even
+            // though their weighted mean is representable.
+            self.mean * (left_count / combined_count) + other.mean * right_weight
+        };
+        // Scale counts first, then one delta before squaring. The count factor
+        // is in [1/2, u64::MAX/4], so this ordering avoids both an unnecessary
+        // delta² overflow and count-product overflow (and premature underflow).
+        let count_factor = left_count * right_weight;
+        self.m2 += other.m2 + delta * (delta * count_factor);
         self.count = combined;
     }
 
@@ -126,6 +137,25 @@ mod tests {
             m2 / values.len() as f64,
             m2 / (values.len() - 1) as f64,
         )
+    }
+
+    #[test]
+    fn merge_preserves_representable_subnormal_m2() {
+        let mut left = RunningStats {
+            count: 1_u64 << 60,
+            mean: 0.0,
+            m2: 0.0,
+        };
+        let right = RunningStats {
+            count: 1_u64 << 60,
+            mean: 1e-163,
+            m2: 0.0,
+        };
+        left.merge(&right);
+        // Exact real arithmetic: 2^59 * (1e-163)^2, despite delta² underflowing.
+        let expected = 5.764_607_523_034_235e-309;
+        assert!((left.m2 / expected - 1.0).abs() < 1e-13);
+        assert_eq!(left.count(), 1_u64 << 61);
     }
 
     #[test]
