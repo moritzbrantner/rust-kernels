@@ -98,20 +98,13 @@ mod tests {
     fn grazing_sweep_preserves_tangent_contact() {
         let moving = Sphere::new([0.0; 3], 0.0);
         let target = Sphere::new([-19199.0, 20393.0, 0.0], 19805.0);
-        let hit =
-            sphere_sphere_time_of_impact(moving, [597.0, 19796.0, 0.0], target, 2.0)
-                .expect("exact grazing sweep must hit");
+        let hit = sphere_sphere_time_of_impact(moving, [597.0, 19796.0, 0.0], target, 2.0)
+            .expect("exact grazing sweep must hit");
         assert!((hit.time - 1.0).abs() <= 4.0 * f64::EPSILON);
 
         let near_miss = Sphere::new([-19200.0, 20393.0, 0.0], 19805.0);
         assert!(
-            sphere_sphere_time_of_impact(
-                moving,
-                [597.0, 19796.0, 0.0],
-                near_miss,
-                2.0,
-            )
-            .is_none()
+            sphere_sphere_time_of_impact(moving, [597.0, 19796.0, 0.0], near_miss, 2.0,).is_none()
         );
     }
 
