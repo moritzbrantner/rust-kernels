@@ -139,12 +139,16 @@ pub(crate) fn ray_sphere_radius(ray: Ray3, center: Vec3, radius: f64) -> Option<
     // Full-range f32 products remain finite in f64.
     let perpendicular_squared =
         length_squared(cross(to_center, raw_direction)) / length_squared(raw_direction);
-    if perpendicular_squared > radius_squared {
+    let boundary_tolerance =
+        4.0 * f64::EPSILON * perpendicular_squared.max(radius_squared);
+    if perpendicular_squared > radius_squared + boundary_tolerance {
         return None;
     }
 
     let center_distance = dot(to_center, direction);
-    let half_chord = (radius_squared - perpendicular_squared).max(0.0).sqrt();
+    let half_chord = (radius_squared - perpendicular_squared.min(radius_squared))
+        .max(0.0)
+        .sqrt();
     let near = center_distance - half_chord;
     let far = center_distance + half_chord;
     if far < 0.0 {
@@ -220,6 +224,18 @@ mod tests {
         let mut off_line = direction;
         off_line[2] = f32::from_bits(off_line[2].to_bits() + 1);
         assert!(ray_sphere(ray, Sphere::new(off_line, 0.0)).is_none());
+    }
+
+    #[test]
+    fn ray_sphere_preserves_large_pythagorean_tangent() {
+        let ray = Ray3::new([0.0; 3], [597.0, 19796.0, 0.0]);
+        let tangent = Sphere::new([-19199.0, 20393.0, 0.0], 19805.0);
+        let hit = ray_sphere(ray, tangent).expect("exact tangent must count as a hit");
+        assert!((hit.enter_distance - 19805.0).abs() <= 4.0 * f64::EPSILON * 19805.0);
+        assert!((hit.exit_distance - 19805.0).abs() <= 4.0 * f64::EPSILON * 19805.0);
+
+        let near_miss = Sphere::new([-19200.0, 20393.0, 0.0], 19805.0);
+        assert!(ray_sphere(ray, near_miss).is_none());
     }
 
     #[test]
