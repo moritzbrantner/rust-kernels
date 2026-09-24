@@ -20,3 +20,7 @@ harness = false
 [[bench]]
 name = "audit_numerics"
 harness = false
+
+[[bench]]
+name = "ray_queries"
+harness = false

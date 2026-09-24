@@ -93,3 +93,18 @@ See [the boundary audit](boundary-audit.md) for the historical failure fixtures,
 26 additional Divan workloads, deterministic edge/allocation budgets and numerical
 contracts. Allocation budgets are asserted in Rust tests; Divan runs directly
 through Cargo and wall-clock times remain informational.
+
+
+## Ray-query and continuous-collision microbenchmarks
+
+Run the constant-time geometry query batches with:
+
+```sh
+cargo bench -p geometry-kernels --bench ray_queries
+```
+
+The Divan suite batches ray/AABB, ray/sphere and swept sphere/sphere queries at
+64, 1,024 and 4,096 targets. Input construction is outside the measured region
+and each workload returns a checksum. Correctness is owned by independent Rust
+oracles and metamorphic tests; wall-clock results remain informational because
+these kernels have constant per-query algorithmic complexity.
