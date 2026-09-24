@@ -139,8 +139,7 @@ pub(crate) fn ray_sphere_radius(ray: Ray3, center: Vec3, radius: f64) -> Option<
     // Full-range f32 products remain finite in f64.
     let perpendicular_squared =
         length_squared(cross(to_center, raw_direction)) / length_squared(raw_direction);
-    let boundary_tolerance =
-        4.0 * f64::EPSILON * perpendicular_squared.max(radius_squared);
+    let boundary_tolerance = 4.0 * f64::EPSILON * perpendicular_squared.max(radius_squared);
     if perpendicular_squared > radius_squared + boundary_tolerance {
         return None;
     }
