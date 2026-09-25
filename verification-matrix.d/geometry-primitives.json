@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "issue": 52,
+  "kernels": [
+    {
+      "id": "f64-fixed-orientation-primitives",
+      "crate": "geometry-kernels",
+      "module": "crate::primitive3",
+      "sources": [
+        "crates/geometry-kernels/src/primitive3.rs"
+      ],
+      "oracleDifferential": "partial",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "The complete ten-pair primitive matrix is exercised with specialized capsule/wedge cases migrated from the Physics Engine reference implementation; full independent differential fuzz coverage remains follow-up work.",
+        "Swapped-order capsule/wedge symmetry and deterministic pair canonicalization provide metamorphic evidence.",
+        "Deterministic work counters ratchet SAT axes, wedge vertex tests, support evaluations and bounded sweep iterations independently of wall-clock timing.",
+        "criterion: New developer-facing contact and CCD workloads use Divan in crates/geometry-kernels/benches/primitive3.rs; Criterion is not used for this new suite."
+      ]
+    }
+  ]
+}
