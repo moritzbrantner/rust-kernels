@@ -91,11 +91,7 @@ impl PrimitiveShape3 {
             PrimitiveKind3::Box | PrimitiveKind3::Wedge => {
                 [self.data[0], self.data[1], self.data[2]]
             }
-            PrimitiveKind3::Capsule => [
-                self.data[1],
-                self.data[0] + self.data[1],
-                self.data[1],
-            ],
+            PrimitiveKind3::Capsule => [self.data[1], self.data[0] + self.data[1], self.data[1]],
         }
     }
 
@@ -128,12 +124,7 @@ pub struct PrimitiveBody3 {
 
 impl PrimitiveBody3 {
     #[must_use]
-    pub fn new(
-        shape: PrimitiveShape3,
-        position: Vec3,
-        axes: [Vec3; 3],
-        velocity: Vec3,
-    ) -> Self {
+    pub fn new(shape: PrimitiveShape3, position: Vec3, axes: [Vec3; 3], velocity: Vec3) -> Self {
         debug_assert!(position.into_iter().all(f64::is_finite));
         debug_assert!(velocity.into_iter().all(f64::is_finite));
         debug_assert!(axes.into_iter().flatten().all(f64::is_finite));
@@ -283,36 +274,22 @@ pub fn bounds_extents(body: PrimitiveBody3) -> Vec3 {
 }
 
 #[must_use]
-pub fn support_point(
-    body: PrimitiveBody3,
-    direction: Vec3,
-    work: &mut PrimitiveWork3,
-) -> Vec3 {
+pub fn support_point(body: PrimitiveBody3, direction: Vec3, work: &mut PrimitiveWork3) -> Vec3 {
     work.support_evaluations += 1;
     support_impl(body, direction, Some(work))
 }
 
-fn support_impl(
-    body: PrimitiveBody3,
-    direction: Vec3,
-    work: Option<&mut PrimitiveWork3>,
-) -> Vec3 {
+fn support_impl(body: PrimitiveBody3, direction: Vec3, work: Option<&mut PrimitiveWork3>) -> Vec3 {
     let unit = unit_or_zero(direction);
     match body.shape.kind {
-        PrimitiveKind3::Sphere => add(
-            body.position,
-            scale(unit, body.shape.sphere_radius()),
-        ),
+        PrimitiveKind3::Sphere => add(body.position, scale(unit, body.shape.sphere_radius())),
         PrimitiveKind3::Box => {
             let half = body.shape.half_extents();
             let mut point = body.position;
             for (index, axis) in body.axes.into_iter().enumerate() {
                 let projection = dot(direction, axis);
                 if projection.abs() > 1.0e-12 {
-                    point = add(
-                        point,
-                        scale(axis, half[index] * projection.signum()),
-                    );
+                    point = add(point, scale(axis, half[index] * projection.signum()));
                 }
             }
             point
@@ -322,7 +299,12 @@ fn support_impl(
             let axis = body.axes[1];
             let end = scale(
                 axis,
-                half_segment * if dot(direction, axis) < 0.0 { -1.0 } else { 1.0 },
+                half_segment
+                    * if dot(direction, axis) < 0.0 {
+                        -1.0
+                    } else {
+                        1.0
+                    },
             );
             add(add(body.position, end), scale(unit, radius))
         }
@@ -346,11 +328,7 @@ fn support_impl(
 }
 
 #[must_use]
-pub fn query(
-    a: PrimitiveBody3,
-    b: PrimitiveBody3,
-    work: &mut PrimitiveWork3,
-) -> PrimitiveContact3 {
+pub fn query(a: PrimitiveBody3, b: PrimitiveBody3, work: &mut PrimitiveWork3) -> PrimitiveContact3 {
     let (pair, reversed) = PrimitivePair3::canonical(a.shape.kind, b.shape.kind);
     let (left, right) = if reversed { (b, a) } else { (a, b) };
     let contact = query_canonical(pair, left, right, work);
@@ -465,10 +443,7 @@ fn sphere_sphere(a: PrimitiveBody3, b: PrimitiveBody3) -> PrimitiveContact3 {
 
 fn sphere_box(sphere: PrimitiveBody3, box_body: PrimitiveBody3) -> PrimitiveContact3 {
     let half = box_body.shape.half_extents();
-    let local = inverse_rotate(
-        box_body.axes,
-        sub(sphere.position, box_body.position),
-    );
+    let local = inverse_rotate(box_body.axes, sub(sphere.position, box_body.position));
     let radius = sphere.shape.sphere_radius();
     if local
         .into_iter()
@@ -637,11 +612,7 @@ fn capsule_wedge(capsule: PrimitiveBody3, wedge: PrimitiveBody3) -> PrimitiveCon
     }
 }
 
-fn poly_poly(
-    a: PrimitiveBody3,
-    b: PrimitiveBody3,
-    work: &mut PrimitiveWork3,
-) -> PrimitiveContact3 {
+fn poly_poly(a: PrimitiveBody3, b: PrimitiveBody3, work: &mut PrimitiveWork3) -> PrimitiveContact3 {
     let (axes, len) = poly_axes(a, b);
     let mut best_separation = f64::NEG_INFINITY;
     let mut best_normal = [1.0, 0.0, 0.0];
@@ -707,11 +678,7 @@ fn poly_sweep_time(
     (exit >= 0.0 && enter <= 1.0).then_some(enter.max(0.0))
 }
 
-fn projection_interval(
-    body: PrimitiveBody3,
-    axis: Vec3,
-    work: &mut PrimitiveWork3,
-) -> (f64, f64) {
+fn projection_interval(body: PrimitiveBody3, axis: Vec3, work: &mut PrimitiveWork3) -> (f64, f64) {
     let maximum = dot(support_point(body, axis, work), axis);
     let minimum = dot(support_point(body, neg(axis), work), axis);
     (minimum, maximum)
@@ -1152,7 +1119,11 @@ fn rotate_local(axes: [Vec3; 3], local: Vec3) -> Vec3 {
 }
 
 fn inverse_rotate(axes: [Vec3; 3], world: Vec3) -> Vec3 {
-    [dot(world, axes[0]), dot(world, axes[1]), dot(world, axes[2])]
+    [
+        dot(world, axes[0]),
+        dot(world, axes[1]),
+        dot(world, axes[2]),
+    ]
 }
 
 #[cfg(test)]
@@ -1240,18 +1211,12 @@ mod tests {
 
     #[test]
     fn glancing_capsule_sweep_uses_normal_closing_speed() {
-        let capsule = body(
-            PrimitiveShape3::capsule(0.0, 0.1),
-            [-400.0, 1.0, 0.0],
-        );
+        let capsule = body(PrimitiveShape3::capsule(0.0, 0.1), [-400.0, 1.0, 0.0]);
         let capsule = PrimitiveBody3 {
             velocity: [800.0, -2.0, 0.0],
             ..capsule
         };
-        let target = body(
-            PrimitiveShape3::cuboid([500.0, 0.01, 10.0]),
-            [0.0; 3],
-        );
+        let target = body(PrimitiveShape3::cuboid([500.0, 0.01, 10.0]), [0.0; 3]);
         let mut work = PrimitiveWork3::default();
         let time = swept_time(capsule, target, 1.0, 0.02, &mut work)
             .expect("glancing capsule sweep must hit");
@@ -1266,10 +1231,7 @@ mod tests {
             [-1.0, -1.0, 10.0],
             [0.0, 0.0, -10_000.0],
         );
-        let wedge = body(
-            PrimitiveShape3::wedge([4.0, 4.0, 0.02]),
-            [0.0; 3],
-        );
+        let wedge = body(PrimitiveShape3::wedge([4.0, 4.0, 0.02]), [0.0; 3]);
         let mut work = PrimitiveWork3::default();
         let time = swept_time(capsule, wedge, 1.0 / 60.0, 0.02, &mut work)
             .expect("fast capsule must reach thin wedge");
