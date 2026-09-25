@@ -8,11 +8,7 @@ fn main() {
 }
 
 fn capsule() -> PrimitiveBody3 {
-    PrimitiveBody3::axis_aligned(
-        PrimitiveShape3::capsule(2.0, 0.5),
-        [0.0; 3],
-        [0.0; 3],
-    )
+    PrimitiveBody3::axis_aligned(PrimitiveShape3::capsule(2.0, 0.5), [0.0; 3], [0.0; 3])
 }
 
 fn wedge() -> PrimitiveBody3 {
@@ -44,11 +40,8 @@ fn fast_capsule_wedge_sweep(bencher: Bencher) {
         [-1.0, -1.0, 10.0],
         [0.0, 0.0, -10_000.0],
     );
-    let target = PrimitiveBody3::axis_aligned(
-        PrimitiveShape3::wedge([4.0, 4.0, 0.02]),
-        [0.0; 3],
-        [0.0; 3],
-    );
+    let target =
+        PrimitiveBody3::axis_aligned(PrimitiveShape3::wedge([4.0, 4.0, 0.02]), [0.0; 3], [0.0; 3]);
     bencher.bench_local(|| {
         let mut work = PrimitiveWork3::default();
         black_box(swept_time(
