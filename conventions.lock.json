@@ -1,6 +1,5 @@
 {
-  "schemaVersion": 1,
-  "sourceRevision": "cd6c229e8c61ff3e3bd949ca82394fa788039897",
+  "schemaVersion": 2,
   "requestedModules": [
     "rust-performance"
   ],
