@@ -19,6 +19,7 @@
     "crates/collection-kernels/src/lib.rs",
     "crates/geometry-kernels/src/lib.rs",
     "crates/graph-kernels/src/lib.rs",
+    "crates/noise-kernels/src/lib.rs",
     "crates/search-kernels/src/lib.rs",
     "crates/statistics-kernels/src/lib.rs"
   ],
