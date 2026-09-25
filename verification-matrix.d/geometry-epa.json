@@ -23,6 +23,26 @@
         "crates/geometry-kernels/tests/audit_regressions.rs compares 4-64-vertex polygon penetration with an independent SAT oracle and verifies every expanded polytope is convex and encloses the origin.",
         "criterion: New no-trace/trace workloads use Divan allocation profiling in crates/geometry-kernels/benches/audit_numerics.rs; scripts/audit-evidence.py gates the four-allocation no-trace control and reports informational timings."
       ]
+    },
+    {
+      "id": "convex-3d-epa-penetration",
+      "crate": "geometry-kernels",
+      "module": "crate::epa3",
+      "sources": [
+        "crates/geometry-kernels/src/epa3.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "Analytic sphere penetration and OBB/SAT cases provide independent depth/reference evidence.",
+        "Swapped-shape symmetry, deterministic replay, touching/separated inputs, strict seed enclosure, and bounded iteration-limit behavior are covered.",
+        "This is a bounded correctness/reference kernel; production consumers should retain specialized hot paths where deterministic work evidence justifies them."
+      ]
     }
   ]
 }
