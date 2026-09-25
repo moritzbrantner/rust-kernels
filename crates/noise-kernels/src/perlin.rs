@@ -32,16 +32,8 @@ pub fn perlin2(permutation: &Permutation, x: f64, y: f64) -> f64 {
     let local_y1 = local_y - 1.0;
 
     let n00 = dot2(permutation.hash2(cell_x, cell_y), local_x, local_y);
-    let n10 = dot2(
-        permutation.hash2(cell_x + 1, cell_y),
-        local_x1,
-        local_y,
-    );
-    let n01 = dot2(
-        permutation.hash2(cell_x, cell_y + 1),
-        local_x,
-        local_y1,
-    );
+    let n10 = dot2(permutation.hash2(cell_x + 1, cell_y), local_x1, local_y);
+    let n01 = dot2(permutation.hash2(cell_x, cell_y + 1), local_x, local_y1);
     let n11 = dot2(
         permutation.hash2(cell_x + 1, cell_y + 1),
         local_x1,
@@ -179,12 +171,7 @@ mod tests {
                 assert_close(perlin2(&permutation, f64::from(x), f64::from(y)), 0.0);
                 for z in -2..=2 {
                     assert_close(
-                        perlin3(
-                            &permutation,
-                            f64::from(x),
-                            f64::from(y),
-                            f64::from(z),
-                        ),
+                        perlin3(&permutation, f64::from(x), f64::from(y), f64::from(z)),
                         0.0,
                     );
                 }
@@ -225,7 +212,10 @@ mod tests {
             ((0.25, 0.75), 0.076_884_269_714_355_47),
             ((-1.125, 2.5), -0.557_483_673_095_703_1),
             ((12_345.25, -6_789.75), -0.092_047_691_345_214_84),
-            ((1_000_000_000_000.25, -999_999_999_999.5), -0.288_818_359_375),
+            (
+                (1_000_000_000_000.25, -999_999_999_999.5),
+                -0.288_818_359_375,
+            ),
         ];
         for ((x, y), expected) in fixtures2 {
             assert_close(perlin2(&permutation, x, y), expected);
