@@ -1,6 +1,6 @@
 use crate::{
     gjk::{GjkResult, GjkStatus},
-    math3::{Vec3, add, cross, dot, length_squared, neg, normalized, scale, sub},
+    math3::{Vec3, add, cross, dot, length_squared, neg, scale, sub},
     support::{MinkowskiSupportPoint, SupportMap3, minkowski_support},
 };
 
@@ -293,16 +293,16 @@ where
             let a = gjk.simplex[0].point;
             let b = gjk.simplex[1].point;
             let c = gjk.simplex[2].point;
-            let normal = normalized(cross(sub(b, a), sub(c, a)))?;
+            let normal = normalize_nonzero(cross(sub(b, a), sub(c, a)))?;
             push_support_pair(left, right, normal, &mut vertices, epsilon);
         }
         2 => {
             let a = gjk.simplex[0].point;
             let b = gjk.simplex[1].point;
-            let axis = normalized(sub(b, a))?;
+            let axis = normalize_nonzero(sub(b, a))?;
             let seed = least_aligned_axis(axis);
-            let first = normalized(cross(axis, seed))?;
-            let second = normalized(cross(axis, first))?;
+            let first = normalize_nonzero(cross(axis, seed))?;
+            let second = normalize_nonzero(cross(axis, first))?;
             push_support_pair(left, right, first, &mut vertices, epsilon);
             push_support_pair(left, right, second, &mut vertices, epsilon);
         }
@@ -320,12 +320,20 @@ where
             [1.0, -1.0, 1.0],
             [-1.0, 1.0, 1.0],
         ] {
-            let direction = normalized(direction)?;
+            let direction = normalize_nonzero(direction)?;
             push_support_pair(left, right, direction, &mut vertices, epsilon);
         }
     }
 
     Some(vertices)
+}
+
+fn normalize_nonzero(vector: Vec3) -> Option<Vec3> {
+    let length_squared = length_squared(vector);
+    if length_squared == 0.0 || !length_squared.is_finite() {
+        return None;
+    }
+    Some(scale(vector, length_squared.sqrt().recip()))
 }
 
 fn least_aligned_axis(direction: Vec3) -> Vec3 {
@@ -418,9 +426,8 @@ fn origin_barycentric_tetrahedron(points: [Vec3; 4], epsilon: f64) -> Option<[f6
     let determinant = dot(ab, cross(ac, ad));
     let scale_squared = length_squared(ab)
         .max(length_squared(ac))
-        .max(length_squared(ad))
-        .max(1.0);
-    if determinant.abs() <= epsilon * scale_squared.sqrt() * scale_squared {
+        .max(length_squared(ad));
+    if determinant.abs() <= epsilon * scale_squared {
         return None;
     }
     let rhs = neg(a);
@@ -449,12 +456,11 @@ fn make_face(
     let raw = cross(ab, ac);
     let longest_edge_squared = length_squared(ab)
         .max(length_squared(ac))
-        .max(length_squared(sub(c, b)))
-        .max(1.0);
+        .max(length_squared(sub(c, b)));
     if length_squared(raw) <= epsilon * epsilon * longest_edge_squared {
         return None;
     }
-    let mut normal = normalized(raw)?;
+    let mut normal = normalize_nonzero(raw)?;
     let mut distance = dot(normal, a);
     if distance < 0.0 {
         indices.swap(1, 2);
@@ -645,6 +651,34 @@ mod tests {
             Epa3Status::IterationLimit | Epa3Status::NoProgress
         ));
         assert_eq!(result.iterations, 1);
+    }
+
+    #[test]
+    fn configured_epsilon_controls_tiny_valid_face_normalization() {
+        let scale = 1.0e-7;
+        let left = Obb3::new(
+            [0.0; 3],
+            [scale, scale * 0.8, scale * 0.6],
+            [0.2, -0.15, 0.1],
+        );
+        let right = Obb3::new(
+            [scale * 0.8, 0.0, 0.0],
+            [scale, scale * 0.7, scale * 0.5],
+            [-0.1, 0.2, -0.05],
+        );
+        let gjk = gjk_intersection(&left, &right);
+        let result = epa_penetration_3d_with_config(
+            &left,
+            &right,
+            &gjk,
+            Epa3Config {
+                max_iterations: 128,
+                tolerance: 1.0e-13,
+                epsilon: 1.0e-16,
+            },
+        );
+        assert_eq!(result.status, Epa3Status::Converged);
+        assert!(result.penetration.is_some());
     }
 
     #[test]
