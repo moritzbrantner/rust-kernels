@@ -123,3 +123,11 @@
 - Tests for deterministic mutators should apply the same operation twice and assert that the second application performs zero writes or equivalent reconciliation work while preserving the verified final state.
 - Unrelated input changes must not invalidate derived work. Relevant input changes should trigger only the smallest safe affected reconciliation.
 - Use input fingerprints or incremental state only for expensive derived work where the identity includes every relevant input and tool version. Do not add memoization to cheap pure algorithms merely because they are deterministic.
+
+## REP-022 — Deterministic systems replay from declared inputs
+
+- When deterministic replay is part of a system's contract, the replay identity includes the authoritative initial state, ordered external inputs or events, seed or random stream, relevant configuration, and implementation/content identity needed to interpret them.
+- Replaying the same declared inputs must reproduce the same authoritative observable state or canonical fingerprint.
+- Wall-clock time, thread scheduling, unordered iteration, ambient machine state, rendering cadence, and non-authoritative simulations must not silently alter authoritative replay results.
+- When nondeterminism is intentional, isolate and record it at an explicit boundary rather than allowing it to leak into otherwise deterministic state transitions.
+- A replay verifier should identify the first divergent authoritative step or fingerprint when practical instead of reporting only a final mismatch.
