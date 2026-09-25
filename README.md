@@ -80,6 +80,13 @@ BK-tree search and single-word byte-oriented Myers distance.
 Tokenization, normalization, approximate-index policy and ranking remain outside
 these kernels. The complete crate is also available through the source registry.
 
+### Noise
+
+`noise-kernels` provides a deterministic seeded `Permutation` plus allocation-free
+2D and 3D Perlin sampling. The fixed permutation state is shared infrastructure
+for later Simplex and Worley kernels; terrain composition and world-generation
+policy remain consumer-owned.
+
 ### Statistics
 
 `statistics-kernels` contains `RunningStats`, a Welford-style streaming accumulator for count, mean, population/sample variance, and standard deviation. Accumulators can be merged without replaying observations, with tests against batch calculations and large-offset fixtures.
