@@ -1292,7 +1292,10 @@ mod tests {
         let mut work = PrimitiveWork3::default();
         let contact = query(capsule, wedge, &mut work);
         let expected = -(0.5_f64 / 2.0_f64.sqrt() + 0.1);
-        assert!((contact.separation - expected).abs() < 1.0e-12, "{contact:?}");
+        assert!(
+            (contact.separation - expected).abs() < 1.0e-12,
+            "{contact:?}"
+        );
     }
 
     #[test]
@@ -1358,11 +1361,8 @@ mod tests {
         assert_eq!(support_point(wedge, [1.0, 0.0, 0.0], &mut work)[0], 3.0);
         assert_eq!(work.vertex_tests, 6);
 
-        let cuboid = PrimitiveBody3::axis_aligned(
-            PrimitiveShape3::cuboid([1.0; 3]),
-            [0.0; 3],
-            [0.0; 3],
-        );
+        let cuboid =
+            PrimitiveBody3::axis_aligned(PrimitiveShape3::cuboid([1.0; 3]), [0.0; 3], [0.0; 3]);
         let tiny = support_point(cuboid, [1.0e-13, 0.0, 0.0], &mut work);
         let scaled = support_point(cuboid, [1.0, 0.0, 0.0], &mut work);
         assert_eq!(tiny[0], 1.0);
