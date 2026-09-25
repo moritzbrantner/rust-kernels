@@ -288,9 +288,8 @@ fn support_impl(body: PrimitiveBody3, direction: Vec3, work: Option<&mut Primiti
             let mut point = body.position;
             for (index, axis) in body.axes.into_iter().enumerate() {
                 let projection = dot(direction, axis);
-                if projection.abs() > 1.0e-12 {
-                    point = add(point, scale(axis, half[index] * projection.signum()));
-                }
+                let sign = if projection < 0.0 { -1.0 } else { 1.0 };
+                point = add(point, scale(axis, half[index] * sign));
             }
             point
         }
@@ -376,9 +375,10 @@ pub fn swept_time(
 
     let displacement = scale(sub(b.velocity, a.velocity), dt);
     if length_squared(displacement) <= 1.0e-28 {
-        return None;
+        let contact = query_canonical(pair, a, b, work);
+        return (contact.separation <= margin).then_some(0.0);
     }
-    let target = margin.max(1.0e-6);
+    let target = margin;
     let tolerance = 1.0e-9 * (1.0 + a.shape.radius() + b.shape.radius());
     let mut time = 0.0;
     let mut current_a = a;
@@ -520,17 +520,17 @@ fn capsule_box(capsule: PrimitiveBody3, box_body: PrimitiveBody3) -> PrimitiveCo
     let local_a = inverse_rotate(box_body.axes, sub(world_a, box_body.position));
     let local_b = inverse_rotate(box_body.axes, sub(world_b, box_body.position));
 
-    if let Some((enter, exit)) = segment_aabb_interval(local_a, local_b, half) {
-        let local_core = add(local_a, scale(sub(local_b, local_a), (enter + exit) * 0.5));
-        let (outward, depth) = nearest_box_face(local_core, half);
+    if segment_aabb_interval(local_a, local_b, half).is_some() {
+        let (outward, penetration, local_core, core_depth) =
+            segment_face_penetration(local_a, local_b, &box_planes(half), radius);
         let core = add(box_body.position, rotate_local(box_body.axes, local_core));
         let outward = rotate_local(box_body.axes, outward);
         let normal = neg(outward);
         return PrimitiveContact3 {
             normal,
-            separation: -depth - radius,
+            separation: -penetration,
             point_a: add(core, scale(normal, radius)),
-            point_b: add(core, scale(outward, depth)),
+            point_b: add(core, scale(outward, core_depth)),
         };
     }
 
@@ -583,18 +583,17 @@ fn capsule_wedge(capsule: PrimitiveBody3, wedge: PrimitiveBody3) -> PrimitiveCon
     let local_a = inverse_rotate(wedge.axes, sub(world_a, wedge.position));
     let local_b = inverse_rotate(wedge.axes, sub(world_b, wedge.position));
 
-    if let Some((enter, exit)) = segment_wedge_interval(local_a, local_b, half) {
-        let local_core = add(local_a, scale(sub(local_b, local_a), (enter + exit) * 0.5));
-        let (outward, depth) =
-            wedge_inside_depth(local_core, half).unwrap_or(([0.0, 1.0, 0.0], 0.0));
+    if segment_wedge_interval(local_a, local_b, half).is_some() {
+        let (outward, penetration, local_core, core_depth) =
+            segment_face_penetration(local_a, local_b, &wedge_planes(half), radius);
         let core = add(wedge.position, rotate_local(wedge.axes, local_core));
         let outward = rotate_local(wedge.axes, outward);
         let normal = neg(outward);
         return PrimitiveContact3 {
             normal,
-            separation: -depth - radius,
+            separation: -penetration,
             point_a: add(core, scale(normal, radius)),
-            point_b: add(core, scale(outward, depth)),
+            point_b: add(core, scale(outward, core_depth)),
         };
     }
 
@@ -774,6 +773,40 @@ fn wedge_vertices(half: Vec3) -> [Vec3; 6] {
         [-half[0], half[1], half[2]],
         [half[0], -half[1], half[2]],
     ]
+}
+
+fn box_planes(half: Vec3) -> [(Vec3, f64); 6] {
+    [
+        ([1.0, 0.0, 0.0], half[0]),
+        ([-1.0, 0.0, 0.0], half[0]),
+        ([0.0, 1.0, 0.0], half[1]),
+        ([0.0, -1.0, 0.0], half[1]),
+        ([0.0, 0.0, 1.0], half[2]),
+        ([0.0, 0.0, -1.0], half[2]),
+    ]
+}
+
+fn segment_face_penetration(
+    a: Vec3,
+    b: Vec3,
+    planes: &[(Vec3, f64)],
+    radius: f64,
+) -> (Vec3, f64, Vec3, f64) {
+    let mut best = ([1.0, 0.0, 0.0], f64::INFINITY, a, 0.0);
+    for &(normal, limit) in planes {
+        let a_depth = limit - dot(normal, a);
+        let b_depth = limit - dot(normal, b);
+        let (core, core_depth) = if a_depth >= b_depth {
+            (a, a_depth)
+        } else {
+            (b, b_depth)
+        };
+        let penetration = core_depth.max(0.0) + radius;
+        if penetration < best.1 {
+            best = (normal, penetration, core, core_depth.max(0.0));
+        }
+    }
+    best
 }
 
 fn wedge_planes(half: Vec3) -> [(Vec3, f64); 5] {
@@ -1150,6 +1183,30 @@ mod tests {
         assert!(seen.into_iter().all(|value| value));
     }
 
+    fn shape_for_kind(kind: PrimitiveKind3) -> PrimitiveShape3 {
+        match kind {
+            PrimitiveKind3::Sphere => PrimitiveShape3::sphere(1.0),
+            PrimitiveKind3::Box => PrimitiveShape3::cuboid([1.0, 0.8, 1.2]),
+            PrimitiveKind3::Capsule => PrimitiveShape3::capsule(0.7, 0.6),
+            PrimitiveKind3::Wedge => PrimitiveShape3::wedge([1.2, 0.9, 1.1]),
+        }
+    }
+
+    #[test]
+    fn every_primitive_pair_executes_its_registered_kernel() {
+        for pair in PrimitivePair3::ALL {
+            let (left, right) = pair.kinds();
+            let a = body(shape_for_kind(left), [0.0; 3]);
+            let b = body(shape_for_kind(right), [0.25, 0.1, -0.05]);
+            let mut work = PrimitiveWork3::default();
+            let contact = query(a, b, &mut work);
+            assert!(contact.separation.is_finite(), "{pair:?}");
+            assert!(contact.normal.into_iter().all(f64::is_finite), "{pair:?}");
+            assert_eq!(work.pair_dispatches[pair.index()], 1, "{pair:?}");
+            assert_eq!(work.pair_dispatches.into_iter().sum::<u64>(), 1, "{pair:?}");
+        }
+    }
+
     #[test]
     fn capsule_sphere_and_capsule_capsule_use_analytic_segment_distance() {
         let capsule = body(PrimitiveShape3::capsule(2.0, 0.5), [0.0; 3]);
@@ -1210,6 +1267,55 @@ mod tests {
     }
 
     #[test]
+    fn partial_capsule_box_penetration_uses_the_whole_segment() {
+        let capsule = PrimitiveBody3::new(
+            PrimitiveShape3::capsule(1.0, 0.1),
+            [1.5, 0.0, 0.0],
+            [[0.0, 1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]],
+            [0.0; 3],
+        );
+        let cuboid = body(PrimitiveShape3::cuboid([1.0; 3]), [0.0; 3]);
+        let mut work = PrimitiveWork3::default();
+        let contact = query(capsule, cuboid, &mut work);
+        assert!((contact.separation + 0.6).abs() < 1.0e-12, "{contact:?}");
+    }
+
+    #[test]
+    fn partial_capsule_wedge_penetration_uses_the_whole_segment() {
+        let capsule = PrimitiveBody3::new(
+            PrimitiveShape3::capsule(1.0, 0.1),
+            [0.5, 0.0, 0.0],
+            [[0.0, 1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]],
+            [0.0; 3],
+        );
+        let wedge = body(PrimitiveShape3::wedge([1.0; 3]), [0.0; 3]);
+        let mut work = PrimitiveWork3::default();
+        let contact = query(capsule, wedge, &mut work);
+        let expected = -(0.5_f64 / 2.0_f64.sqrt() + 0.1);
+        assert!((contact.separation - expected).abs() < 1.0e-12, "{contact:?}");
+    }
+
+    #[test]
+    fn stationary_overlap_reports_time_zero() {
+        let left = body(PrimitiveShape3::sphere(1.0), [0.0; 3]);
+        let right = body(PrimitiveShape3::sphere(1.0), [1.5, 0.0, 0.0]);
+        let mut work = PrimitiveWork3::default();
+        assert_eq!(swept_time(left, right, 1.0, 0.0, &mut work), Some(0.0));
+    }
+
+    #[test]
+    fn zero_margin_does_not_expand_a_near_miss() {
+        let moving = PrimitiveBody3::axis_aligned(
+            PrimitiveShape3::sphere(1.0),
+            [-3.0, 0.0, 0.0],
+            [6.0, 0.0, 0.0],
+        );
+        let target = body(PrimitiveShape3::sphere(1.0), [0.0, 2.000_000_5, 0.0]);
+        let mut work = PrimitiveWork3::default();
+        assert_eq!(swept_time(moving, target, 1.0, 0.0, &mut work), None);
+    }
+
+    #[test]
     fn glancing_capsule_sweep_uses_normal_closing_speed() {
         let capsule = body(PrimitiveShape3::capsule(0.0, 0.1), [-400.0, 1.0, 0.0]);
         let capsule = PrimitiveBody3 {
@@ -1251,5 +1357,15 @@ mod tests {
         assert_eq!(bounds_extents(wedge), [2.0, 1.0, 3.0]);
         assert_eq!(support_point(wedge, [1.0, 0.0, 0.0], &mut work)[0], 3.0);
         assert_eq!(work.vertex_tests, 6);
+
+        let cuboid = PrimitiveBody3::axis_aligned(
+            PrimitiveShape3::cuboid([1.0; 3]),
+            [0.0; 3],
+            [0.0; 3],
+        );
+        let tiny = support_point(cuboid, [1.0e-13, 0.0, 0.0], &mut work);
+        let scaled = support_point(cuboid, [1.0, 0.0, 0.0], &mut work);
+        assert_eq!(tiny[0], 1.0);
+        assert_eq!(tiny[0], scaled[0]);
     }
 }
