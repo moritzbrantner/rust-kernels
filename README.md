@@ -24,7 +24,7 @@ The repository starts with spatial/collision kernels and expands into small gene
 - deterministic AABB queries
 - `StaticBvhBroadPhase`, differential-tested against `NaiveBroadPhase`
 
-`geometry-kernels` supplies analytical relations, OBB/SAT, GJK, planar EPA, distance-normalized ray/AABB and ray/sphere interval queries, plus bounded swept sphere/sphere time-of-impact. `octree-kernels` provides conservative hierarchical broad-phase detection; `spatial-kernels` also supplies sweep-and-prune and `bvh-kernels` has dynamic trees. Triangle/mesh rays and general convex continuous collision remain separate future work. See [the ray and CCD guide](docs/ray-and-ccd.md).
+`geometry-kernels` supplies analytical relations, OBB/SAT, GJK, planar/3D EPA, distance-normalized ray queries, bounded sphere time-of-impact, and reusable f64 sphere/box/capsule/wedge contact + fixed-orientation sweep kernels. `octree-kernels` provides conservative hierarchical broad-phase detection; `spatial-kernels` also supplies sweep-and-prune and `bvh-kernels` has dynamic trees. Triangle/mesh rays and general convex continuous collision remain separate future work. See [the ray and CCD guide](docs/ray-and-ccd.md).
 
 ### Collections
 
