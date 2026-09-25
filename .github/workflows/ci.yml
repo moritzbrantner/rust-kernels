@@ -44,6 +44,7 @@ jobs:
           mkdir -p target/cargo-benchmark-evidence
           cargo bench -p geometry-kernels --bench audit_numerics -- --bench --sample-count 50 --sample-size 8 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/geometry-audit.txt
           cargo bench -p geometry-kernels --bench ray_queries -- --bench --sample-count 50 --sample-size 8 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/geometry-ray-queries.txt
+          cargo bench -p geometry-kernels --bench primitive3 -- --bench --sample-count 50 --sample-size 8 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/geometry-primitive3.txt
           cargo bench -p statistics-kernels --bench audit_numerics -- --bench --sample-count 50 --sample-size 8 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/statistics-audit.txt
           cargo bench -p graph-kernels --bench boundary_cases -- --bench --sample-count 30 --sample-size 4 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/graph-boundary.txt
           cargo bench -p octree-kernels --bench boundary_cases -- --bench --sample-count 30 --sample-size 4 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/octree-boundary.txt
