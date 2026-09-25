@@ -41,7 +41,8 @@
       "notes": [
         "Analytic sphere penetration and OBB/SAT cases provide independent depth/reference evidence.",
         "Swapped-shape symmetry, deterministic replay, touching/separated inputs, strict seed enclosure, and bounded iteration-limit behavior are covered.",
-        "This is a bounded correctness/reference kernel; production consumers should retain specialized hot paths where deterministic work evidence justifies them."
+        "This is a bounded correctness/reference kernel; production consumers should retain specialized hot paths where deterministic work evidence justifies them.",
+        "criterion: no standalone Criterion/Divan threshold is claimed for this bounded reference kernel; deterministic iteration/status evidence is covered by tests."
       ]
     }
   ]
