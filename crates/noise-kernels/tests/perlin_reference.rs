@@ -46,11 +46,8 @@ fn reference2(permutation: &Permutation, x: f64, y: f64) -> f64 {
 
     for (corner_y, row) in contributions.iter_mut().enumerate() {
         for (corner_x, contribution) in row.iter_mut().enumerate() {
-            let gradient = GRADIENTS[hash2(
-                table,
-                cell_x + corner_x,
-                cell_y + corner_y,
-            ) % GRADIENTS.len()];
+            let gradient =
+                GRADIENTS[hash2(table, cell_x + corner_x, cell_y + corner_y) % GRADIENTS.len()];
             let offset_x = local_x - corner_x as f64;
             let offset_y = local_y - corner_y as f64;
             *contribution = gradient[0] * offset_x + gradient[1] * offset_y;
@@ -81,9 +78,8 @@ fn reference3(permutation: &Permutation, x: f64, y: f64, z: f64) -> f64 {
                 let offset_x = local_x - corner_x as f64;
                 let offset_y = local_y - corner_y as f64;
                 let offset_z = local_z - corner_z as f64;
-                *contribution = gradient[0] * offset_x
-                    + gradient[1] * offset_y
-                    + gradient[2] * offset_z;
+                *contribution =
+                    gradient[0] * offset_x + gradient[1] * offset_y + gradient[2] * offset_z;
             }
         }
     }
