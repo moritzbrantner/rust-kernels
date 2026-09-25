@@ -88,12 +88,7 @@ fn perlin3_scattered(bencher: Bencher, count: usize) {
     bencher.counter(ItemsCount::new(count)).bench_local(|| {
         let mut sum = 0.0;
         for point in black_box(&points) {
-            sum += perlin3(
-                black_box(&permutation),
-                point[0],
-                point[1],
-                point[2],
-            );
+            sum += perlin3(black_box(&permutation), point[0], point[1], point[2]);
         }
         black_box(sum)
     });
@@ -107,12 +102,7 @@ fn perlin3_coherent_grid(bencher: Bencher, count: usize) {
     bencher.counter(ItemsCount::new(count)).bench_local(|| {
         let mut sum = 0.0;
         for point in black_box(&points) {
-            sum += perlin3(
-                black_box(&permutation),
-                point[0],
-                point[1],
-                point[2],
-            );
+            sum += perlin3(black_box(&permutation), point[0], point[1], point[2]);
         }
         black_box(sum)
     });
