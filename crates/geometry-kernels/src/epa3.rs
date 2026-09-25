@@ -243,7 +243,6 @@ where
             retained.push(face);
         }
         faces = retained;
-
     }
 
     Epa3Result {
@@ -516,6 +515,7 @@ mod tests {
     use crate::{
         Sphere,
         gjk::gjk_intersection,
+        math3::{scale, sub},
         obb3::{Obb3, obb3_sat},
     };
 
@@ -602,10 +602,15 @@ mod tests {
             .expect("reverse overlap must converge");
 
         assert!((forward.depth - reverse.depth).abs() <= 2.0e-6);
+        for penetration in [forward, reverse] {
+            let witness_delta = sub(penetration.point_left, penetration.point_right);
+            let expected = scale(penetration.normal, penetration.depth);
+            for axis in 0..3 {
+                assert!((witness_delta[axis] - expected[axis]).abs() <= 2.0e-9);
+            }
+        }
         for axis in 0..3 {
             assert!((forward.normal[axis] + reverse.normal[axis]).abs() <= 2.0e-3);
-            assert!((forward.point_left[axis] - reverse.point_right[axis]).abs() <= 2.0e-6);
-            assert!((forward.point_right[axis] - reverse.point_left[axis]).abs() <= 2.0e-6);
         }
     }
 
