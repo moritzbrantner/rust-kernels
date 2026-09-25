@@ -5,6 +5,7 @@ members = [
     "crates/collection-kernels",
     "crates/geometry-kernels",
     "crates/graph-kernels",
+    "crates/noise-kernels",
     "crates/octree-kernels",
     "crates/search-kernels",
     "crates/similarity-kernels",

@@ -1184,6 +1184,63 @@
           ]
         }
       ]
+    },
+    {
+      "name": "noise-kernels",
+      "type": "registry:crate",
+      "title": "Noise Kernels",
+      "description": "Deterministic seeded procedural noise primitives with allocation-free sampling.",
+      "crate": {
+        "package": "noise-kernels",
+        "manifest": "crates/noise-kernels/Cargo.toml"
+      },
+      "tags": [
+        "noise",
+        "procedural",
+        "perlin",
+        "world-generation"
+      ],
+      "dependencies": [],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "crates/noise-kernels/Cargo.toml",
+          "target": "crates/noise-kernels/Cargo.toml"
+        },
+        {
+          "path": "crates/noise-kernels/src/lib.rs",
+          "target": "crates/noise-kernels/src/lib.rs"
+        },
+        {
+          "path": "crates/noise-kernels/src/permutation.rs",
+          "target": "crates/noise-kernels/src/permutation.rs"
+        },
+        {
+          "path": "crates/noise-kernels/src/perlin.rs",
+          "target": "crates/noise-kernels/src/perlin.rs"
+        },
+        {
+          "path": "crates/noise-kernels/benches/perlin.rs",
+          "target": "crates/noise-kernels/benches/perlin.rs"
+        }
+      ],
+      "provides": [
+        {
+          "name": "seeded-noise-permutation",
+          "type": "data-structure",
+          "symbols": [
+            "Permutation"
+          ]
+        },
+        {
+          "name": "perlin-noise",
+          "type": "algorithm",
+          "symbols": [
+            "perlin2",
+            "perlin3"
+          ]
+        }
+      ]
     }
   ]
 }
