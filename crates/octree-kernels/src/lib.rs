@@ -239,11 +239,19 @@ fn subdivide(index: usize, config: OctreeConfig, bodies: &[Body], nodes: &mut Ve
             .filter(|&member| child_bounds[child].overlaps(bodies[member].aabb))
             .collect()
     });
-    // A subdivision must actually reduce at least one occupied child's set.
-    if !child_members
+    let occupied_children = child_members
         .iter()
-        .any(|members| !members.is_empty() && members.len() < node.members.len())
-    {
+        .filter(|members| !members.is_empty())
+        .count();
+    let any_child_reduces = child_members
+        .iter()
+        .any(|members| !members.is_empty() && members.len() < node.members.len());
+
+    // A single occupied child may temporarily retain the full member set while
+    // its spatial bounds shrink; deeper levels can still separate the cluster.
+    // Stop only when multiple occupied children would all duplicate the full
+    // parent set, because that multiplies work without reducing candidates.
+    if occupied_children == 0 || (!any_child_reduces && occupied_children > 1) {
         return;
     }
 
@@ -476,6 +484,27 @@ mod tests {
         ];
         let result = OctreeBroadPhase::new(5, 1).detect(&bodies);
         assert_eq!(result.pairs, vec![Pair::new(1, 2)]);
+    }
+
+    #[test]
+    fn single_full_child_may_descend_to_find_later_separation() {
+        let bodies = vec![
+            body(1, [-9.0, -9.0, -9.0], 0.25),
+            body(2, [-7.0, -9.0, -9.0], 0.25),
+            body(3, [9.0, 9.0, 9.0], 0.25),
+        ];
+        let tree = OctreeBroadPhase::new(6, 1);
+        let trace = tree.trace(&bodies);
+
+        assert_eq!(trace.result.pairs, NaiveBroadPhase.detect(&bodies).pairs);
+        assert!(
+            trace.nodes.iter().any(|node| node.depth >= 2),
+            "expected a full single-child branch to continue descending"
+        );
+        assert!(
+            trace.result.stats.aabb_tests < 3,
+            "expected deeper subdivision to avoid all-pairs testing"
+        );
     }
 
     #[test]
