@@ -832,17 +832,6 @@ fn wedge_vertices(half: Vec3) -> [Vec3; 6] {
     ]
 }
 
-fn box_planes(half: Vec3) -> [(Vec3, f64); 6] {
-    [
-        ([1.0, 0.0, 0.0], half[0]),
-        ([-1.0, 0.0, 0.0], half[0]),
-        ([0.0, 1.0, 0.0], half[1]),
-        ([0.0, -1.0, 0.0], half[1]),
-        ([0.0, 0.0, 1.0], half[2]),
-        ([0.0, 0.0, -1.0], half[2]),
-    ]
-}
-
 fn segment_face_penetration(
     a: Vec3,
     b: Vec3,
