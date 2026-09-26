@@ -47,6 +47,7 @@ jobs:
           cargo bench -p statistics-kernels --bench audit_numerics -- --bench --sample-count 50 --sample-size 8 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/statistics-audit.txt
           cargo bench -p graph-kernels --bench boundary_cases -- --bench --sample-count 30 --sample-size 4 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/graph-boundary.txt
           cargo bench -p octree-kernels --bench boundary_cases -- --sample-count 30 --sample-size 4 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/octree-boundary.txt
+          cargo bench -p octree-kernels --bench boundary_cases -- --audit-probe | tee target/cargo-benchmark-evidence/octree-audit.txt
           cargo bench -p search-kernels --bench boundary_cases -- --bench --sample-count 30 --sample-size 4 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/search-boundary.txt
           cargo bench -p statistics-kernels --bench boundary_cases -- --bench --sample-count 30 --sample-size 4 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/statistics-boundary.txt
           cargo bench -p similarity-kernels --bench expansion -- --bench --sample-count 32 --sample-size 1 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/similarity-expansion.txt
