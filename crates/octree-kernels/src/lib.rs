@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::HashSet;
 
 use spatial_kernels::{
     Aabb, Body, BroadPhase, BroadPhaseResult, BroadPhaseStats, ColliderId, Pair,
@@ -97,6 +97,46 @@ struct Node {
     children: Vec<usize>,
 }
 
+#[derive(Debug)]
+enum TestedPairs {
+    Dense { words: Vec<u64>, body_count: usize },
+    Sparse(HashSet<(usize, usize)>),
+}
+
+impl TestedPairs {
+    const MAX_DENSE_PAIRS: u128 = 16 * 1024 * 1024;
+
+    fn new(body_count: usize) -> Self {
+        let count = body_count as u128;
+        let possible_pairs = count.saturating_mul(count.saturating_sub(1)) / 2;
+        if possible_pairs <= Self::MAX_DENSE_PAIRS {
+            let word_count = usize::try_from(possible_pairs.div_ceil(64))
+                .expect("dense pair marker size is bounded");
+            Self::Dense {
+                words: vec![0; word_count],
+                body_count,
+            }
+        } else {
+            Self::Sparse(HashSet::new())
+        }
+    }
+
+    fn insert(&mut self, a: usize, b: usize) -> bool {
+        let (left, right) = if a < b { (a, b) } else { (b, a) };
+        match self {
+            Self::Dense { words, body_count } => {
+                let offset = left * (2 * *body_count - left - 1) / 2 + (right - left - 1);
+                let word = offset / 64;
+                let mask = 1_u64 << (offset % 64);
+                let fresh = words[word] & mask == 0;
+                words[word] |= mask;
+                fresh
+            }
+            Self::Sparse(tested) => tested.insert((left, right)),
+        }
+    }
+}
+
 fn run_octree(config: OctreeConfig, bodies: &[Body], trace: bool) -> OctreeTrace {
     validate_unique_ids(bodies);
 
@@ -120,8 +160,8 @@ fn run_octree(config: OctreeConfig, bodies: &[Body], trace: bool) -> OctreeTrace
     }];
     subdivide(0, config, bodies, &mut nodes);
 
-    let mut tested = HashSet::new();
-    let mut overlaps = BTreeSet::new();
+    let mut tested = TestedPairs::new(bodies.len());
+    let mut overlaps = Vec::new();
     let mut aabb_tests = 0_u64;
 
     for node in nodes.iter().filter(|node| node.children.is_empty()) {
@@ -129,20 +169,20 @@ fn run_octree(config: OctreeConfig, bodies: &[Body], trace: bool) -> OctreeTrace
             for right in (left + 1)..node.members.len() {
                 let a = node.members[left];
                 let b = node.members[right];
-                let pair = Pair::new(bodies[a].id, bodies[b].id);
-                if !tested.insert(pair) {
+                if !tested.insert(a, b) {
                     continue;
                 }
                 aabb_tests += 1;
                 if bodies[a].aabb.overlaps(bodies[b].aabb) {
-                    overlaps.insert(pair);
+                    overlaps.push(Pair::new(bodies[a].id, bodies[b].id));
                 }
             }
         }
     }
+    overlaps.sort_unstable();
 
     let result = BroadPhaseResult {
-        pairs: overlaps.into_iter().collect(),
+        pairs: overlaps,
         stats: BroadPhaseStats {
             aabb_tests,
             occupied_cells: None,
@@ -199,11 +239,19 @@ fn subdivide(index: usize, config: OctreeConfig, bodies: &[Body], nodes: &mut Ve
             .filter(|&member| child_bounds[child].overlaps(bodies[member].aabb))
             .collect()
     });
-    // A subdivision must actually reduce at least one occupied child's set.
-    if !child_members
+    let occupied_children = child_members
         .iter()
-        .any(|members| !members.is_empty() && members.len() < node.members.len())
-    {
+        .filter(|members| !members.is_empty())
+        .count();
+    let any_child_reduces = child_members
+        .iter()
+        .any(|members| !members.is_empty() && members.len() < node.members.len());
+
+    // A single occupied child may temporarily retain the full member set while
+    // its spatial bounds shrink; deeper levels can still separate the cluster.
+    // Stop only when multiple occupied children would all duplicate the full
+    // parent set, because that multiplies work without reducing candidates.
+    if occupied_children == 0 || (!any_child_reduces && occupied_children > 1) {
         return;
     }
 
@@ -436,6 +484,58 @@ mod tests {
         ];
         let result = OctreeBroadPhase::new(5, 1).detect(&bodies);
         assert_eq!(result.pairs, vec![Pair::new(1, 2)]);
+    }
+
+    #[test]
+    fn single_full_child_may_descend_to_find_later_separation() {
+        let bodies = vec![
+            body(1, [-9.0, -9.0, -9.0], 0.25),
+            body(2, [-7.0, -9.0, -9.0], 0.25),
+            body(3, [9.0, 9.0, 9.0], 0.25),
+        ];
+        let tree = OctreeBroadPhase::new(6, 1);
+        let trace = tree.trace(&bodies);
+
+        assert_eq!(trace.result.pairs, NaiveBroadPhase.detect(&bodies).pairs);
+        assert!(
+            trace.nodes.iter().any(|node| node.depth >= 2),
+            "expected a full single-child branch to continue descending"
+        );
+        assert!(
+            trace.result.stats.aabb_tests < 3,
+            "expected deeper subdivision to avoid all-pairs testing"
+        );
+    }
+
+    #[test]
+    fn straddler_does_not_prevent_deeper_partitioning() {
+        let mut bodies = vec![body(0, [0.0; 3], 100.0)];
+        for z in 0..8 {
+            for y in 0..8 {
+                for x in 0..8 {
+                    let id = bodies.len() as u32;
+                    bodies.push(body(
+                        id,
+                        [
+                            -90.0 + x as f32 * 10.0,
+                            -90.0 + y as f32 * 10.0,
+                            -90.0 + z as f32 * 10.0,
+                        ],
+                        0.5,
+                    ));
+                }
+            }
+        }
+
+        let naive = NaiveBroadPhase.detect(&bodies);
+        let octree = OctreeBroadPhase::new(6, 4).detect(&bodies);
+        assert_eq!(octree.pairs, naive.pairs);
+        assert!(
+            octree.stats.aabb_tests < naive.stats.aabb_tests / 4,
+            "octree tests={} naive tests={}",
+            octree.stats.aabb_tests,
+            naive.stats.aabb_tests
+        );
     }
 
     #[test]

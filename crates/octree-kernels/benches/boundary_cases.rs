@@ -30,10 +30,74 @@ fn scene(n: usize) -> Vec<Body> {
         .collect()
 }
 
+fn clustered_scene(n: usize) -> Vec<Body> {
+    const CENTERS: [[f32; 3]; 8] = [
+        [-0.6, -0.6, -0.6],
+        [-0.6, -0.6, 0.6],
+        [-0.6, 0.6, -0.6],
+        [-0.6, 0.6, 0.6],
+        [0.6, -0.6, -0.6],
+        [0.6, -0.6, 0.6],
+        [0.6, 0.6, -0.6],
+        [0.6, 0.6, 0.6],
+    ];
+    let mut rng = SplitMix64::new(42);
+    let extent = 99.5_f32;
+    let jitter = extent * 0.08;
+
+    (0..n)
+        .map(|id| {
+            let cluster = CENTERS[(rng.next_u64() as usize) % CENTERS.len()];
+            let center = [
+                (cluster[0] * extent + rng.signed(jitter)).clamp(-extent, extent),
+                (cluster[1] * extent + rng.signed(jitter)).clamp(-extent, extent),
+                (cluster[2] * extent + rng.signed(jitter)).clamp(-extent, extent),
+            ];
+            Body::new(id as u32, Aabb::from_center_half_extents(center, [0.5; 3]))
+        })
+        .collect()
+}
+
+#[derive(Clone, Copy)]
+struct SplitMix64 {
+    state: u64,
+}
+
+impl SplitMix64 {
+    const fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = self.state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    }
+
+    fn signed(&mut self, extent: f32) -> f32 {
+        let mantissa = (self.next_u64() >> 40) as u32;
+        let unit = mantissa as f32 / (1_u32 << 24) as f32;
+        (unit * 2.0 - 1.0) * extent
+    }
+}
+
 #[divan::bench(args = [64, 256, 1024])]
 fn detect_pairs(bencher: Bencher, n: usize) {
     let bodies = scene(n);
     let tree = OctreeBroadPhase::new(6, 4);
+    assert_eq!(
+        tree.detect(&bodies).pairs,
+        NaiveBroadPhase.detect(&bodies).pairs
+    );
+    bencher.bench_local(|| black_box(tree.detect(black_box(&bodies))));
+}
+
+#[divan::bench(args = [256, 1024, 3000])]
+fn detect_clustered_pairs(bencher: Bencher, n: usize) {
+    let bodies = clustered_scene(n);
+    let tree = OctreeBroadPhase::default();
     assert_eq!(
         tree.detect(&bodies).pairs,
         NaiveBroadPhase.detect(&bodies).pairs
@@ -74,6 +138,28 @@ fn probe() {
                 .sum::<u64>(),
         );
     }
+    let clustered = clustered_scene(3000);
+    let clustered_trace = OctreeBroadPhase::default().trace(&clustered);
+    assert_eq!(
+        clustered_trace.result.pairs,
+        NaiveBroadPhase.detect(&clustered).pairs
+    );
+    emit(
+        "octree_clustered_3000",
+        "pairs",
+        clustered_trace.result.pairs.len(),
+    );
+    emit(
+        "octree_clustered_3000",
+        "aabb_tests",
+        clustered_trace.result.stats.aabb_tests,
+    );
+    emit(
+        "octree_clustered_3000",
+        "nodes",
+        clustered_trace.nodes.len(),
+    );
+
     let point = |x| Aabb::new([x, 0.0, 0.0], [x, 0.0, 0.0]);
     let bodies = [
         Body::new(0, point(-3668.735)),
