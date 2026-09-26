@@ -90,7 +90,21 @@ impl StaticBvh {
     /// Returns every overlapping collider pair exactly once in canonical order.
     #[must_use]
     pub fn overlapping_pairs(&self) -> Vec<Pair> {
-        self.overlapping_pairs_with_tests().0
+        self.overlapping_pairs_result().pairs
+    }
+
+    /// Returns exact overlap pairs plus deterministic broad-phase work counters
+    /// for the current retained tree state.
+    #[must_use]
+    pub fn overlapping_pairs_result(&self) -> BroadPhaseResult {
+        let (pairs, aabb_tests) = self.overlapping_pairs_with_tests();
+        BroadPhaseResult {
+            pairs,
+            stats: BroadPhaseStats {
+                aabb_tests,
+                occupied_cells: None,
+            },
+        }
     }
 
     fn overlapping_pairs_with_tests(&self) -> (Vec<Pair>, u64) {
@@ -440,7 +454,21 @@ impl DynamicAabbTree {
 
     #[must_use]
     pub fn overlapping_pairs(&self) -> Vec<Pair> {
-        self.overlapping_pairs_with_tests().0
+        self.overlapping_pairs_result().pairs
+    }
+
+    /// Returns exact overlap pairs plus deterministic broad-phase work counters
+    /// for the current retained tree state.
+    #[must_use]
+    pub fn overlapping_pairs_result(&self) -> BroadPhaseResult {
+        let (pairs, aabb_tests) = self.overlapping_pairs_with_tests();
+        BroadPhaseResult {
+            pairs,
+            stats: BroadPhaseStats {
+                aabb_tests,
+                occupied_cells: None,
+            },
+        }
     }
 
     fn overlapping_pairs_with_tests(&self) -> (Vec<Pair>, u64) {
@@ -777,14 +805,7 @@ impl BroadPhase for DynamicAabbTreeBroadPhase {
         for body in ordered {
             tree.insert(body);
         }
-        let (pairs, aabb_tests) = tree.overlapping_pairs_with_tests();
-        BroadPhaseResult {
-            pairs,
-            stats: BroadPhaseStats {
-                aabb_tests,
-                occupied_cells: None,
-            },
-        }
+        tree.overlapping_pairs_result()
     }
 }
 
@@ -911,6 +932,21 @@ mod tests {
         assert_eq!(bvh.pairs, naive.pairs);
         assert!(bvh.stats.aabb_tests < naive.stats.aabb_tests / 10);
         assert_eq!(naive.stats.aabb_tests, 4_950);
+    }
+
+    #[test]
+    fn retained_result_matches_snapshot_adapter_work_and_pairs() {
+        let bodies = fixture();
+        let margin = 0.75;
+        let mut tree = DynamicAabbTree::new(margin);
+        for body in &bodies {
+            tree.insert(*body);
+        }
+
+        let retained = tree.overlapping_pairs_result();
+        let snapshot = DynamicAabbTreeBroadPhase::new(margin).detect(&bodies);
+        assert_eq!(retained, snapshot);
+        assert_eq!(tree.overlapping_pairs(), retained.pairs);
     }
 
     #[test]
