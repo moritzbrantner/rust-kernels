@@ -53,10 +53,7 @@ fn clustered_scene(n: usize) -> Vec<Body> {
                 (cluster[1] * extent + rng.signed(jitter)).clamp(-extent, extent),
                 (cluster[2] * extent + rng.signed(jitter)).clamp(-extent, extent),
             ];
-            Body::new(
-                id as u32,
-                Aabb::from_center_half_extents(center, [0.5; 3]),
-            )
+            Body::new(id as u32, Aabb::from_center_half_extents(center, [0.5; 3]))
         })
         .collect()
 }
