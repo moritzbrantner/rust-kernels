@@ -1473,17 +1473,17 @@ mod tests {
         let mut work = PrimitiveWork3::default();
         let contact = query(capsule, cuboid, &mut work);
         let expected = -(2.0_f64.sqrt() + 0.1);
-        assert!((contact.separation - expected).abs() < 1.0e-12, "{contact:?}");
+        assert!(
+            (contact.separation - expected).abs() < 1.0e-12,
+            "{contact:?}"
+        );
         assert!(work.axes_tested >= 4, "{work:?}");
     }
 
     #[test]
     fn wedge_inside_tolerance_scales_with_geometry() {
         let wedge = body(PrimitiveShape3::wedge([1.0e-9; 3]), [0.0; 3]);
-        let sphere = body(
-            PrimitiveShape3::sphere(1.0e-12),
-            [-1.05e-9, -5.0e-10, 0.0],
-        );
+        let sphere = body(PrimitiveShape3::sphere(1.0e-12), [-1.05e-9, -5.0e-10, 0.0]);
         let mut work = PrimitiveWork3::default();
         assert!(query(sphere, wedge, &mut work).separation > 0.0);
     }
