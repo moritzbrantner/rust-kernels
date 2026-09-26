@@ -779,6 +779,10 @@
         {
           "path": "crates/bvh-kernels/src/lib.rs",
           "target": "crates/bvh-kernels/src/lib.rs"
+        },
+        {
+          "path": "crates/bvh-kernels/benches/dynamic_pairs.rs",
+          "target": "crates/bvh-kernels/benches/dynamic_pairs.rs"
         }
       ],
       "provides": [
