@@ -2,6 +2,7 @@ pub mod continuous;
 pub mod epa;
 pub mod epa3;
 pub mod gjk;
+pub mod gjk_distance;
 pub mod gjk_trace;
 pub mod math3;
 pub mod planar;
