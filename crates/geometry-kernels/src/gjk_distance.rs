@@ -432,7 +432,10 @@ mod tests {
             },
         );
 
-        assert_eq!(result.intersection.status, crate::gjk::GjkStatus::IterationLimit);
+        assert_eq!(
+            result.intersection.status,
+            crate::gjk::GjkStatus::IterationLimit
+        );
         assert_eq!(result.status, GjkDistanceStatus::Converged);
         let closest = result
             .closest
