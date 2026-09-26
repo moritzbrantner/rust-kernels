@@ -99,10 +99,7 @@ struct Node {
 
 #[derive(Debug)]
 enum TestedPairs {
-    Dense {
-        words: Vec<u64>,
-        body_count: usize,
-    },
+    Dense { words: Vec<u64>, body_count: usize },
     Sparse(HashSet<(usize, usize)>),
 }
 
@@ -139,7 +136,6 @@ impl TestedPairs {
         }
     }
 }
-
 
 fn run_octree(config: OctreeConfig, bodies: &[Body], trace: bool) -> OctreeTrace {
     validate_unique_ids(bodies);
