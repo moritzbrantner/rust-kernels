@@ -24,3 +24,7 @@ harness = false
 [[bench]]
 name = "ray_queries"
 harness = false
+
+[[bench]]
+name = "primitive3"
+harness = false
