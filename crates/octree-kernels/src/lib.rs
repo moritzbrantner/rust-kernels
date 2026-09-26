@@ -199,10 +199,15 @@ fn subdivide(index: usize, config: OctreeConfig, bodies: &[Body], nodes: &mut Ve
             .filter(|&member| child_bounds[child].overlaps(bodies[member].aabb))
             .collect()
     });
-    // A subdivision must actually reduce at least one occupied child's set.
-    if !child_members
+    // Every recursive branch must make strict progress. If any child would
+    // retain the complete parent set, descending into it only duplicates the
+    // same candidate population at a deeper level while sibling overlap
+    // creates additional copies. This is especially costly for clustered
+    // scenes with straddlers near split planes.
+    let parent_member_count = node.members.len();
+    if child_members
         .iter()
-        .any(|members| !members.is_empty() && members.len() < node.members.len())
+        .any(|members| members.len() == parent_member_count)
     {
         return;
     }
@@ -436,6 +441,21 @@ mod tests {
         ];
         let result = OctreeBroadPhase::new(5, 1).detect(&bodies);
         assert_eq!(result.pairs, vec![Pair::new(1, 2)]);
+    }
+
+    #[test]
+    fn subdivision_stops_when_a_child_cannot_reduce_the_candidate_set() {
+        let bodies = vec![
+            body(1, [0.0, 0.0, 0.0], 10.0),
+            body(2, [-8.0, -8.0, -8.0], 0.5),
+        ];
+        let tree = OctreeBroadPhase::new(6, 1);
+        let trace = tree.trace(&bodies);
+
+        assert_eq!(trace.result.pairs, NaiveBroadPhase.detect(&bodies).pairs);
+        assert_eq!(trace.nodes.len(), 1);
+        assert_eq!(trace.leaf_count, 1);
+        assert_eq!(trace.occupied_leaf_count, 1);
     }
 
     #[test]
