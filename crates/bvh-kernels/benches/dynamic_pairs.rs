@@ -28,10 +28,7 @@ fn clustered_scene(n: usize) -> Vec<Body> {
                 base[1] + ((local / 8) % 8) as f32 * 0.8,
                 base[2] + (local / 64) as f32 * 0.8,
             ];
-            Body::new(
-                id as u32,
-                Aabb::from_center_half_extents(center, [0.5; 3]),
-            )
+            Body::new(id as u32, Aabb::from_center_half_extents(center, [0.5; 3]))
         })
         .collect()
 }
@@ -60,15 +57,15 @@ fn probe() {
         let tree = retained_tree(&bodies);
         let result = tree.overlapping_pairs_result();
         assert_eq!(result.pairs, naive.pairs);
-        println!("AUDIT\tdynamic_clustered_{n}\tpairs\t{}", result.pairs.len());
+        println!(
+            "AUDIT\tdynamic_clustered_{n}\tpairs\t{}",
+            result.pairs.len()
+        );
         println!(
             "AUDIT\tdynamic_clustered_{n}\taabb_tests\t{}",
             result.stats.aabb_tests
         );
-        println!(
-            "AUDIT\tdynamic_clustered_{n}\tnodes\t{}",
-            tree.node_count()
-        );
+        println!("AUDIT\tdynamic_clustered_{n}\tnodes\t{}", tree.node_count());
         println!("AUDIT\tdynamic_clustered_{n}\theight\t{}", tree.height());
     }
 }
