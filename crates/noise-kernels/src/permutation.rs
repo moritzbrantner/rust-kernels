@@ -44,6 +44,14 @@ impl Permutation {
         let yz_hash = usize::from(self.table[(y + z_hash) & 255]);
         self.table[(x + yz_hash) & 255]
     }
+
+    #[inline]
+    pub(crate) fn hash4(&self, x: usize, y: usize, z: usize, w: usize) -> u8 {
+        let w_hash = usize::from(self.table[w & 255]);
+        let zw_hash = usize::from(self.table[(z + w_hash) & 255]);
+        let yzw_hash = usize::from(self.table[(y + zw_hash) & 255]);
+        self.table[(x + yzw_hash) & 255]
+    }
 }
 
 impl Default for Permutation {
