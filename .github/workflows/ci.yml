@@ -45,6 +45,8 @@ jobs:
           cargo bench -p geometry-kernels --bench audit_numerics -- --bench --sample-count 50 --sample-size 8 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/geometry-audit.txt
           cargo bench -p geometry-kernels --bench ray_queries -- --bench --sample-count 50 --sample-size 8 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/geometry-ray-queries.txt
           cargo bench -p statistics-kernels --bench audit_numerics -- --bench --sample-count 50 --sample-size 8 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/statistics-audit.txt
+          cargo bench -p bvh-kernels --bench dynamic_pairs -- --sample-count 30 --sample-size 4 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/bvh-dynamic-pairs.txt
+          cargo bench -p bvh-kernels --bench dynamic_pairs -- --audit-probe | tee target/cargo-benchmark-evidence/bvh-dynamic-audit.txt
           cargo bench -p graph-kernels --bench boundary_cases -- --bench --sample-count 30 --sample-size 4 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/graph-boundary.txt
           cargo bench -p octree-kernels --bench boundary_cases -- --sample-count 30 --sample-size 4 --threads 1 --color never --timer os | tee target/cargo-benchmark-evidence/octree-boundary.txt
           cargo bench -p octree-kernels --bench boundary_cases -- --audit-probe | tee target/cargo-benchmark-evidence/octree-audit.txt
