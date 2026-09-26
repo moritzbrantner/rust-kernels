@@ -454,7 +454,21 @@ impl DynamicAabbTree {
 
     #[must_use]
     pub fn overlapping_pairs(&self) -> Vec<Pair> {
-        self.overlapping_pairs_with_tests().0
+        self.overlapping_pairs_result().pairs
+    }
+
+    /// Returns exact overlap pairs plus deterministic broad-phase work counters
+    /// for the current retained tree state.
+    #[must_use]
+    pub fn overlapping_pairs_result(&self) -> BroadPhaseResult {
+        let (pairs, aabb_tests) = self.overlapping_pairs_with_tests();
+        BroadPhaseResult {
+            pairs,
+            stats: BroadPhaseStats {
+                aabb_tests,
+                occupied_cells: None,
+            },
+        }
     }
 
     fn overlapping_pairs_with_tests(&self) -> (Vec<Pair>, u64) {
