@@ -1198,7 +1198,8 @@
         "noise",
         "procedural",
         "perlin",
-        "world-generation"
+        "world-generation",
+        "simplex"
       ],
       "dependencies": [],
       "registryDependencies": [],
@@ -1222,6 +1223,14 @@
         {
           "path": "crates/noise-kernels/benches/perlin.rs",
           "target": "crates/noise-kernels/benches/perlin.rs"
+        },
+        {
+          "path": "crates/noise-kernels/src/simplex.rs",
+          "target": "crates/noise-kernels/src/simplex.rs"
+        },
+        {
+          "path": "crates/noise-kernels/benches/simplex.rs",
+          "target": "crates/noise-kernels/benches/simplex.rs"
         }
       ],
       "provides": [
@@ -1238,6 +1247,15 @@
           "symbols": [
             "perlin2",
             "perlin3"
+          ]
+        },
+        {
+          "name": "simplex-noise",
+          "type": "algorithm",
+          "symbols": [
+            "simplex2",
+            "simplex3",
+            "simplex4"
           ]
         }
       ]

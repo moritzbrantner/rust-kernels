@@ -420,6 +420,31 @@
           }
         }
       ]
+    },
+    {
+      "id": "simplex-sampling-allocations",
+      "kind": "micro",
+      "description": "Repeated 2D, 3D, and 4D Simplex sampling from prebuilt permutation state performs no heap allocation.",
+      "dimensions": {
+        "samplesPerDimension": 1024,
+        "dimensions": "2D,3D,4D"
+      },
+      "correctnessEvidence": [
+        "crates/noise-kernels/tests/allocation_regressions.rs::repeated_simplex_sampling_allocates_nothing",
+        "crates/noise-kernels/tests/simplex_reference.rs::optimized_simplex_matches_generic_corner_order_oracle"
+      ],
+      "metrics": [
+        {
+          "name": "allocator-calls",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 0
+          }
+        }
+      ]
     }
   ]
 }

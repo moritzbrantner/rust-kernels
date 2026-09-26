@@ -83,8 +83,8 @@ these kernels. The complete crate is also available through the source registry.
 ### Noise
 
 `noise-kernels` provides a deterministic seeded `Permutation` plus allocation-free
-2D and 3D Perlin sampling. The fixed permutation state is shared infrastructure
-for later Simplex and Worley kernels; terrain composition and world-generation
+2D/3D Perlin and 2D/3D/4D Simplex sampling. The fixed permutation state is shared
+infrastructure for later Worley kernels; terrain composition and world-generation
 policy remain consumer-owned.
 
 ### Statistics
