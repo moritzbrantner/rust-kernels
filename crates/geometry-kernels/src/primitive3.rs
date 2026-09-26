@@ -1200,11 +1200,15 @@ fn fallback_normal(delta: Vec3, fallback: Vec3) -> Vec3 {
 }
 
 fn unit_or_zero(vector: Vec3) -> Vec3 {
-    let scale = vector.into_iter().map(f64::abs).fold(0.0, f64::max);
-    if scale == 0.0 || !scale.is_finite() {
+    let max_component = vector.into_iter().map(f64::abs).fold(0.0, f64::max);
+    if max_component == 0.0 || !max_component.is_finite() {
         return [0.0; 3];
     }
-    let scaled = [vector[0] / scale, vector[1] / scale, vector[2] / scale];
+    let scaled = [
+        vector[0] / max_component,
+        vector[1] / max_component,
+        vector[2] / max_component,
+    ];
     let length = length_squared(scaled).sqrt();
     if length == 0.0 || !length.is_finite() {
         [0.0; 3]
