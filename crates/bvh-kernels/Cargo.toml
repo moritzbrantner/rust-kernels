@@ -8,3 +8,10 @@ description = "Small deterministic bounding-volume hierarchy kernels"
 
 [dependencies]
 spatial-kernels = { path = "../spatial-kernels" }
+
+[dev-dependencies]
+divan = "=0.1.21"
+
+[[bench]]
+name = "dynamic_pairs"
+harness = false
