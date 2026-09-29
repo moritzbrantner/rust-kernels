@@ -6,6 +6,7 @@ pub mod gjk_distance;
 pub mod gjk_trace;
 pub mod math3;
 pub mod planar;
+pub mod primitive3;
 pub mod primitives;
 pub mod ray;
 pub mod support;
