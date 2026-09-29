@@ -1023,32 +1023,73 @@ fn closest_point_segment(point: Vec3, a: Vec3, b: Vec3) -> Vec3 {
     add(a, scale(delta, time))
 }
 
-fn closest_segment_segment(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> (Vec3, Vec3) {
-    let d1 = sub(q1, p1);
-    let d2 = sub(q2, p2);
-    let r = sub(p1, p2);
-    let a = length_squared(d1);
-    let e = length_squared(d2);
-    let epsilon = 1.0e-20;
+/// Returns closest points on two closed segments, including zero-length segments.
+///
+/// Returns `None` for non-finite endpoints or arithmetic outside the finite f64
+/// range. Parallel segments can have multiple equally close point pairs; the
+/// first segment's start is preferred when it belongs to that set.
+#[must_use]
+pub fn closest_segment_points(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> Option<(Vec3, Vec3)> {
+    if !p1
+        .into_iter()
+        .chain(q1)
+        .chain(p2)
+        .chain(q2)
+        .all(f64::is_finite)
+    {
+        return None;
+    }
+    let points = closest_segment_segment(p1, q1, p2, q2);
+    points
+        .0
+        .into_iter()
+        .chain(points.1)
+        .all(f64::is_finite)
+        .then_some(points)
+}
 
-    if a <= epsilon && e <= epsilon {
+fn closest_segment_segment(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> (Vec3, Vec3) {
+    let unscaled_d1 = sub(q1, p1);
+    let unscaled_d2 = sub(q2, p2);
+    let unscaled_r = sub(p1, p2);
+    let components = unscaled_d1.into_iter().chain(unscaled_d2).chain(unscaled_r);
+    let mut span = 0.0_f64;
+    for component in components {
+        if !component.is_finite() {
+            return ([f64::NAN; 3], [f64::NAN; 3]);
+        }
+        span = span.max(component.abs());
+    }
+    if span == 0.0 {
         return (p1, p2);
     }
-    if a <= epsilon {
-        let t = (dot(d2, r) / e).clamp(0.0, 1.0);
-        return (p1, add(p2, scale(d2, t)));
+    // Divide components individually: the reciprocal can overflow for subnormal spans.
+    let d1 = unscaled_d1.map(|value| value / span);
+    let d2 = unscaled_d2.map(|value| value / span);
+    let r = unscaled_r.map(|value| value / span);
+    let a = length_squared(d1);
+    let e = length_squared(d2);
+
+    if a == 0.0 && e == 0.0 {
+        return (p1, p2);
     }
-    if e <= epsilon {
+    if a == 0.0 {
+        let t = (dot(d2, r) / e).clamp(0.0, 1.0);
+        return (p1, add(p2, scale(unscaled_d2, t)));
+    }
+    if e == 0.0 {
         let s = (-dot(d1, r) / a).clamp(0.0, 1.0);
-        return (add(p1, scale(d1, s)), p2);
+        return (add(p1, scale(unscaled_d1, s)), p2);
     }
 
     let b = dot(d1, d2);
     let c = dot(d1, r);
     let f = dot(d2, r);
-    let denominator = a * e - b * b;
-    let mut s = if denominator.abs() > epsilon {
-        ((b * f - c * e) / denominator).clamp(0.0, 1.0)
+    // The cross product avoids subtracting nearly equal squared dot products.
+    let normal = cross(d1, d2);
+    let denominator = length_squared(normal);
+    let mut s = if denominator > 0.0 {
+        (dot(cross(d2, r), normal) / denominator).clamp(0.0, 1.0)
     } else {
         0.0
     };
@@ -1060,7 +1101,10 @@ fn closest_segment_segment(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> (Vec3, Vec
         t = 1.0;
         s = ((b - c) / a).clamp(0.0, 1.0);
     }
-    (add(p1, scale(d1, s)), add(p2, scale(d2, t)))
+    (
+        add(p1, scale(unscaled_d1, s)),
+        add(p2, scale(unscaled_d2, t)),
+    )
 }
 
 fn segment_aabb_interval(a: Vec3, b: Vec3, half: Vec3) -> Option<(f64, f64)> {
@@ -1228,6 +1272,158 @@ fn inverse_rotate(axes: [Vec3; 3], world: Vec3) -> Vec3 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn closest_segments_preserve_crossings_across_scales() {
+        for scale in [1.0e-150, 1.0e-12, 1.0, 1.0e9, 1.0e150] {
+            let points = closest_segment_points(
+                [-2.0 * scale, 0.0, 0.0],
+                [2.0 * scale, 0.0, 0.0],
+                [scale, -3.0 * scale, 0.0],
+                [scale, scale, 0.0],
+            )
+            .unwrap();
+            for point in [points.0, points.1] {
+                assert!(
+                    length(sub(point, [scale, 0.0, 0.0])) <= 1.0e-14 * scale,
+                    "scale={scale}, point={point:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn closest_segments_handle_skew_endpoints_parallel_and_degenerate_cases() {
+        let cases = [
+            (
+                [0.0; 3],
+                [2.0, 0.0, 0.0],
+                [1.0, -1.0, 3.0],
+                [1.0, 1.0, 3.0],
+                ([1.0, 0.0, 0.0], [1.0, 0.0, 3.0]),
+            ),
+            (
+                [0.0; 3],
+                [1.0, 0.0, 0.0],
+                [2.0, 1.0, 0.0],
+                [2.0, 2.0, 0.0],
+                ([1.0, 0.0, 0.0], [2.0, 1.0, 0.0]),
+            ),
+            (
+                [0.0; 3],
+                [2.0, 0.0, 0.0],
+                [1.0, 1.0, 0.0],
+                [3.0, 1.0, 0.0],
+                ([1.0, 0.0, 0.0], [1.0, 1.0, 0.0]),
+            ),
+            (
+                [1.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [0.0; 3],
+                [2.0, 0.0, 0.0],
+                ([1.0, 0.0, 0.0], [1.0, 0.0, 0.0]),
+            ),
+            (
+                [1.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [2.0, 0.0, 0.0],
+                [2.0, 0.0, 0.0],
+                ([1.0, 0.0, 0.0], [2.0, 0.0, 0.0]),
+            ),
+        ];
+        for (p1, q1, p2, q2, expected) in cases {
+            let actual = closest_segment_points(p1, q1, p2, q2).unwrap();
+            assert_eq!(actual, expected);
+            let reversed = closest_segment_points(p2, q2, p1, q1).unwrap();
+            assert!(
+                (length(sub(actual.0, actual.1)) - length(sub(reversed.0, reversed.1))).abs()
+                    < 1.0e-14
+            );
+        }
+    }
+
+    #[test]
+    fn closest_segments_resolve_nearly_parallel_crossings() {
+        for slope in [1.0e-4, 1.0e-8, 1.0e-12] {
+            let points = closest_segment_points(
+                [-1.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [-1.0, -slope, 0.0],
+                [1.0, slope, 0.0],
+            )
+            .unwrap();
+            assert!(
+                length(points.0) < 1.0e-14,
+                "slope={slope}, points={points:?}"
+            );
+            assert!(
+                length(points.1) < 1.0e-14,
+                "slope={slope}, points={points:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn closest_segments_satisfy_membership_and_independent_distance_bounds() {
+        let mut state = 12_345_u64;
+        let mut coordinate = || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1);
+            ((state >> 32) % 2001) as f64 / 100.0 - 10.0
+        };
+        for _ in 0..128 {
+            let endpoints: [Vec3; 4] =
+                std::array::from_fn(|_| std::array::from_fn(|_| coordinate()));
+            let [p1, q1, p2, q2] = endpoints;
+            let (left, right) = closest_segment_points(p1, q1, p2, q2).unwrap();
+            for (point, start, end) in [(left, p1, q1), (right, p2, q2)] {
+                let delta = sub(end, start);
+                let offset = sub(point, start);
+                let t = dot(offset, delta) / length_squared(delta);
+                assert!((-1.0e-14..=1.0 + 1.0e-14).contains(&t));
+                assert!(length(sub(offset, scale(delta, t))) < 1.0e-12);
+            }
+            let distance = length(sub(left, right));
+            // Exhaustive independently interpolated candidates provide an upper bound.
+            for i in 0..=16 {
+                for j in 0..=16 {
+                    let a = add(
+                        scale(p1, 1.0 - f64::from(i) / 16.0),
+                        scale(q1, f64::from(i) / 16.0),
+                    );
+                    let b = add(
+                        scale(p2, 1.0 - f64::from(j) / 16.0),
+                        scale(q2, f64::from(j) / 16.0),
+                    );
+                    assert!(distance <= length(sub(a, b)) + 1.0e-12);
+                }
+            }
+            for (a, b, c, d) in [(q1, p1, p2, q2), (p2, q2, p1, q1)] {
+                let points = closest_segment_points(a, b, c, d).unwrap();
+                assert!((length(sub(points.0, points.1)) - distance).abs() < 1.0e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn closest_segments_reject_non_finite_and_unrepresentable_arithmetic() {
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(
+                closest_segment_points([invalid, 0.0, 0.0], [1.0; 3], [0.0; 3], [2.0; 3]),
+                None
+            );
+        }
+        assert_eq!(
+            closest_segment_points(
+                [-f64::MAX, 0.0, 0.0],
+                [f64::MAX, 0.0, 0.0],
+                [0.0; 3],
+                [1.0; 3]
+            ),
+            None
+        );
+    }
 
     fn body(shape: PrimitiveShape3, position: Vec3) -> PrimitiveBody3 {
         PrimitiveBody3::axis_aligned(shape, position, [0.0; 3])
