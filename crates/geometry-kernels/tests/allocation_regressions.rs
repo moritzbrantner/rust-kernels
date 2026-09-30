@@ -158,3 +158,46 @@ fn entire_capsule_row_avoids_query_scratch_allocation() {
     assert_eq!(work.vertex_tests, 0);
     assert_eq!(work.sweep_iterations, 0);
 }
+
+#[test]
+fn retained_heightfield_queries_allocate_nothing_and_reuse_one_normal() {
+    use geometry_kernels::heightfield::{HeightfieldData3, PreparedHeightfield3};
+    let terrain = PreparedHeightfield3::try_new(HeightfieldData3 {
+        columns: (0..65).map(f64::from).collect(),
+        rows: (0..65).map(f64::from).collect(),
+        heights: vec![0.0; 65 * 65],
+        active_cells: None,
+    })
+    .unwrap();
+    let preparation = terrain.preparation();
+    assert_eq!(preparation.triangles_prepared, 8192);
+    assert_eq!(preparation.retained_bytes, 231_448);
+    ALLOCS.with(|count| count.set(0));
+    REALLOCS.with(|count| count.set(0));
+    ENABLED.with(|enabled| enabled.set(true));
+    let mut valid = true;
+    let mut tested = 0;
+    let mut normal_reuses = 0;
+    for index in 0..8192 {
+        let x = f64::from(index % 64) + 0.3;
+        let z = f64::from((index / 64) % 64) + 0.7;
+        match std::hint::black_box(terrain.sample(std::hint::black_box(x), std::hint::black_box(z)))
+        {
+            Ok(result) => {
+                valid &= result.surface.is_some()
+                    && result.work.cells_visited == 1
+                    && result.work.coordinate_comparisons <= 16;
+                tested += result.work.triangles_tested;
+                normal_reuses += result.work.normal_reuses;
+            }
+            Err(_) => valid = false,
+        }
+    }
+    ENABLED.with(|enabled| enabled.set(false));
+    assert!(valid);
+    assert_eq!(tested, 8192);
+    assert_eq!(normal_reuses, 8192);
+    assert_eq!(ALLOCS.with(Cell::get), 0);
+    assert_eq!(REALLOCS.with(Cell::get), 0);
+    assert_eq!(terrain.preparation(), preparation);
+}

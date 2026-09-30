@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "issue": 52,
+  "kernels": [
+    {
+      "id": "f64-retained-heightfield-surface",
+      "crate": "geometry-kernels",
+      "module": "crate::heightfield",
+      "sources": [
+        "crates/geometry-kernels/src/heightfield.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "1536 seeded nonuniform-grid samples at three scales match independently materialized exhaustive triangle barycentric/plane queries. Flat/tilted/steep surfaces, checkerboard diagonals, shared grid edges/vertices, holes, closed outer boundaries and range failures have Cargo-native cases.",
+        "8192 retained 65x65 queries allocate/reallocate zero times, test one cell/triangle and reuse one prepared normal, with at most16 coordinate comparisons. Preparation and vector-payload retained bytes are reported independently; no timing speedup is claimed.",
+        "Developer-facing complete prepared sample calls run in the existing Divan primitive3 benchmark. This is vertical surface projection, not a ray, capsule sweep, rigid-body contact or character response.",
+        "criterion: Complete prepared sample calls use the existing Divan primitive3 suite; no new Criterion suite is added."
+      ]
+    }
+  ]
+}
