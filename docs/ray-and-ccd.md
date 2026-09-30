@@ -61,3 +61,29 @@ The Divan suite measures deterministic batches of 64, 1,024 and 4,096 AABBs,
 spheres and sphere sweeps. Input construction is outside the timed region and
 every workload returns a checksum so the query loop cannot disappear. Raw
 wall-clock measurements remain informational.
+
+## Checked fixed-orientation primitive sweeps
+
+`primitive3::try_swept_time(a, b, dt, margin, max_iterations, work)` supports
+sphere, box, capsule and wedge pairs with fixed orientations and linear motion.
+It returns normalized first-contact time in `[0, 1]`, or `Ok(None)` after a
+separating-plane test proves a miss over the requested interval. Contact at the
+initial pose returns zero. The non-negative margin expands contact admission.
+
+Search failure provides no collision-absence conclusion: callers must handle
+`InvalidInput`, `NonFiniteComputation` and `IterationLimit` separately. The limit
+bounds conservative-advance iterations or swept-SAT axes, including a contact
+query that admits a hit. Stationary curved pairs use a current-contact query
+without search iterations; stationary polyhedral pairs still inspect SAT axes.
+Work includes iterations performed before an error. A caller may retry with a
+deliberate policy or return an error; treating it as a miss can tunnel through a
+collider. No numerical fallback or automatic budget increase is provided.
+
+The existing `swept_time` Option API remains a compatibility wrapper using 128
+iterations. It cannot distinguish failure from a miss. Collision-authoritative
+consumers should use the checked API. Finite inputs do not guarantee that every
+intermediate remains finite: for example, uniformly scaling an analytic capsule/
+sphere hit by `1e160` overflows the current squared-distance calculation. The
+checked query reports this failure rather than claiming collision absence.
+Angular trajectories and general convex continuous collision are outside this
+fixed-orientation contract.
