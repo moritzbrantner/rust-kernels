@@ -62,3 +62,28 @@ fn no_trace_quad_epa_uses_at_most_four_allocations() {
     assert!(result.penetration.is_some());
     assert!(allocations <= 4, "allocation calls={allocations}");
 }
+
+#[test]
+fn primitive_volume_queries_allocate_nothing() {
+    use geometry_kernels::primitive3::{PrimitiveShape3, try_volume_properties};
+    let shapes = [
+        PrimitiveShape3::sphere(1.0),
+        PrimitiveShape3::cuboid([1.0, 2.0, 3.0]),
+        PrimitiveShape3::capsule(1000.0, 0.01),
+        PrimitiveShape3::wedge([1.0, 2.0, 3.0]),
+    ];
+    ALLOCS.with(|count| count.set(0));
+    REALLOCS.with(|count| count.set(0));
+    ENABLED.with(|enabled| enabled.set(true));
+    let mut valid = true;
+    for _ in 0..1024 {
+        for shape in shapes {
+            valid &=
+                std::hint::black_box(try_volume_properties(std::hint::black_box(shape))).is_ok();
+        }
+    }
+    ENABLED.with(|enabled| enabled.set(false));
+    assert!(valid);
+    assert_eq!(ALLOCS.with(Cell::get), 0);
+    assert_eq!(REALLOCS.with(Cell::get), 0);
+}

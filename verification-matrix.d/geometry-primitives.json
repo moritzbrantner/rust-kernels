@@ -9,7 +9,8 @@
       "sources": [
         "crates/geometry-kernels/src/primitive3.rs",
         "crates/geometry-kernels/src/primitive3/ray.rs",
-        "crates/geometry-kernels/src/primitive3/ray/tests.rs"
+        "crates/geometry-kernels/src/primitive3/ray/tests.rs",
+        "crates/geometry-kernels/src/primitive3/volume.rs"
       ],
       "oracleDifferential": "partial",
       "propertyMetamorphic": "present",
@@ -23,7 +24,8 @@
         "Swapped-order capsule/wedge symmetry and deterministic pair canonicalization provide metamorphic evidence.",
         "Deterministic work counters ratchet SAT axes, wedge vertex tests, support evaluations and bounded sweep iterations independently of wall-clock timing.",
         "criterion: New developer-facing contact and CCD workloads use Divan in crates/geometry-kernels/benches/primitive3.rs; Criterion is not used for this new suite.",
-        "Analytic f64 segment rays cover all four shapes: 4096 independent occupancy/bisection crossings, simple tangency/endpoint/inside/miss cases, pose and 1e-150..1e150 scale covariance, fixed plane/quadratic work ceilings and Divan complete-call workloads. This does not complete the existing contact-pair independent differential backlog."
+        "Analytic f64 segment rays cover all four shapes: 4096 independent occupancy/bisection crossings, simple tangency/endpoint/inside/miss cases, pose and 1e-150..1e150 scale covariance, fixed plane/quadratic work ceilings and Divan complete-call workloads. This does not complete the existing contact-pair independent differential backlog.",
+        "Uniform volume/centroid/normalized central moment products use independent capsule slice and wedge tetrahedron integration, sphere/box limits and scale covariance. A 4096-query Cargo-native allocation ratchet reports zero allocations/reallocations; fixed scalar formulas require no scratch. Divan measures complete mixed calls. This geometric-integral evidence does not complete contact-pair differential coverage."
       ]
     }
   ]

@@ -5,6 +5,9 @@
 
 use crate::math3::{Vec3, add, cross, dot, length, length_squared, neg, normalized, scale, sub};
 
+mod volume;
+pub use volume::{PrimitiveVolumeError3, PrimitiveVolumeProperties3, try_volume_properties};
+
 mod ray;
 pub use ray::{
     PrimitiveRayError3, PrimitiveRayFeature3, PrimitiveRayHit3, PrimitiveRayWork3, try_ray_cast,
