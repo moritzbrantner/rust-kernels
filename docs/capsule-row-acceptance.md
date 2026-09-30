@@ -74,6 +74,16 @@ executes 6144 warmed mixed queries, including containment and separation, with z
 allocations or reallocations. The inline box breakpoint array holds eight f64
 values (64 bytes); no heap query scratch capacity grows.
 
+Measurement environment on 2026-09-30: AMD Ryzen 7 5700X (8 cores/16 threads),
+Linux 7.0.0-34-generic, target `x86_64-unknown-linux-gnu`, rustc 1.98.1
+(`48a229cea`, LLVM 22.1.8), Cargo 1.98.1. Divan uses the optimized Cargo bench
+profile; paired probes use the optimized release profile, with no custom
+`RUSTFLAGS` or `CARGO_ENCODED_RUSTFLAGS`. Runs share this developer host without CPU
+affinity or exclusive scheduling. Counted code producer:
+`e3bdc928d2833fa832912a1df437321e09db32fc`; `primitive3.rs` SHA-256:
+`5943c77a04f0e63bfc857bd45e461f5512e89f2aeba36875c6590471c9d2ddb7`.
+Subsequent documentation-only corrections preserve that measured code.
+
 Divan's `capsule_row_contacts` measures three complete calls per sample. A local
 50-sample/eight-iteration run reported a 316.6 ns median; this is developer evidence,
 not a timing guarantee or an optimization claim. Additional before/after probes
