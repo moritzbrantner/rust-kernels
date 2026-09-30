@@ -87,3 +87,37 @@ fn primitive_volume_queries_allocate_nothing() {
     assert_eq!(ALLOCS.with(Cell::get), 0);
     assert_eq!(REALLOCS.with(Cell::get), 0);
 }
+
+#[test]
+fn capsule_skeleton_contact_queries_allocate_nothing() {
+    use geometry_kernels::primitive3::{PrimitiveBody3, PrimitiveShape3, PrimitiveWork3, query};
+    let capsule =
+        PrimitiveBody3::axis_aligned(PrimitiveShape3::capsule(5.0, 0.5), [0.0; 3], [0.0; 3]);
+    let sphere =
+        PrimitiveBody3::axis_aligned(PrimitiveShape3::sphere(0.25), [0.0, 2.0, 0.0], [0.0; 3]);
+    let crossing = PrimitiveBody3 {
+        axes: [[0.0, 1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, -1.0]],
+        ..capsule
+    };
+    let mut work = PrimitiveWork3::default();
+    ALLOCS.with(|count| count.set(0));
+    REALLOCS.with(|count| count.set(0));
+    ENABLED.with(|enabled| enabled.set(true));
+    for _ in 0..2048 {
+        for target in [sphere, crossing] {
+            std::hint::black_box(query(
+                std::hint::black_box(capsule),
+                std::hint::black_box(target),
+                &mut work,
+            ));
+        }
+    }
+    ENABLED.with(|enabled| enabled.set(false));
+    assert_eq!(ALLOCS.with(Cell::get), 0);
+    assert_eq!(REALLOCS.with(Cell::get), 0);
+    assert_eq!(work.pair_dispatches.iter().sum::<u64>(), 4096);
+    assert_eq!(work.support_evaluations, 0);
+    assert_eq!(work.axes_tested, 0);
+    assert_eq!(work.vertex_tests, 0);
+    assert_eq!(work.sweep_iterations, 0);
+}

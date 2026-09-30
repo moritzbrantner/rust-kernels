@@ -577,15 +577,14 @@ fn capsule_segment(body: PrimitiveBody3) -> (Vec3, Vec3) {
 
 fn capsule_sphere(capsule: PrimitiveBody3, sphere: PrimitiveBody3) -> PrimitiveContact3 {
     let (a, b) = capsule_segment(capsule);
-    let core = closest_point_segment(sphere.position, a, b);
+    let (core, _) = closest_segment_segment(a, b, sphere.position, sphere.position);
     let delta = sub(sphere.position, core);
-    let distance = length(delta);
-    let normal = fallback_normal(delta, sub(sphere.position, capsule.position));
     let (_, capsule_radius) = capsule.shape.capsule_parts();
     let sphere_radius = sphere.shape.sphere_radius();
+    let (normal, normal_distance) = capsule_normal(delta, capsule, sphere);
     PrimitiveContact3 {
         normal,
-        separation: distance - capsule_radius - sphere_radius,
+        separation: normal_distance - capsule_radius - sphere_radius,
         point_a: add(core, scale(normal, capsule_radius)),
         point_b: sub(sphere.position, scale(normal, sphere_radius)),
     }
@@ -596,16 +595,89 @@ fn capsule_capsule(a: PrimitiveBody3, b: PrimitiveBody3) -> PrimitiveContact3 {
     let (b0, b1) = capsule_segment(b);
     let (point_a, point_b) = closest_segment_segment(a0, a1, b0, b1);
     let delta = sub(point_b, point_a);
-    let distance = length(delta);
-    let normal = fallback_normal(delta, sub(b.position, a.position));
     let (_, a_radius) = a.shape.capsule_parts();
     let (_, b_radius) = b.shape.capsule_parts();
+    let (normal, normal_distance) = capsule_normal(delta, a, b);
     PrimitiveContact3 {
         normal,
-        separation: distance - a_radius - b_radius,
+        separation: normal_distance - a_radius - b_radius,
         point_a: add(point_a, scale(normal, a_radius)),
         point_b: sub(point_b, scale(normal, b_radius)),
     }
+}
+
+// At a skeleton intersection, center-to-center motion can run along a skeleton
+// and leave the solids penetrating. Choose a direction perpendicular to every
+// nonzero skeleton instead. Near-zero closest-point deltas are classified with
+// a scale-aware budget including pose-coordinate roundoff. Projection keeps
+// witnesses and separation consistent with the chosen direction rather than
+// understating its clearance.
+fn capsule_normal(delta: Vec3, left: PrimitiveBody3, right: PrimitiveBody3) -> (Vec3, f64) {
+    let left_axis = capsule_axis(left);
+    let right_axis = capsule_axis(right);
+    let distance = length(delta);
+    let coordinate_span = left
+        .position
+        .into_iter()
+        .chain(right.position)
+        .map(f64::abs)
+        .fold(0.0, f64::max);
+    let characteristic_length = coordinate_span
+        .max(left.shape.radius())
+        .max(right.shape.radius());
+    let tolerance = 64.0 * f64::EPSILON * characteristic_length;
+    let radius_sum = left.shape.half_extents()[0] + right.shape.half_extents()[0];
+    // A normal tie must never turn a resolved separation into a contact. For
+    // two collapsed skeletons the center delta is already the complete geometry.
+    if distance >= radius_sum
+        || distance > tolerance
+        || (left_axis.is_none() && right_axis.is_none() && distance > 0.0)
+    {
+        return (unit_or_zero(delta), distance);
+    }
+    let mut normal = match (left_axis, right_axis) {
+        (Some(left), Some(right)) => {
+            // Subtract nearly parallel axes before crossing: this avoids the
+            // cancellation of order-one products at tiny relative angles.
+            let relative = if dot(left, right) >= 0.0 {
+                sub(right, left)
+            } else {
+                add(right, left)
+            };
+            let perpendicular = unit_or_zero(cross(left, relative));
+            if perpendicular == [0.0; 3] {
+                perpendicular_to(left)
+            } else {
+                perpendicular
+            }
+        }
+        (Some(axis), None) | (None, Some(axis)) => perpendicular_to(axis),
+        (None, None) => [1.0, 0.0, 0.0],
+    };
+    let projection = dot(normal, delta);
+    if projection < 0.0
+        || (projection == 0.0 && dot(normal, sub(right.position, left.position)) < 0.0)
+    {
+        normal = neg(normal);
+    }
+    (normal, dot(normal, delta))
+}
+
+fn capsule_axis(body: PrimitiveBody3) -> Option<Vec3> {
+    (body.shape.kind() == PrimitiveKind3::Capsule && body.shape.capsule_parts().0 > 0.0)
+        .then_some(body.axes[1])
+}
+
+fn perpendicular_to(axis: Vec3) -> Vec3 {
+    let mut least_aligned = 0;
+    for index in 1..3 {
+        if axis[index].abs() < axis[least_aligned].abs() {
+            least_aligned = index;
+        }
+    }
+    let mut basis = [0.0; 3];
+    basis[least_aligned] = 1.0;
+    unit_or_zero(cross(axis, basis))
 }
 
 fn capsule_box(
