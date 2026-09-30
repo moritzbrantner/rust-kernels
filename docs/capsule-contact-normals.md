@@ -31,9 +31,10 @@ clearance evidence for this repair.
 
 A Cargo-native allocator test executes 4096 warmed queries without allocations or
 reallocations. Divan measures two complete degenerate contact calls per sample.
-Existing dispatch/support/axis/sweep counters remain unchanged and do not count
-internal segment-distance operations. Full contact-row differential coverage and
-expanded work accounting remain separate follow-up acceptance requirements.
+The original repair preserved dispatch/support/axis/sweep counters. The subsequent
+[capsule row acceptance](capsule-row-acceptance.md) adds explicit segment-distance
+and feature counts plus independent complete-row contact and sweep fixtures. Other
+primitive rows retain their separate differential acceptance requirements.
 
 ```sh
 cargo test -p geometry-kernels --test capsule_contact_normals
