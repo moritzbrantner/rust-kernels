@@ -70,3 +70,28 @@ fn primitive_volume_properties(bencher: Bencher) {
         }
     });
 }
+
+#[divan::bench]
+fn capsule_skeleton_contacts(bencher: Bencher) {
+    let capsule =
+        PrimitiveBody3::axis_aligned(PrimitiveShape3::capsule(5.0, 0.5), [0.0; 3], [0.0; 3]);
+    let sphere =
+        PrimitiveBody3::axis_aligned(PrimitiveShape3::sphere(0.25), [0.0, 2.0, 0.0], [0.0; 3]);
+    let crossing = PrimitiveBody3 {
+        axes: [[0.0, 1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, -1.0]],
+        ..capsule
+    };
+    bencher.bench_local(|| {
+        let mut work = PrimitiveWork3::default();
+        black_box(query(
+            black_box(capsule),
+            black_box(sphere),
+            black_box(&mut work),
+        ));
+        black_box(query(
+            black_box(capsule),
+            black_box(crossing),
+            black_box(&mut work),
+        ));
+    });
+}
