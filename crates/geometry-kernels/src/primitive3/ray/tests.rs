@@ -233,3 +233,26 @@ fn invalid_inputs_and_unrepresentable_computations_are_errors_not_misses() {
         Err(PrimitiveRayError3::InvalidInput)
     );
 }
+
+#[test]
+fn nonfinite_plane_parameter_is_an_error_and_initial_cap_seams_keep_feature_order() {
+    assert_eq!(
+        try_ray_cast(
+            body(Shape::cuboid([1.0; 3])),
+            [2.0, 0.0, 0.0],
+            [-1e-320, 1.0, 0.0],
+            &mut PrimitiveRayWork3::default()
+        ),
+        Err(PrimitiveRayError3::NonFiniteComputation)
+    );
+    let b = body(Shape::capsule(2.0, 1.0));
+    for (y, feature) in [
+        (-2.0, PrimitiveRayFeature3::CapsuleNegativeCap),
+        (2.0, PrimitiveRayFeature3::CapsulePositiveCap),
+    ] {
+        let hit = cast(b, [1.0, y, 0.0], [1.0, 0.0, 0.0]).unwrap();
+        assert_eq!(hit.feature, feature);
+        assert_eq!(hit.fraction, 0.0);
+        assert_eq!(hit.normal, [1.0, 0.0, 0.0]);
+    }
+}

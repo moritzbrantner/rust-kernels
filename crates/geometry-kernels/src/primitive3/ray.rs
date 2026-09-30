@@ -170,9 +170,9 @@ fn curved(
             Interior
         } else if h == 0.0 {
             Sphere
-        } else if axial < -h {
+        } else if axial <= -h {
             CapsuleNegativeCap
-        } else if axial > h {
+        } else if axial >= h {
             CapsulePositiveCap
         } else {
             CapsuleSide
@@ -308,6 +308,9 @@ fn polyhedral(
             }
         } else {
             let t = -start / velocity;
+            if !t.is_finite() {
+                return Err(PrimitiveRayError3::NonFiniteComputation);
+            }
             if velocity < 0.0 && t > enter {
                 enter = t;
                 entry_face = index;
