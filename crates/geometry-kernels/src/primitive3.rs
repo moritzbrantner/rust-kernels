@@ -5,6 +5,11 @@
 
 use crate::math3::{Vec3, add, cross, dot, length, length_squared, neg, normalized, scale, sub};
 
+mod ray;
+pub use ray::{
+    PrimitiveRayError3, PrimitiveRayFeature3, PrimitiveRayHit3, PrimitiveRayWork3, try_ray_cast,
+};
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum PrimitiveKind3 {
     Sphere,
