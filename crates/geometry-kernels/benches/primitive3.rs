@@ -113,3 +113,18 @@ fn capsule_row_contacts(bencher: Bencher) {
         }
     });
 }
+
+#[divan::bench]
+fn prepared_heightfield_surface_query(bencher: Bencher) {
+    use geometry_kernels::heightfield::{HeightfieldData3, PreparedHeightfield3};
+    let terrain = PreparedHeightfield3::try_new(HeightfieldData3 {
+        columns: (0..65).map(f64::from).collect(),
+        rows: (0..65).map(f64::from).collect(),
+        heights: (0..65 * 65)
+            .map(|index| (f64::from(index) * 0.1).sin())
+            .collect(),
+        active_cells: None,
+    })
+    .expect("finite benchmark geometry");
+    bencher.bench_local(|| black_box(terrain.sample(black_box(31.2), black_box(20.7))));
+}
