@@ -53,3 +53,20 @@ fn fast_capsule_wedge_sweep(bencher: Bencher) {
         ))
     });
 }
+
+#[divan::bench]
+fn primitive_volume_properties(bencher: Bencher) {
+    let shapes = [
+        PrimitiveShape3::sphere(1.0),
+        PrimitiveShape3::cuboid([1.0, 2.0, 3.0]),
+        PrimitiveShape3::capsule(1000.0, 0.01),
+        PrimitiveShape3::wedge([1.0, 2.0, 3.0]),
+    ];
+    bencher.bench_local(|| {
+        for shape in shapes {
+            let _ = black_box(geometry_kernels::primitive3::try_volume_properties(
+                black_box(shape),
+            ));
+        }
+    });
+}
