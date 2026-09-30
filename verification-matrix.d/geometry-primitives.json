@@ -7,7 +7,9 @@
       "crate": "geometry-kernels",
       "module": "crate::primitive3",
       "sources": [
-        "crates/geometry-kernels/src/primitive3.rs"
+        "crates/geometry-kernels/src/primitive3.rs",
+        "crates/geometry-kernels/src/primitive3/ray.rs",
+        "crates/geometry-kernels/src/primitive3/ray/tests.rs"
       ],
       "oracleDifferential": "partial",
       "propertyMetamorphic": "present",
@@ -20,7 +22,8 @@
         "Every unordered pair executes its registered implementation in direct kernel tests; specialized capsule/wedge cases and CCD regressions are migrated from Physics Engine, while full independent differential fuzz coverage remains follow-up work.",
         "Swapped-order capsule/wedge symmetry and deterministic pair canonicalization provide metamorphic evidence.",
         "Deterministic work counters ratchet SAT axes, wedge vertex tests, support evaluations and bounded sweep iterations independently of wall-clock timing.",
-        "criterion: New developer-facing contact and CCD workloads use Divan in crates/geometry-kernels/benches/primitive3.rs; Criterion is not used for this new suite."
+        "criterion: New developer-facing contact and CCD workloads use Divan in crates/geometry-kernels/benches/primitive3.rs; Criterion is not used for this new suite.",
+        "Analytic f64 segment rays cover all four shapes: 4096 independent occupancy/bisection crossings, simple tangency/endpoint/inside/miss cases, pose and 1e-150..1e150 scale covariance, fixed plane/quadratic work ceilings and Divan complete-call workloads. This does not complete the existing contact-pair independent differential backlog."
       ]
     }
   ]
