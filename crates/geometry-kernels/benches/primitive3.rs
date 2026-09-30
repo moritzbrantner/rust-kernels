@@ -95,3 +95,21 @@ fn capsule_skeleton_contacts(bencher: Bencher) {
         ));
     });
 }
+
+#[divan::bench]
+fn capsule_row_contacts(bencher: Bencher) {
+    let a = PrimitiveBody3::axis_aligned(PrimitiveShape3::capsule(2.0, 0.25), [0.0; 3], [0.0; 3]);
+    let shapes = [
+        PrimitiveShape3::sphere(0.5),
+        PrimitiveShape3::cuboid([0.5, 0.5, 0.5]),
+        PrimitiveShape3::capsule(1.0, 0.5),
+    ];
+    let targets =
+        shapes.map(|shape| PrimitiveBody3::axis_aligned(shape, [1.0, 0.0, 0.0], [0.0; 3]));
+    bencher.bench_local(|| {
+        let mut work = PrimitiveWork3::default();
+        for b in targets {
+            black_box(query(black_box(a), black_box(b), black_box(&mut work)));
+        }
+    });
+}

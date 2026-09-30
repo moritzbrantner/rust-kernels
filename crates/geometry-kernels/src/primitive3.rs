@@ -247,6 +247,12 @@ pub struct PrimitiveWork3 {
     pub axes_tested: u64,
     pub vertex_tests: u64,
     pub sweep_iterations: u64,
+    /// Closest segment/point, segment/segment or segment/box problems evaluated.
+    /// Includes unsuccessful queries; does not count individual scalar operations.
+    pub segment_distance_evaluations: u64,
+    /// Segment endpoint regions, box slabs/breakpoints and distance candidates visited.
+    /// Triangle-only feature work and numerical validation checks are excluded.
+    pub segment_feature_tests: u64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -353,14 +359,14 @@ pub fn query_canonical(
     match pair {
         PrimitivePair3::SphereSphere => sphere_sphere(a, b),
         PrimitivePair3::SphereBox => sphere_box(a, b),
-        PrimitivePair3::SphereCapsule => flip(capsule_sphere(b, a)),
+        PrimitivePair3::SphereCapsule => flip(capsule_sphere(b, a, work)),
         PrimitivePair3::SphereWedge => sphere_wedge(a, b),
         PrimitivePair3::BoxBox | PrimitivePair3::BoxWedge | PrimitivePair3::WedgeWedge => {
             poly_poly(a, b, work)
         }
         PrimitivePair3::BoxCapsule => flip(capsule_box(b, a, work)),
-        PrimitivePair3::CapsuleCapsule => capsule_capsule(a, b),
-        PrimitivePair3::CapsuleWedge => capsule_wedge(a, b),
+        PrimitivePair3::CapsuleCapsule => capsule_capsule(a, b, work),
+        PrimitivePair3::CapsuleWedge => capsule_wedge(a, b, work),
     }
 }
 
@@ -575,9 +581,13 @@ fn capsule_segment(body: PrimitiveBody3) -> (Vec3, Vec3) {
     (sub(body.position, axis), add(body.position, axis))
 }
 
-fn capsule_sphere(capsule: PrimitiveBody3, sphere: PrimitiveBody3) -> PrimitiveContact3 {
+fn capsule_sphere(
+    capsule: PrimitiveBody3,
+    sphere: PrimitiveBody3,
+    work: &mut PrimitiveWork3,
+) -> PrimitiveContact3 {
     let (a, b) = capsule_segment(capsule);
-    let (core, _) = closest_segment_segment(a, b, sphere.position, sphere.position);
+    let (core, _) = closest_segment_segment(a, b, sphere.position, sphere.position, work);
     let delta = sub(sphere.position, core);
     let (_, capsule_radius) = capsule.shape.capsule_parts();
     let sphere_radius = sphere.shape.sphere_radius();
@@ -590,10 +600,14 @@ fn capsule_sphere(capsule: PrimitiveBody3, sphere: PrimitiveBody3) -> PrimitiveC
     }
 }
 
-fn capsule_capsule(a: PrimitiveBody3, b: PrimitiveBody3) -> PrimitiveContact3 {
+fn capsule_capsule(
+    a: PrimitiveBody3,
+    b: PrimitiveBody3,
+    work: &mut PrimitiveWork3,
+) -> PrimitiveContact3 {
     let (a0, a1) = capsule_segment(a);
     let (b0, b1) = capsule_segment(b);
-    let (point_a, point_b) = closest_segment_segment(a0, a1, b0, b1);
+    let (point_a, point_b) = closest_segment_segment(a0, a1, b0, b1, work);
     let delta = sub(point_b, point_a);
     let (_, a_radius) = a.shape.capsule_parts();
     let (_, b_radius) = b.shape.capsule_parts();
@@ -691,7 +705,7 @@ fn capsule_box(
     let local_a = inverse_rotate(box_body.axes, sub(world_a, box_body.position));
     let local_b = inverse_rotate(box_body.axes, sub(world_b, box_body.position));
 
-    if segment_aabb_interval(local_a, local_b, half).is_some() {
+    if segment_aabb_interval(local_a, local_b, half, work).is_some() {
         let capsule_axis = unit_or_zero(sub(local_b, local_a));
         let candidates = [
             [1.0, 0.0, 0.0],
@@ -736,7 +750,7 @@ fn capsule_box(
                 if outward[2] < 0.0 { -half[2] } else { half[2] },
             ];
             let local_core = if (outward_a - outward_b).abs() <= projection_tolerance {
-                closest_point_segment(box_support, local_a, local_b)
+                closest_point_segment(box_support, local_a, local_b, work)
             } else if outward_a < outward_b {
                 local_a
             } else {
@@ -758,7 +772,7 @@ fn capsule_box(
         };
     }
 
-    let (local_core, local_box) = closest_segment_aabb(local_a, local_b, half);
+    let (local_core, local_box) = closest_segment_aabb(local_a, local_b, half, work);
     let core = add(box_body.position, rotate_local(box_body.axes, local_core));
     let point_b = add(box_body.position, rotate_local(box_body.axes, local_box));
     let delta = sub(point_b, core);
@@ -800,7 +814,11 @@ fn sphere_wedge(sphere: PrimitiveBody3, wedge: PrimitiveBody3) -> PrimitiveConta
     }
 }
 
-fn capsule_wedge(capsule: PrimitiveBody3, wedge: PrimitiveBody3) -> PrimitiveContact3 {
+fn capsule_wedge(
+    capsule: PrimitiveBody3,
+    wedge: PrimitiveBody3,
+    work: &mut PrimitiveWork3,
+) -> PrimitiveContact3 {
     let half = wedge.shape.half_extents();
     let (_, radius) = capsule.shape.capsule_parts();
     let (world_a, world_b) = capsule_segment(capsule);
@@ -821,7 +839,7 @@ fn capsule_wedge(capsule: PrimitiveBody3, wedge: PrimitiveBody3) -> PrimitiveCon
         };
     }
 
-    let (local_core, local_wedge) = closest_segment_wedge(local_a, local_b, half);
+    let (local_core, local_wedge) = closest_segment_wedge(local_a, local_b, half, work);
     let core = add(wedge.position, rotate_local(wedge.axes, local_core));
     let point_b = add(wedge.position, rotate_local(wedge.axes, local_wedge));
     let delta = sub(point_b, core);
@@ -1127,7 +1145,7 @@ fn closest_point_wedge(point: Vec3, half: Vec3) -> Vec3 {
     best
 }
 
-fn closest_segment_wedge(a: Vec3, b: Vec3, half: Vec3) -> (Vec3, Vec3) {
+fn closest_segment_wedge(a: Vec3, b: Vec3, half: Vec3, work: &mut PrimitiveWork3) -> (Vec3, Vec3) {
     let mut best = (a, wedge_vertices(half)[0]);
     let mut best_distance = f64::INFINITY;
     for triangle in wedge_triangles(half) {
@@ -1140,7 +1158,7 @@ fn closest_segment_wedge(a: Vec3, b: Vec3, half: Vec3) -> (Vec3, Vec3) {
             (triangle[1], triangle[2]),
             (triangle[2], triangle[0]),
         ] {
-            let candidate = closest_segment_segment(a, b, edge.0, edge.1);
+            let candidate = closest_segment_segment(a, b, edge.0, edge.1, work);
             update_pair(candidate.0, candidate.1, &mut best, &mut best_distance);
         }
     }
@@ -1201,12 +1219,14 @@ fn closest_point_triangle(point: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Vec3 {
     )
 }
 
-fn closest_point_segment(point: Vec3, a: Vec3, b: Vec3) -> Vec3 {
+fn closest_point_segment(point: Vec3, a: Vec3, b: Vec3, work: &mut PrimitiveWork3) -> Vec3 {
+    work.segment_distance_evaluations += 1;
     let delta = sub(b, a);
     let denominator = length_squared(delta);
     if denominator <= 1.0e-20 {
         return a;
     }
+    work.segment_feature_tests += 1;
     let time = (dot(sub(point, a), delta) / denominator).clamp(0.0, 1.0);
     add(a, scale(delta, time))
 }
@@ -1227,7 +1247,7 @@ pub fn closest_segment_points(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> Option<
     {
         return None;
     }
-    let points = closest_segment_segment(p1, q1, p2, q2);
+    let points = closest_segment_segment(p1, q1, p2, q2, &mut PrimitiveWork3::default());
     points
         .0
         .into_iter()
@@ -1236,7 +1256,14 @@ pub fn closest_segment_points(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> Option<
         .then_some(points)
 }
 
-fn closest_segment_segment(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> (Vec3, Vec3) {
+fn closest_segment_segment(
+    p1: Vec3,
+    q1: Vec3,
+    p2: Vec3,
+    q2: Vec3,
+    work: &mut PrimitiveWork3,
+) -> (Vec3, Vec3) {
+    work.segment_distance_evaluations += 1;
     let unscaled_d1 = sub(q1, p1);
     let unscaled_d2 = sub(q2, p2);
     let unscaled_r = sub(p1, p2);
@@ -1262,10 +1289,12 @@ fn closest_segment_segment(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> (Vec3, Vec
         return (p1, p2);
     }
     if a == 0.0 {
+        work.segment_feature_tests += 1;
         let t = (dot(d2, r) / e).clamp(0.0, 1.0);
         return (p1, add(p2, scale(unscaled_d2, t)));
     }
     if e == 0.0 {
+        work.segment_feature_tests += 1;
         let s = (-dot(d1, r) / a).clamp(0.0, 1.0);
         return (add(p1, scale(unscaled_d1, s)), p2);
     }
@@ -1277,17 +1306,24 @@ fn closest_segment_segment(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> (Vec3, Vec
     let normal = cross(d1, d2);
     let denominator = length_squared(normal);
     let mut s = if denominator > 0.0 {
+        work.segment_feature_tests += 1;
         (dot(cross(d2, r), normal) / denominator).clamp(0.0, 1.0)
     } else {
         0.0
     };
     let mut t = (b * s + f) / e;
+    work.segment_feature_tests += 1;
     if t < 0.0 {
+        work.segment_feature_tests += 1;
         t = 0.0;
         s = (-c / a).clamp(0.0, 1.0);
-    } else if t > 1.0 {
-        t = 1.0;
-        s = ((b - c) / a).clamp(0.0, 1.0);
+    } else {
+        work.segment_feature_tests += 1;
+        if t > 1.0 {
+            work.segment_feature_tests += 1;
+            t = 1.0;
+            s = ((b - c) / a).clamp(0.0, 1.0);
+        }
     }
     (
         add(p1, scale(unscaled_d1, s)),
@@ -1295,11 +1331,17 @@ fn closest_segment_segment(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> (Vec3, Vec
     )
 }
 
-fn segment_aabb_interval(a: Vec3, b: Vec3, half: Vec3) -> Option<(f64, f64)> {
+fn segment_aabb_interval(
+    a: Vec3,
+    b: Vec3,
+    half: Vec3,
+    work: &mut PrimitiveWork3,
+) -> Option<(f64, f64)> {
     let delta = sub(b, a);
     let mut enter = 0.0_f64;
     let mut exit = 1.0_f64;
     for axis in 0..3 {
+        work.segment_feature_tests += 1;
         let start = a[axis];
         let velocity = delta[axis];
         let extent = half[axis];
@@ -1320,7 +1362,8 @@ fn segment_aabb_interval(a: Vec3, b: Vec3, half: Vec3) -> Option<(f64, f64)> {
     (exit >= 0.0 && enter <= 1.0).then_some((enter.max(0.0), exit.min(1.0)))
 }
 
-fn closest_segment_aabb(a: Vec3, b: Vec3, half: Vec3) -> (Vec3, Vec3) {
+fn closest_segment_aabb(a: Vec3, b: Vec3, half: Vec3, work: &mut PrimitiveWork3) -> (Vec3, Vec3) {
+    work.segment_distance_evaluations += 1;
     let delta = sub(b, a);
     let mut times = [0.0; 8];
     times[0] = 0.0;
@@ -1332,6 +1375,7 @@ fn closest_segment_aabb(a: Vec3, b: Vec3, half: Vec3) -> (Vec3, Vec3) {
             continue;
         }
         for bound in [-half[axis], half[axis]] {
+            work.segment_feature_tests += 1;
             let time = (bound - a[axis]) / velocity;
             if time > 0.0 && time < 1.0 {
                 times[len] = time;
@@ -1351,13 +1395,15 @@ fn closest_segment_aabb(a: Vec3, b: Vec3, half: Vec3) -> (Vec3, Vec3) {
 
     let mut best = (a, clamp_aabb(a, half));
     let mut best_distance = length_squared(sub(best.1, best.0));
-    let mut evaluate = |time: f64| {
+    work.segment_feature_tests += 1;
+    let mut evaluate = |time: f64, work: &mut PrimitiveWork3| {
+        work.segment_feature_tests += 1;
         let point = add(a, scale(delta, time.clamp(0.0, 1.0)));
         let clamped = clamp_aabb(point, half);
         update_pair(point, clamped, &mut best, &mut best_distance);
     };
     for &time in &times[..len] {
-        evaluate(time);
+        evaluate(time, work);
     }
     for window in times[..len].windows(2) {
         let low = window[0];
@@ -1367,6 +1413,7 @@ fn closest_segment_aabb(a: Vec3, b: Vec3, half: Vec3) -> (Vec3, Vec3) {
         let mut numerator = 0.0;
         let mut denominator = 0.0;
         for axis in 0..3 {
+            work.segment_feature_tests += 1;
             let coordinate = point[axis];
             let bound = if coordinate < -half[axis] {
                 -half[axis]
@@ -1380,7 +1427,7 @@ fn closest_segment_aabb(a: Vec3, b: Vec3, half: Vec3) -> (Vec3, Vec3) {
             denominator += velocity * velocity;
         }
         if denominator > 1.0e-20 {
-            evaluate((-numerator / denominator).clamp(low, high));
+            evaluate((-numerator / denominator).clamp(low, high), work);
         }
     }
     best
