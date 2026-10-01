@@ -1,9 +1,32 @@
 use divan::{Bencher, black_box};
+use geometry_kernels::primitive3::{
+    PrimitiveBody3, PrimitiveRayWork3, PrimitiveShape3, try_ray_cast,
+};
 use geometry_kernels::{Ray3, Sphere, ray_aabb, ray_sphere, sphere_sphere_time_of_impact};
 use spatial_kernels::Aabb;
 
 fn main() {
     divan::main();
+}
+
+#[divan::bench(args = [0, 1, 2, 3])]
+fn f64_primitive_segment_ray(bencher: Bencher, kind: u8) {
+    let shape = match kind {
+        0 => PrimitiveShape3::sphere(1.0),
+        1 => PrimitiveShape3::cuboid([1.0; 3]),
+        2 => PrimitiveShape3::capsule(2.0, 1.0),
+        _ => PrimitiveShape3::wedge([1.0; 3]),
+    };
+    let body = PrimitiveBody3::axis_aligned(shape, [0.0; 3], [0.0; 3]);
+    bencher.bench_local(|| {
+        let mut work = PrimitiveRayWork3::default();
+        black_box(try_ray_cast(
+            black_box(body),
+            [-3.0, -0.5, 0.0],
+            [6.0, 0.0, 0.0],
+            &mut work,
+        ))
+    });
 }
 
 fn boxes(n: usize) -> Vec<Aabb> {

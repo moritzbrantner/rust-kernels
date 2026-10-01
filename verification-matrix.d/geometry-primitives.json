@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "issue": 52,
+  "kernels": [
+    {
+      "id": "f64-fixed-orientation-primitives",
+      "crate": "geometry-kernels",
+      "module": "crate::primitive3",
+      "sources": [
+        "crates/geometry-kernels/src/primitive3.rs",
+        "crates/geometry-kernels/src/primitive3/ray.rs",
+        "crates/geometry-kernels/src/primitive3/ray/tests.rs",
+        "crates/geometry-kernels/src/primitive3/volume.rs"
+      ],
+      "oracleDifferential": "partial",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "Every unordered pair executes its registered implementation in direct kernel tests; specialized capsule/wedge cases and CCD regressions are migrated from Physics Engine, while full independent differential fuzz coverage remains follow-up work.",
+        "Swapped-order capsule/wedge symmetry and deterministic pair canonicalization provide metamorphic evidence.",
+        "Deterministic work counters ratchet SAT axes, wedge vertex tests, support evaluations and bounded sweep iterations independently of wall-clock timing.",
+        "criterion: New developer-facing contact and CCD workloads use Divan in crates/geometry-kernels/benches/primitive3.rs; Criterion is not used for this new suite.",
+        "Analytic f64 segment rays cover all four shapes: 4096 independent occupancy/bisection crossings, simple tangency/endpoint/inside/miss cases, pose and 1e-150..1e150 scale covariance, fixed plane/quadratic work ceilings and Divan complete-call workloads. This does not complete the existing contact-pair independent differential backlog.",
+        "Uniform volume/centroid/normalized central moment products use independent capsule slice and wedge tetrahedron integration, sphere/box limits and scale covariance. A 4096-query Cargo-native allocation ratchet reports zero allocations/reallocations; fixed scalar formulas require no scratch. Divan measures complete mixed calls. This geometric-integral evidence does not complete contact-pair differential coverage.",
+        "Capsule skeleton-intersection normal repair uses independent support-plane clearance certificates, 1024 seeded rotated intersections, near-parallel/collapsed/short skeleton cases and resolved-miss preservation. A 4096-query allocation ratchet reports zero allocations/reallocations; Divan measures two complete degenerate contact calls. Existing dispatch/support counters do not count internal segment-distance operations; this bounded defect repair does not complete contact-row differential/work acceptance.",
+        "Capsule sphere/box/capsule row: 2304 deterministic seeded and 540 edge cases use an independent 80-step convex distance minimizer and support-plane penetration clearance in both orders. Generic GJK outcomes are counted explicitly; unresolved probes are checked by the independent oracle, never relabeled converged. 108 translated thin-obstacle sweeps use independent static-distance bisection. Actual segment-distance/feature counters fence one sphere/capsule problem, at most six capsule/box problems and 46 box feature visits; a maximal-breakpoint fixture reaches 46. 6144 mixed warmed calls allocate/reallocate zero times; Divan measures three complete row calls. Other primitive-row independent differential coverage remains partial."
+      ]
+    }
+  ]
+}

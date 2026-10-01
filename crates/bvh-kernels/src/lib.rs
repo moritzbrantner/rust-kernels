@@ -90,7 +90,21 @@ impl StaticBvh {
     /// Returns every overlapping collider pair exactly once in canonical order.
     #[must_use]
     pub fn overlapping_pairs(&self) -> Vec<Pair> {
-        self.overlapping_pairs_with_tests().0
+        self.overlapping_pairs_result().pairs
+    }
+
+    /// Returns exact overlap pairs plus deterministic broad-phase work counters
+    /// for the current retained tree state.
+    #[must_use]
+    pub fn overlapping_pairs_result(&self) -> BroadPhaseResult {
+        let (pairs, aabb_tests) = self.overlapping_pairs_with_tests();
+        BroadPhaseResult {
+            pairs,
+            stats: BroadPhaseStats {
+                aabb_tests,
+                occupied_cells: None,
+            },
+        }
     }
 
     fn overlapping_pairs_with_tests(&self) -> (Vec<Pair>, u64) {
@@ -440,63 +454,112 @@ impl DynamicAabbTree {
 
     #[must_use]
     pub fn overlapping_pairs(&self) -> Vec<Pair> {
-        self.overlapping_pairs_with_tests().0
+        self.overlapping_pairs_result().pairs
+    }
+
+    /// Returns exact overlap pairs plus deterministic broad-phase work counters
+    /// for the current retained tree state.
+    #[must_use]
+    pub fn overlapping_pairs_result(&self) -> BroadPhaseResult {
+        let (pairs, aabb_tests) = self.overlapping_pairs_with_tests();
+        BroadPhaseResult {
+            pairs,
+            stats: BroadPhaseStats {
+                aabb_tests,
+                occupied_cells: None,
+            },
+        }
     }
 
     fn overlapping_pairs_with_tests(&self) -> (Vec<Pair>, u64) {
         let Some(root) = self.root else {
             return (Vec::new(), 0);
         };
-        let mut bodies: Vec<_> = self
-            .leaves
-            .values()
-            .map(|&index| self.node(index).body.expect("leaf must contain a body"))
-            .collect();
-        bodies.sort_unstable_by_key(|body| body.id);
 
         let mut pairs = Vec::new();
         let mut aabb_tests = 0_u64;
-        for body in bodies {
-            self.collect_pairs_for(root, body, &mut pairs, &mut aabb_tests);
-        }
+        self.collect_within_dynamic(root, &mut pairs, &mut aabb_tests);
         pairs.sort_unstable();
         (pairs, aabb_tests)
     }
 
-    fn collect_pairs_for(
+    fn collect_within_dynamic(
         &self,
-        index: usize,
-        query: Body,
+        node_index: usize,
         pairs: &mut Vec<Pair>,
         aabb_tests: &mut u64,
     ) {
-        let node = self.node(index);
-        if !node.bounds.overlaps(query.aabb) {
-            return;
-        }
-        if let Some(body) = node.body {
-            if body.id <= query.id {
-                return;
-            }
-            *aabb_tests += 1;
-            if body.aabb.overlaps(query.aabb) {
-                pairs.push(Pair::new(query.id, body.id));
-            }
+        let node = self.node(node_index);
+        if node.is_leaf() {
             return;
         }
 
-        self.collect_pairs_for(
-            node.left.expect("branch must have left child"),
-            query,
-            pairs,
-            aabb_tests,
-        );
-        self.collect_pairs_for(
-            node.right.expect("branch must have right child"),
-            query,
-            pairs,
-            aabb_tests,
-        );
+        let left = node.left.expect("branch must have left child");
+        let right = node.right.expect("branch must have right child");
+        self.collect_within_dynamic(left, pairs, aabb_tests);
+        self.collect_within_dynamic(right, pairs, aabb_tests);
+        self.collect_cross_dynamic(left, right, pairs, aabb_tests);
+    }
+
+    fn collect_cross_dynamic(
+        &self,
+        left_index: usize,
+        right_index: usize,
+        pairs: &mut Vec<Pair>,
+        aabb_tests: &mut u64,
+    ) {
+        let left_node = self.node(left_index);
+        let right_node = self.node(right_index);
+        if !left_node.bounds.overlaps(right_node.bounds) {
+            return;
+        }
+
+        match (left_node.body, right_node.body) {
+            (Some(left), Some(right)) => {
+                *aabb_tests += 1;
+                if left.aabb.overlaps(right.aabb) {
+                    pairs.push(Pair::new(left.id, right.id));
+                }
+            }
+            (None, Some(_)) => {
+                self.collect_cross_dynamic(
+                    left_node.left.expect("branch must have left child"),
+                    right_index,
+                    pairs,
+                    aabb_tests,
+                );
+                self.collect_cross_dynamic(
+                    left_node.right.expect("branch must have right child"),
+                    right_index,
+                    pairs,
+                    aabb_tests,
+                );
+            }
+            (Some(_), None) => {
+                self.collect_cross_dynamic(
+                    left_index,
+                    right_node.left.expect("branch must have left child"),
+                    pairs,
+                    aabb_tests,
+                );
+                self.collect_cross_dynamic(
+                    left_index,
+                    right_node.right.expect("branch must have right child"),
+                    pairs,
+                    aabb_tests,
+                );
+            }
+            (None, None) => {
+                let left_left = left_node.left.expect("branch must have left child");
+                let left_right = left_node.right.expect("branch must have right child");
+                let right_left = right_node.left.expect("branch must have left child");
+                let right_right = right_node.right.expect("branch must have right child");
+                self.collect_cross_dynamic(left_left, right_left, pairs, aabb_tests);
+                self.collect_cross_dynamic(left_left, right_right, pairs, aabb_tests);
+                self.collect_cross_dynamic(left_right, right_left, pairs, aabb_tests);
+                self.collect_cross_dynamic(left_right, right_right, pairs, aabb_tests);
+            }
+        }
     }
 
     fn insert_leaf(&mut self, leaf: usize) {
@@ -777,14 +840,7 @@ impl BroadPhase for DynamicAabbTreeBroadPhase {
         for body in ordered {
             tree.insert(body);
         }
-        let (pairs, aabb_tests) = tree.overlapping_pairs_with_tests();
-        BroadPhaseResult {
-            pairs,
-            stats: BroadPhaseStats {
-                aabb_tests,
-                occupied_cells: None,
-            },
-        }
+        tree.overlapping_pairs_result()
     }
 }
 
@@ -911,6 +967,21 @@ mod tests {
         assert_eq!(bvh.pairs, naive.pairs);
         assert!(bvh.stats.aabb_tests < naive.stats.aabb_tests / 10);
         assert_eq!(naive.stats.aabb_tests, 4_950);
+    }
+
+    #[test]
+    fn retained_result_matches_snapshot_adapter_work_and_pairs() {
+        let bodies = fixture();
+        let margin = 0.75;
+        let mut tree = DynamicAabbTree::new(margin);
+        for body in &bodies {
+            tree.insert(*body);
+        }
+
+        let retained = tree.overlapping_pairs_result();
+        let snapshot = DynamicAabbTreeBroadPhase::new(margin).detect(&bodies);
+        assert_eq!(retained, snapshot);
+        assert_eq!(tree.overlapping_pairs(), retained.pairs);
     }
 
     #[test]
@@ -1043,6 +1114,40 @@ mod tests {
                 "step {step}"
             );
         }
+    }
+
+    #[test]
+    fn dynamic_pair_traversal_matches_naive_for_clustered_scene() {
+        let bodies: Vec<_> = (0..512)
+            .map(|id| {
+                let cluster = id % 8;
+                let local = id / 8;
+                let base = [
+                    if cluster & 1 == 0 { -40.0 } else { 40.0 },
+                    if cluster & 2 == 0 { -40.0 } else { 40.0 },
+                    if cluster & 4 == 0 { -40.0 } else { 40.0 },
+                ];
+                let offset = [
+                    (local % 4) as f32 * 0.8,
+                    ((local / 4) % 4) as f32 * 0.8,
+                    (local / 16) as f32 * 0.8,
+                ];
+                body(
+                    id,
+                    [
+                        base[0] + offset[0],
+                        base[1] + offset[1],
+                        base[2] + offset[2],
+                    ],
+                    0.5,
+                )
+            })
+            .collect();
+
+        let naive = NaiveBroadPhase.detect(&bodies);
+        let dynamic = DynamicAabbTreeBroadPhase::new(1.25).detect(&bodies);
+        assert_eq!(dynamic.pairs, naive.pairs);
+        assert!(dynamic.stats.aabb_tests < naive.stats.aabb_tests / 4);
     }
 
     #[test]

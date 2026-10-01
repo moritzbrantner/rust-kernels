@@ -1,0 +1,130 @@
+use divan::{Bencher, black_box};
+use geometry_kernels::primitive3::{
+    PrimitiveBody3, PrimitiveShape3, PrimitiveWork3, query, swept_time,
+};
+
+fn main() {
+    divan::main();
+}
+
+fn capsule() -> PrimitiveBody3 {
+    PrimitiveBody3::axis_aligned(PrimitiveShape3::capsule(2.0, 0.5), [0.0; 3], [0.0; 3])
+}
+
+fn wedge() -> PrimitiveBody3 {
+    PrimitiveBody3::axis_aligned(
+        PrimitiveShape3::wedge([2.0, 2.0, 2.0]),
+        [1.0, 0.5, 0.0],
+        [0.0; 3],
+    )
+}
+
+#[divan::bench]
+fn capsule_wedge_contact(bencher: Bencher) {
+    let capsule = capsule();
+    let wedge = wedge();
+    bencher.bench_local(|| {
+        let mut work = PrimitiveWork3::default();
+        black_box(query(
+            black_box(capsule),
+            black_box(wedge),
+            black_box(&mut work),
+        ))
+    });
+}
+
+#[divan::bench]
+fn fast_capsule_wedge_sweep(bencher: Bencher) {
+    let moving = PrimitiveBody3::axis_aligned(
+        PrimitiveShape3::capsule(0.5, 0.1),
+        [-1.0, -1.0, 10.0],
+        [0.0, 0.0, -10_000.0],
+    );
+    let target =
+        PrimitiveBody3::axis_aligned(PrimitiveShape3::wedge([4.0, 4.0, 0.02]), [0.0; 3], [0.0; 3]);
+    bencher.bench_local(|| {
+        let mut work = PrimitiveWork3::default();
+        black_box(swept_time(
+            black_box(moving),
+            black_box(target),
+            black_box(1.0 / 60.0),
+            black_box(0.02),
+            black_box(&mut work),
+        ))
+    });
+}
+
+#[divan::bench]
+fn primitive_volume_properties(bencher: Bencher) {
+    let shapes = [
+        PrimitiveShape3::sphere(1.0),
+        PrimitiveShape3::cuboid([1.0, 2.0, 3.0]),
+        PrimitiveShape3::capsule(1000.0, 0.01),
+        PrimitiveShape3::wedge([1.0, 2.0, 3.0]),
+    ];
+    bencher.bench_local(|| {
+        for shape in shapes {
+            let _ = black_box(geometry_kernels::primitive3::try_volume_properties(
+                black_box(shape),
+            ));
+        }
+    });
+}
+
+#[divan::bench]
+fn capsule_skeleton_contacts(bencher: Bencher) {
+    let capsule =
+        PrimitiveBody3::axis_aligned(PrimitiveShape3::capsule(5.0, 0.5), [0.0; 3], [0.0; 3]);
+    let sphere =
+        PrimitiveBody3::axis_aligned(PrimitiveShape3::sphere(0.25), [0.0, 2.0, 0.0], [0.0; 3]);
+    let crossing = PrimitiveBody3 {
+        axes: [[0.0, 1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, -1.0]],
+        ..capsule
+    };
+    bencher.bench_local(|| {
+        let mut work = PrimitiveWork3::default();
+        black_box(query(
+            black_box(capsule),
+            black_box(sphere),
+            black_box(&mut work),
+        ));
+        black_box(query(
+            black_box(capsule),
+            black_box(crossing),
+            black_box(&mut work),
+        ));
+    });
+}
+
+#[divan::bench]
+fn capsule_row_contacts(bencher: Bencher) {
+    let a = PrimitiveBody3::axis_aligned(PrimitiveShape3::capsule(2.0, 0.25), [0.0; 3], [0.0; 3]);
+    let shapes = [
+        PrimitiveShape3::sphere(0.5),
+        PrimitiveShape3::cuboid([0.5, 0.5, 0.5]),
+        PrimitiveShape3::capsule(1.0, 0.5),
+    ];
+    let targets =
+        shapes.map(|shape| PrimitiveBody3::axis_aligned(shape, [1.0, 0.0, 0.0], [0.0; 3]));
+    bencher.bench_local(|| {
+        let mut work = PrimitiveWork3::default();
+        for b in targets {
+            black_box(query(black_box(a), black_box(b), black_box(&mut work)));
+        }
+    });
+}
+
+#[divan::bench]
+fn prepared_heightfield_surface_query(bencher: Bencher) {
+    use geometry_kernels::heightfield::{HeightfieldData3, PreparedHeightfield3};
+    let terrain = PreparedHeightfield3::try_new(HeightfieldData3 {
+        columns: (0..65).map(f64::from).collect(),
+        rows: (0..65).map(f64::from).collect(),
+        heights: (0..65 * 65)
+            .map(|index| (f64::from(index) * 0.1).sin())
+            .collect(),
+        active_cells: None,
+    })
+    .expect("finite benchmark geometry");
+    bencher.bench_local(|| black_box(terrain.sample(black_box(31.2), black_box(20.7))));
+}

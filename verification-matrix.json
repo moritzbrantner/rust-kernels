@@ -500,6 +500,26 @@
       ]
     },
     {
+      "id": "gjk-closest-distance-3d",
+      "crate": "geometry-kernels",
+      "module": "crate::gjk_distance",
+      "sources": [
+        "crates/geometry-kernels/src/gjk_distance.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "Analytic sphere/sphere and capsule/sphere distances plus diagonal AABB closest-corner distance provide independent oracle evidence.",
+        "Swapped-shape symmetry, touching/intersection classification, deterministic replay, and inconclusive-prepass refinement are covered.",
+        "criterion: this is a bounded reusable correctness/reference kernel; dedicated deterministic performance evidence will be added when a consumer workload establishes representative hot-path shapes."
+      ]
+    },
+    {
       "id": "geometry-math3",
       "crate": "geometry-kernels",
       "module": "crate::math3",
