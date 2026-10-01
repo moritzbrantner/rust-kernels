@@ -46,11 +46,7 @@ fn reduced_skew_lattice<const N: usize>(
 
 #[inline]
 fn needs_skew_reduction<const N: usize>(coordinates: [f64; N]) -> bool {
-    coordinates
-        .into_iter()
-        .map(f64::abs)
-        .fold(0.0, f64::max)
-        > SKEW_REDUCTION_THRESHOLD
+    coordinates.into_iter().map(f64::abs).fold(0.0, f64::max) > SKEW_REDUCTION_THRESHOLD
 }
 
 const GRADIENTS_3D: [[f64; 3]; 12] = [
@@ -236,48 +232,47 @@ pub fn simplex4(permutation: &Permutation, x: f64, y: f64, z: f64, w: f64) -> f6
         "Simplex coordinates must be finite"
     );
 
-    let (ii, jj, kk, ll, x0, y0, z0, w0) =
-        if needs_skew_reduction([x, y, z, w]) {
-            let (cells, origin) = reduced_skew_lattice([x, y, z, w], F4, G4);
-            (
-                cells[0], cells[1], cells[2], cells[3], origin[0], origin[1], origin[2], origin[3],
-            )
-        } else {
-            let sum = x + y + z + w;
-            assert!(sum.is_finite(), "Simplex skew transform must remain finite");
-            let skew = sum * F4;
-            let skewed_x = x + skew;
-            let skewed_y = y + skew;
-            let skewed_z = z + skew;
-            let skewed_w = w + skew;
-            assert!(
-                skewed_x.is_finite()
-                    && skewed_y.is_finite()
-                    && skewed_z.is_finite()
-                    && skewed_w.is_finite(),
-                "Simplex skew transform must remain finite"
-            );
-            let i = skewed_x.floor();
-            let j = skewed_y.floor();
-            let k = skewed_z.floor();
-            let l = skewed_w.floor();
-            let lattice_sum = i + j + k + l;
-            assert!(
-                lattice_sum.is_finite(),
-                "Simplex skew transform must remain finite"
-            );
-            let unskew = lattice_sum * G4;
-            (
-                lattice_index(i),
-                lattice_index(j),
-                lattice_index(k),
-                lattice_index(l),
-                x - i + unskew,
-                y - j + unskew,
-                z - k + unskew,
-                w - l + unskew,
-            )
-        };
+    let (ii, jj, kk, ll, x0, y0, z0, w0) = if needs_skew_reduction([x, y, z, w]) {
+        let (cells, origin) = reduced_skew_lattice([x, y, z, w], F4, G4);
+        (
+            cells[0], cells[1], cells[2], cells[3], origin[0], origin[1], origin[2], origin[3],
+        )
+    } else {
+        let sum = x + y + z + w;
+        assert!(sum.is_finite(), "Simplex skew transform must remain finite");
+        let skew = sum * F4;
+        let skewed_x = x + skew;
+        let skewed_y = y + skew;
+        let skewed_z = z + skew;
+        let skewed_w = w + skew;
+        assert!(
+            skewed_x.is_finite()
+                && skewed_y.is_finite()
+                && skewed_z.is_finite()
+                && skewed_w.is_finite(),
+            "Simplex skew transform must remain finite"
+        );
+        let i = skewed_x.floor();
+        let j = skewed_y.floor();
+        let k = skewed_z.floor();
+        let l = skewed_w.floor();
+        let lattice_sum = i + j + k + l;
+        assert!(
+            lattice_sum.is_finite(),
+            "Simplex skew transform must remain finite"
+        );
+        let unskew = lattice_sum * G4;
+        (
+            lattice_index(i),
+            lattice_index(j),
+            lattice_index(k),
+            lattice_index(l),
+            x - i + unskew,
+            y - j + unskew,
+            z - k + unskew,
+            w - l + unskew,
+        )
+    };
 
     let [rank_x, rank_y, rank_z, rank_w] = simplex4_ranks(x0, y0, z0, w0);
     let first = [
@@ -497,7 +492,10 @@ mod tests {
         // Independently derived by reducing the exact f64 skew-lattice
         // coordinates modulo the 256-entry permutation period and sampling
         // the equivalent moderate-coordinate representatives.
-        assert_close(simplex2(&permutation, 1.0e17, 0.25), 0.005_264_632_844_718_684);
+        assert_close(
+            simplex2(&permutation, 1.0e17, 0.25),
+            0.005_264_632_844_718_684,
+        );
         assert_close(
             simplex3(&permutation, 1.0e17, 0.25, -0.5),
             -0.038_847_381_465_779_415,
