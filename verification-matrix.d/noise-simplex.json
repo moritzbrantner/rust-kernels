@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "issue": 52,
+  "kernels": [
+    {
+      "id": "simplex-noise",
+      "crate": "noise-kernels",
+      "module": "crate::simplex2 / simplex3 / simplex4",
+      "sources": [
+        "crates/noise-kernels/src/simplex.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "A generic fixed-array corner-order oracle independently derives simplex corner traversal and matches optimized 2D/3D/4D sampling across generated coordinates and multiple seeds.",
+        "Unit regressions pin seeded fixtures across negative and large coordinates, including asymmetric 1e17 inputs whose independently derived reduced-lattice oracle preserves local detail, plus origin behavior, 4D variation, and non-finite rejection. A dedicated allocation regression executes 1,024 samples in each dimension with zero allocation or reallocation calls.",
+        "criterion: New allocation-profiled Divan workloads cover scattered and coherent/time-slice 2D, 3D, and 4D sampling at multiple sizes."
+      ]
+    }
+  ]
+}

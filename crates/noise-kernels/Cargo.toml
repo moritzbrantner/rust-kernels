@@ -14,3 +14,7 @@ divan = "=0.1.21"
 [[bench]]
 name = "perlin"
 harness = false
+
+[[bench]]
+name = "simplex"
+harness = false
