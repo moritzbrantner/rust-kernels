@@ -465,7 +465,11 @@ mod tests {
     }
 
     /// Independent oracle: intersect the supporting plane, then classify the
-    /// point with signed sub-triangle areas.
+    /// point with signed sub-triangle areas. Returns the signed plane
+    /// parameter and the signed, unclamped weights whether or not the point
+    /// is inside, so disagreements can be judged from the oracle's own data
+    /// rather than from the kernel's clamped output. `None` only for
+    /// degenerate triangles and (near-)parallel rays.
     fn plane_area_oracle(ray: Ray3, triangle: [[f32; 3]; 3]) -> Option<(f64, [f64; 3], bool)> {
         let [a, b, c] = triangle.map(|corner| corner.map(f64::from));
         let normal = cross(sub(b, a), sub(c, a));
@@ -478,17 +482,11 @@ mod tests {
             return None;
         }
         let distance = dot(sub(a, ray.origin64()), normal) / along;
-        if distance < 0.0 {
-            return None;
-        }
-        let point = ray.at(distance);
+        let point = add(ray.origin64(), scale(ray.direction(), distance));
         let weight =
             |p: Vec3, q: Vec3| dot(cross(sub(q, p), sub(point, p)), normal) / (area * area);
         let weights = [weight(b, c), weight(c, a), weight(a, b)];
-        weights
-            .iter()
-            .all(|weight| *weight >= 0.0)
-            .then_some((distance, weights, along < 0.0))
+        Some((distance, weights, along < 0.0))
     }
 
     #[test]
@@ -509,11 +507,19 @@ mod tests {
                 continue;
             }
             let ray = Ray3::new(origin, direction);
-            let expected = plane_area_oracle(ray, triangle);
+            let oracle = plane_area_oracle(ray, triangle);
+            let expected = oracle.filter(|(distance, weights, _)| {
+                *distance >= 0.0 && weights.iter().all(|weight| *weight >= 0.0)
+            });
             let actual = ray_triangle(ray, triangle, f64::INFINITY, TriangleCulling::None);
-            // Skip inputs within rounding of an edge or of parallel, where
-            // the two formulations may legitimately disagree.
+            // Inputs within rounding of an edge, of the origin or of parallel
+            // may legitimately disagree. Judge that from the oracle's signed,
+            // unclamped data: the kernel clamps its own weights and distance,
+            // so they always look near-boundary.
             let near_boundary = |weights: [f64; 3]| weights.iter().any(|w| w.abs() < 1.0e-6);
+            let barely_outside = |distance: f64, weights: [f64; 3]| {
+                distance >= -1.0e-9 && weights.iter().all(|w| *w >= -1.0e-6)
+            };
             match (actual, expected) {
                 (Some(actual), Some((distance, weights, front))) => {
                     hits += 1;
@@ -527,10 +533,14 @@ mod tests {
                     assert_eq!(actual.facing == TriangleFacing::Front, front);
                 }
                 (None, None) => {}
-                (Some(actual), None) => assert!(
-                    near_boundary(actual.barycentric),
-                    "kernel hit, oracle missed: {ray:?} {triangle:?}"
-                ),
+                (Some(_), None) => match oracle {
+                    // Parallel within the oracle's coarser cutoff.
+                    None => {}
+                    Some((distance, weights, _)) => assert!(
+                        barely_outside(distance, weights),
+                        "kernel hit, oracle missed by {distance} {weights:?}: {ray:?} {triangle:?}"
+                    ),
+                },
                 (None, Some((_, weights, _))) => assert!(
                     near_boundary(weights),
                     "oracle hit, kernel missed: {ray:?} {triangle:?}"
