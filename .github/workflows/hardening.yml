@@ -17,6 +17,10 @@ jobs:
     name: Declared MSRV (Rust 1.85.0)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # No Cargo.lock is committed, so resolve to the newest versions that still support the
+      # declared rust-version instead of failing on releases that raised their MSRV.
+      CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: fallback
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
