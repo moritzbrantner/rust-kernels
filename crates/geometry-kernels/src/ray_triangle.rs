@@ -13,8 +13,10 @@
 //! - **Boundaries are inclusive.** Hits exactly on an edge or a vertex, at
 //!   distance zero (origin on the triangle) and exactly at the maximum
 //!   distance (segment endpoints) count. The tests run in f64 after
-//!   widening the f32 inputs and admit each quantity within a bound on its
-//!   own rounding error (then clamp), so such hits are not lost to rounding;
+//!   widening the f32 inputs and admit each signed triple-product numerator
+//!   within a componentwise bound on its rounding error (then clamp), so
+//!   such hits are not lost to rounding while points outside by more than
+//!   rounding still miss;
 //!   results are deterministic. Segments are intersected along their raw
 //!   vector, so the endpoint bound is compared in fraction space.
 //! - **Parallel rays miss.** A ray whose direction lies in the triangle's
@@ -148,15 +150,32 @@ fn ray_triangle_f64(
     })
 }
 
-/// Rounding allowance, in units of each quantity's own error scale, for the
-/// inclusive boundary tests (vertices, edges, distance zero and the bound).
-const BOUNDARY_TOLERANCE: f64 = 8.0 * f64::EPSILON;
+/// Rounding allowance for the inclusive boundary tests (vertices, edges,
+/// distance zero and the bound), in units of a triple product's componentwise
+/// magnitude (see [`triple_magnitude`]). Forming the differences, the cross
+/// product and the dot product perturbs a computed triple product by at most
+/// about `8 ε` of that magnitude; twice that keeps every exact boundary hit.
+const BOUNDARY_TOLERANCE: f64 = 16.0 * f64::EPSILON;
+
+/// `Σ |x_i| (|y_j| |z_k| + |y_k| |z_j|)`: the componentwise magnitude of the
+/// triple product `x · (y × z)`. Its rounding error is proportional to this
+/// sum, not to `|x| |y × z|`, so terms that cancel exactly (an origin on a
+/// vertex) and components that do not take part (near-parallel rays) get the
+/// allowance they actually need.
+fn triple_magnitude(x: Vec3, y: Vec3, z: Vec3) -> f64 {
+    let [x, y, z] = [x, y, z].map(|vector| vector.map(f64::abs));
+    x[0] * (y[1] * z[2] + y[2] * z[1])
+        + x[1] * (y[2] * z[0] + y[0] * z[2])
+        + x[2] * (y[0] * z[1] + y[1] * z[0])
+}
 
 /// Möller–Trumbore along `direction` (any non-zero length): the hit
 /// parameter in units of `direction`, within `[0, max_parameter]`, with
-/// barycentric weights and facing. Boundary admission allows for the
-/// rounding of each term, then clamps, so hits exactly on vertices, edges,
-/// the origin or the bound are kept.
+/// barycentric weights and facing. Each inclusion test compares a signed
+/// triple-product numerator against the determinant with a componentwise
+/// rounding bound, then clamps, so hits exactly on vertices, edges, the
+/// origin or the bound are kept while points outside by more than rounding
+/// still miss.
 fn intersect(
     origin: Vec3,
     direction: Vec3,
@@ -190,35 +209,41 @@ fn intersect(
     if culling == TriangleCulling::BackFaces && facing == TriangleFacing::Back {
         return None;
     }
-    let inverse = determinant.recip();
+    let sign = determinant.signum();
     let to_origin = sub(origin, a);
     let q = cross(to_origin, edge_ab);
-    let norm = |vector: Vec3| length_squared(vector).sqrt();
-    // Each quotient's rounding error is bounded by its numerator's magnitude.
-    let u_error = BOUNDARY_TOLERANCE * norm(to_origin) * norm(p) * inverse.abs();
-    let v_error = BOUNDARY_TOLERANCE * direction_length * norm(q) * inverse.abs();
-    let t_error = BOUNDARY_TOLERANCE * norm(edge_ac) * norm(q) * inverse.abs();
-    let mut u = dot(to_origin, p) * inverse;
-    let mut v = dot(direction, q) * inverse;
-    if u < -u_error || v < -v_error || u + v > 1.0 + u_error + v_error {
+    // Numerators of u, v and the parameter, oriented so inside is >= 0,
+    // with their rounding bounds.
+    let u_numerator = sign * dot(to_origin, p);
+    let v_numerator = sign * dot(direction, q);
+    let t_numerator = sign * dot(edge_ac, q);
+    let determinant = determinant.abs();
+    let determinant_error = BOUNDARY_TOLERANCE * triple_magnitude(edge_ab, direction, edge_ac);
+    let u_error = BOUNDARY_TOLERANCE * triple_magnitude(to_origin, direction, edge_ac);
+    let v_error = BOUNDARY_TOLERANCE * triple_magnitude(direction, to_origin, edge_ab);
+    let t_error = BOUNDARY_TOLERANCE * triple_magnitude(edge_ac, to_origin, edge_ab);
+    if u_numerator < -u_error
+        || v_numerator < -v_error
+        || determinant - u_numerator - v_numerator < -(determinant_error + u_error + v_error)
+        || t_numerator < -t_error
+    {
         return None;
     }
-    let parameter = dot(edge_ac, q) * inverse;
-    if parameter < -t_error || parameter > max_parameter + t_error {
+    if max_parameter.is_finite()
+        && max_parameter * determinant - t_numerator
+            < -(max_parameter * determinant_error + t_error)
+    {
         return None;
     }
-    u = u.max(0.0);
-    v = v.max(0.0);
+    let mut u = (u_numerator / determinant).max(0.0);
+    let mut v = (v_numerator / determinant).max(0.0);
     if u + v > 1.0 {
         let sum = u + v;
         u /= sum;
         v /= sum;
     }
-    Some((
-        parameter.clamp(0.0, max_parameter),
-        [(1.0 - u - v).max(0.0), u, v],
-        facing,
-    ))
+    let parameter = (t_numerator / determinant).clamp(0.0, max_parameter);
+    Some((parameter, [(1.0 - u - v).max(0.0), u, v], facing))
 }
 
 #[cfg(test)]
@@ -226,6 +251,47 @@ mod tests {
     use super::*;
 
     const TRIANGLE: [[f32; 3]; 3] = [[0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0]];
+
+    #[test]
+    fn near_parallel_rays_outside_the_triangle_miss() {
+        // Beyond the parallel cutoff, but u = -0.1: a norm-based allowance
+        // would admit this as a distance-zero hit.
+        let hit = intersect(
+            [-0.1, 0.5, 0.0],
+            [1.0, 0.0, -4e-15],
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            f64::INFINITY,
+            TriangleCulling::None,
+        );
+        assert!(hit.is_none(), "{hit:?}");
+    }
+
+    #[test]
+    fn origins_on_vertices_of_ill_conditioned_triangles_hit_at_zero() {
+        let triangle = [
+            [9.8e-6, -9e-10, 9000.0],
+            [6.8e-24, 4.9e-25, 2.7e-32],
+            [0.0, 0.0, 0.0],
+        ];
+        for direction in [[4e15, -7.9e-5, 9.4e19], [-4e15, 7.9e-5, -9.4e19]] {
+            let (parameter, barycentric, _) = intersect(
+                [0.0, 0.0, 0.0],
+                direction,
+                triangle,
+                f64::INFINITY,
+                TriangleCulling::None,
+            )
+            .expect("origin on vertex c is a distance-zero hit");
+            // The exact parameter is 0; this triangle is so ill-conditioned
+            // that only a rounding-sized parameter can be resolved.
+            assert!((0.0..1e-18).contains(&parameter), "{parameter}");
+            assert!(
+                barycentric
+                    .iter()
+                    .all(|weight| (0.0..=1.0).contains(weight))
+            );
+        }
+    }
 
     fn down(x: f32, y: f32) -> Ray3 {
         Ray3::new([x, y, 3.0], [0.0, 0.0, -1.0])
