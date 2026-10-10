@@ -297,3 +297,34 @@ fn gcd(mut x: i64, mut y: i64) -> i64 {
     }
     x
 }
+
+#[test]
+fn issue_143_segment_endpoint_survives_subtraction_rounding() {
+    // `end - start` rounds the z tail away (f32::MAX vs. the smallest subnormal), but the
+    // closed segment still ends exactly on the triangle's plane inside the triangle.
+    let tiny = -f32::from_bits(1);
+    let triangle = [[0.0, 0.0, tiny], [1.0, 0.0, tiny], [0.0, 1.0, tiny]];
+    for start_z in [f32::MAX, 1.0e30, 3.0] {
+        let hit = segment_triangle(
+            [0.25, 0.25, start_z],
+            [0.25, 0.25, tiny],
+            triangle,
+            TriangleCulling::None,
+        )
+        .unwrap_or_else(|| panic!("endpoint on the triangle must hit (start z {start_z})"));
+        assert!(
+            (hit.fraction - 1.0).abs() <= 1.0e-12,
+            "{} start z {start_z}",
+            hit.fraction
+        );
+        assert_eq!(hit.facing, TriangleFacing::Front);
+    }
+    // Stopping short of the plane by the smallest representable step still misses.
+    let short = segment_triangle(
+        [0.25, 0.25, 3.0],
+        [0.25, 0.25, f32::from_bits(1)],
+        triangle,
+        TriangleCulling::None,
+    );
+    assert!(short.is_none(), "{short:?}");
+}
