@@ -12,13 +12,18 @@
 //!   face hits; [`TriangleCulling::None`] reports both with their facing.
 //! - **Boundaries are inclusive.** Hits exactly on an edge or a vertex, at
 //!   distance zero (origin on the triangle) and exactly at the maximum
-//!   distance (segment endpoints) count. The tests run in f64 after
-//!   widening the f32 inputs and admit each signed triple-product numerator
-//!   within a componentwise bound on its rounding error (then clamp), so
-//!   such hits are not lost to rounding while points outside by more than
-//!   rounding still miss;
-//!   results are deterministic. Segments are intersected along their raw
-//!   vector, so the endpoint bound is compared in fraction space.
+//!   distance (segment endpoints) count, and every other point misses. The
+//!   inside, behind-the-origin and beyond-the-bound tests use the exact signs
+//!   of their triple-product numerators for the f64 inputs (the widened f32
+//!   corners and origin, the unit ray direction or the raw segment vector):
+//!   each numerator is computed in f64 and kept when it clears a
+//!   componentwise forward error bound, and is otherwise evaluated exactly
+//!   with error-free transformations (two-sum, two-product) into a
+//!   fixed-size floating-point expansion. The decision is therefore exact
+//!   for ill-conditioned (sliver) triangles too, needs no tolerance, and is
+//!   deterministic. Only the reported distance, point and weights are
+//!   rounded. Segments are intersected along their raw vector, so the
+//!   endpoint bound is compared in fraction space.
 //! - **Parallel rays miss.** A ray whose direction lies in the triangle's
 //!   plane (within a relative tolerance), including a coplanar ray crossing
 //!   the triangle, reports no hit: a coplanar contact has no unique distance
@@ -150,18 +155,21 @@ fn ray_triangle_f64(
     })
 }
 
-/// Rounding allowance for the inclusive boundary tests (vertices, edges,
-/// distance zero and the bound), in units of a triple product's componentwise
-/// magnitude (see [`triple_magnitude`]). Forming the differences, the cross
-/// product and the dot product perturbs a computed triple product by at most
-/// about `8 ε` of that magnitude; twice that keeps every exact boundary hit.
-const BOUNDARY_TOLERANCE: f64 = 16.0 * f64::EPSILON;
+/// Forward error bound of a computed triple-product numerator, in units of
+/// its componentwise magnitude (see [`triple_magnitude`]). Forming the
+/// differences, the cross product and the dot product perturbs a computed
+/// triple product by at most about `7 ε` of that magnitude (Shewchuk's
+/// `orient3d` bound), and the derived numerators (`w` and the bound gap) add
+/// at most two more roundings; twice that leaves margin for rounding in the
+/// magnitude itself. Barring underflow, a computed numerator farther from zero
+/// than this bound has the sign of the exact one.
+const ERROR_BOUND: f64 = 16.0 * f64::EPSILON;
 
 /// `Σ |x_i| (|y_j| |z_k| + |y_k| |z_j|)`: the componentwise magnitude of the
 /// triple product `x · (y × z)`. Its rounding error is proportional to this
 /// sum, not to `|x| |y × z|`, so terms that cancel exactly (an origin on a
 /// vertex) and components that do not take part (near-parallel rays) get the
-/// allowance they actually need.
+/// bound they actually need.
 fn triple_magnitude(x: Vec3, y: Vec3, z: Vec3) -> f64 {
     let [x, y, z] = [x, y, z].map(|vector| vector.map(f64::abs));
     x[0] * (y[1] * z[2] + y[2] * z[1])
@@ -169,13 +177,104 @@ fn triple_magnitude(x: Vec3, y: Vec3, z: Vec3) -> f64 {
         + x[2] * (y[0] * z[1] + y[1] * z[0])
 }
 
+/// The triple-product numerators [`intersect`] decides on.
+#[derive(Clone, Copy)]
+enum Numerator {
+    /// `(b - a) · (direction × (c - a))`: the determinant, `-(direction ·
+    /// normal)`.
+    Determinant,
+    /// `(origin - a) · (direction × (c - a))`: the weight of `b`.
+    U,
+    /// `direction · ((origin - a) × (b - a))`: the weight of `c`.
+    V,
+    /// `direction · ((c - origin) × (b - origin))`: the weight of `a`.
+    W,
+    /// `(c - a) · ((origin - a) × (b - a))`: the hit parameter.
+    T,
+    /// `max_parameter · determinant - T`: the room left before the bound.
+    BoundGap(f64),
+}
+
+/// Returns `value` when it is farther from zero than its forward error bound,
+/// so its sign is certain; otherwise the exactly evaluated numerator, rounded
+/// once. Either way the result has the sign of the exact numerator.
+#[inline]
+fn certain_sign(
+    value: f64,
+    error: f64,
+    numerator: Numerator,
+    origin: Vec3,
+    direction: Vec3,
+    corners: [Vec3; 3],
+) -> f64 {
+    if value.abs() > error || error == 0.0 {
+        value
+    } else {
+        exact_numerator(numerator, origin, direction, corners)
+    }
+}
+
+/// `numerator` evaluated exactly (see [`exact_triple`]), rounded once. Kept
+/// out of line so the fast path neither inlines it nor reserves stack for
+/// its expansions.
+#[cold]
+#[inline(never)]
+fn exact_numerator(
+    numerator: Numerator,
+    origin: Vec3,
+    direction: Vec3,
+    [a, b, c]: [Vec3; 3],
+) -> f64 {
+    let direction = exact_vector(direction);
+    match numerator {
+        Numerator::Determinant => determinant_numerator(direction, [a, b, c]).estimate(),
+        Numerator::U => exact_triple(
+            exact_difference(origin, a),
+            direction,
+            exact_difference(c, a),
+        )
+        .estimate(),
+        Numerator::V => exact_triple(
+            direction,
+            exact_difference(origin, a),
+            exact_difference(b, a),
+        )
+        .estimate(),
+        Numerator::W => exact_triple(
+            direction,
+            exact_difference(c, origin),
+            exact_difference(b, origin),
+        )
+        .estimate(),
+        Numerator::T => parameter_numerator(origin, [a, b, c]).estimate(),
+        Numerator::BoundGap(max_parameter) => {
+            exact_bound_gap(origin, direction, [a, b, c], max_parameter)
+        }
+    }
+}
+
+fn determinant_numerator(direction: [Exact; 3], [a, b, c]: [Vec3; 3]) -> Expansion<TRIPLE_TERMS> {
+    exact_triple(exact_difference(b, a), direction, exact_difference(c, a))
+}
+
+fn parameter_numerator(origin: Vec3, [a, b, c]: [Vec3; 3]) -> Expansion<TRIPLE_TERMS> {
+    exact_triple(
+        exact_difference(c, a),
+        exact_difference(origin, a),
+        exact_difference(b, a),
+    )
+}
+
 /// Möller–Trumbore along `direction` (any non-zero length): the hit
 /// parameter in units of `direction`, within `[0, max_parameter]`, with
-/// barycentric weights and facing. Each inclusion test compares a signed
-/// triple-product numerator against the determinant with a componentwise
-/// rounding bound, then clamps, so hits exactly on vertices, edges, the
-/// origin or the bound are kept while points outside by more than rounding
-/// still miss.
+/// barycentric weights and facing.
+///
+/// Inclusion is decided from the exact signs of the triple-product numerators
+/// of the f64 inputs: each is computed in f64 and kept when it clears its
+/// forward error bound, and evaluated exactly with error-free transformations
+/// otherwise (see [`exact_triple`]). Hits exactly on vertices, edges, the
+/// origin or the bound therefore count, and every other point outside misses,
+/// however ill-conditioned the triangle.
 fn intersect(
     origin: Vec3,
     direction: Vec3,
@@ -196,12 +295,27 @@ fn intersect(
     }
     let direction_length = length_squared(direction).sqrt();
     let p = cross(direction, edge_ac);
-    // determinant = -(direction · normal).
+    // determinant = -(direction · normal) = u + v + w.
     let determinant = dot(edge_ab, p);
     if determinant.abs() <= PARALLEL_TOLERANCE * normal_length_squared.sqrt() * direction_length {
         return None;
     }
-    let facing = if determinant > 0.0 {
+    let corners = [a, b, c];
+    // The determinant's exact sign is the facing and orients every other
+    // numerator so that inside is >= 0.
+    let determinant_error = ERROR_BOUND * triple_magnitude(edge_ab, direction, edge_ac);
+    let orientation = match certain_sign(
+        determinant,
+        determinant_error,
+        Numerator::Determinant,
+        origin,
+        direction,
+        corners,
+    ) {
+        0.0 => return None,
+        value => value.signum(),
+    };
+    let facing = if orientation > 0.0 {
         TriangleFacing::Front
     } else {
         TriangleFacing::Back
@@ -209,41 +323,218 @@ fn intersect(
     if culling == TriangleCulling::BackFaces && facing == TriangleFacing::Back {
         return None;
     }
-    let sign = determinant.signum();
     let to_origin = sub(origin, a);
     let q = cross(to_origin, edge_ab);
-    // Numerators of u, v and the parameter, oriented so inside is >= 0,
-    // with their rounding bounds.
-    let u_numerator = sign * dot(to_origin, p);
-    let v_numerator = sign * dot(direction, q);
-    let t_numerator = sign * dot(edge_ac, q);
-    let determinant = determinant.abs();
-    let determinant_error = BOUNDARY_TOLERANCE * triple_magnitude(edge_ab, direction, edge_ac);
-    let u_error = BOUNDARY_TOLERANCE * triple_magnitude(to_origin, direction, edge_ac);
-    let v_error = BOUNDARY_TOLERANCE * triple_magnitude(direction, to_origin, edge_ab);
-    let t_error = BOUNDARY_TOLERANCE * triple_magnitude(edge_ac, to_origin, edge_ab);
-    if u_numerator < -u_error
-        || v_numerator < -v_error
-        || determinant - u_numerator - v_numerator < -(determinant_error + u_error + v_error)
-        || t_numerator < -t_error
-    {
+    let u_error = ERROR_BOUND * triple_magnitude(to_origin, direction, edge_ac);
+    let v_error = ERROR_BOUND * triple_magnitude(direction, to_origin, edge_ab);
+    let t_error = ERROR_BOUND * triple_magnitude(edge_ac, to_origin, edge_ab);
+
+    // Edge numerators (weights of b, c and a times the determinant), each
+    // with the sign of its exact value. They sum exactly to the determinant,
+    // so the point is inside the closed triangle exactly when none opposes
+    // its sign.
+    let u_raw = dot(to_origin, p);
+    let u = certain_sign(u_raw, u_error, Numerator::U, origin, direction, corners);
+    if u * orientation < 0.0 {
         return None;
     }
-    if max_parameter.is_finite()
-        && max_parameter * determinant - t_numerator
-            < -(max_parameter * determinant_error + t_error)
-    {
+    let v_raw = dot(direction, q);
+    let v = certain_sign(v_raw, v_error, Numerator::V, origin, direction, corners);
+    if v * orientation < 0.0 {
         return None;
     }
-    let mut u = (u_numerator / determinant).max(0.0);
-    let mut v = (v_numerator / determinant).max(0.0);
-    if u + v > 1.0 {
-        let sum = u + v;
-        u /= sum;
-        v /= sum;
+    // w = determinant - u - v = direction · ((c - origin) × (b - origin)).
+    let w = certain_sign(
+        determinant - u_raw - v_raw,
+        determinant_error + u_error + v_error,
+        Numerator::W,
+        origin,
+        direction,
+        corners,
+    );
+    if w * orientation < 0.0 {
+        return None;
     }
-    let parameter = (t_numerator / determinant).clamp(0.0, max_parameter);
-    Some((parameter, [(1.0 - u - v).max(0.0), u, v], facing))
+
+    // Parameter numerator: behind the origin when its sign opposes the
+    // determinant's.
+    let t_raw = dot(edge_ac, q);
+    let t = certain_sign(t_raw, t_error, Numerator::T, origin, direction, corners);
+    if t * orientation < 0.0 {
+        return None;
+    }
+    if max_parameter.is_finite() {
+        // Beyond the bound when max_parameter · determinant - t opposes the
+        // determinant's sign.
+        let gap = certain_sign(
+            max_parameter * determinant - t_raw,
+            max_parameter * determinant_error + t_error,
+            Numerator::BoundGap(max_parameter),
+            origin,
+            direction,
+            corners,
+        );
+        if gap * orientation < 0.0 {
+            return None;
+        }
+    }
+    // All four numerators now carry the determinant's sign (or are zero), so
+    // the oriented values are non-negative; u + v + w is the determinant.
+    let [u, v, w, t] = [u, v, w, t].map(|value| (value * orientation).abs());
+    let total = u + v + w;
+    let parameter = (t / total).min(max_parameter);
+    Some((parameter, [w / total, u / total, v / total], facing))
+}
+
+/// `max_parameter · determinant - t` evaluated exactly, rounded once. A
+/// `max_parameter · determinant` beyond the f64 range is reported as an
+/// infinite gap with the determinant's sign, which is the exact sign because
+/// the parameter numerator is finite.
+fn exact_bound_gap(
+    origin: Vec3,
+    direction: [Exact; 3],
+    [a, b, c]: [Vec3; 3],
+    max_parameter: f64,
+) -> f64 {
+    let determinant = determinant_numerator(direction, [a, b, c]);
+    let parameter = parameter_numerator(origin, [a, b, c]);
+    let mut gap = Expansion::<{ 3 * TRIPLE_TERMS }>::new();
+    for &term in parameter.terms() {
+        gap.add(-term);
+    }
+    for &term in determinant.terms() {
+        let [product, error] = two_product(max_parameter, term);
+        if !product.is_finite() {
+            return determinant.estimate().signum() * f64::INFINITY;
+        }
+        gap.add(error);
+        gap.add(product);
+    }
+    gap.estimate()
+}
+
+/// An f64 value as an exact `[high, low]` pair: `high + low` is the value.
+type Exact = [f64; 2];
+
+fn exact_vector(vector: Vec3) -> [Exact; 3] {
+    vector.map(|value| [value, 0.0])
+}
+
+/// `left - right` per component, without rounding.
+fn exact_difference(left: Vec3, right: Vec3) -> [Exact; 3] {
+    std::array::from_fn(|axis| two_difference(left[axis], right[axis]))
+}
+
+/// Knuth's two-sum: `[a + b rounded, exact rounding error]`.
+fn two_sum(a: f64, b: f64) -> Exact {
+    let sum = a + b;
+    let b_virtual = sum - a;
+    let a_virtual = sum - b_virtual;
+    [sum, (a - a_virtual) + (b - b_virtual)]
+}
+
+fn two_difference(a: f64, b: f64) -> Exact {
+    let difference = a - b;
+    let b_virtual = a - difference;
+    let a_virtual = difference + b_virtual;
+    [difference, (a - a_virtual) + (b_virtual - b)]
+}
+
+/// `[a · b rounded, exact rounding error]` via a fused multiply-add, which
+/// rounds once on every target.
+fn two_product(a: f64, b: f64) -> Exact {
+    let product = a * b;
+    [product, a.mul_add(b, -product)]
+}
+
+/// Upper bound on the components of an exact triple product: six monomials,
+/// each a product of three `[high, low]` pairs (eight parts), each part two
+/// error-free products deep (four terms).
+const TRIPLE_TERMS: usize = 6 * 8 * 4;
+
+/// `x · (y × z)` of exact vectors as a nonoverlapping expansion whose sum is
+/// the exact value, barring f64 underflow and overflow: products of three
+/// f32-sized differences (or two and a unit direction) stay far inside the
+/// f64 exponent range. Only the fallback paths call it.
+fn exact_triple(x: [Exact; 3], y: [Exact; 3], z: [Exact; 3]) -> Expansion<TRIPLE_TERMS> {
+    let mut sum = Expansion::new();
+    for [i, j, k] in [[0, 1, 2], [1, 2, 0], [2, 0, 1]] {
+        // x_i (y_j z_k - y_k z_j)
+        for (y_axis, z_axis, sign) in [(j, k, 1.0), (k, j, -1.0)] {
+            for x_part in x[i] {
+                for y_part in y[y_axis] {
+                    for z_part in z[z_axis] {
+                        if x_part == 0.0 || y_part == 0.0 || z_part == 0.0 {
+                            continue;
+                        }
+                        let [high, low] = two_product(sign * x_part, y_part);
+                        for term in two_product(high, z_part)
+                            .into_iter()
+                            .chain(two_product(low, z_part))
+                        {
+                            sum.add(term);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    sum
+}
+
+/// Shewchuk's floating-point expansion with fixed capacity: nonoverlapping
+/// components in increasing magnitude whose exact sum is the value, so the
+/// largest component carries its sign. Each [`Expansion::add`] grows it by at
+/// most one component.
+struct Expansion<const N: usize> {
+    terms: [f64; N],
+    len: usize,
+}
+
+impl<const N: usize> Expansion<N> {
+    const fn new() -> Self {
+        Self {
+            terms: [0.0; N],
+            len: 0,
+        }
+    }
+
+    fn terms(&self) -> &[f64] {
+        &self.terms[..self.len]
+    }
+
+    /// Adds `value` exactly (`GROW-EXPANSION` with zero elimination).
+    fn add(&mut self, value: f64) {
+        if value == 0.0 {
+            return;
+        }
+        let mut carry = value;
+        let mut kept = 0;
+        for index in 0..self.len {
+            let [sum, error] = two_sum(carry, self.terms[index]);
+            if error != 0.0 {
+                self.terms[kept] = error;
+                kept += 1;
+            }
+            carry = sum;
+        }
+        if carry != 0.0 {
+            self.terms[kept] = carry;
+            kept += 1;
+        }
+        self.len = kept;
+    }
+
+    /// The value rounded once, which has the exact value's sign.
+    fn estimate(&self) -> f64 {
+        let Some(&largest) = self.terms().last() else {
+            return 0.0;
+        };
+        let sum: f64 = self.terms().iter().sum();
+        // The lower components sum to less than the largest; guard against
+        // rounding that sum up to cancel it.
+        if sum * largest > 0.0 { sum } else { largest }
+    }
 }
 
 #[cfg(test)]
@@ -465,7 +756,11 @@ mod tests {
     }
 
     /// Independent oracle: intersect the supporting plane, then classify the
-    /// point with signed sub-triangle areas.
+    /// point with signed sub-triangle areas. Returns the signed plane
+    /// parameter and the signed, unclamped weights whether or not the point
+    /// is inside, so disagreements can be judged from the oracle's own data
+    /// rather than from the kernel's clamped output. `None` only for
+    /// degenerate triangles and (near-)parallel rays.
     fn plane_area_oracle(ray: Ray3, triangle: [[f32; 3]; 3]) -> Option<(f64, [f64; 3], bool)> {
         let [a, b, c] = triangle.map(|corner| corner.map(f64::from));
         let normal = cross(sub(b, a), sub(c, a));
@@ -478,17 +773,11 @@ mod tests {
             return None;
         }
         let distance = dot(sub(a, ray.origin64()), normal) / along;
-        if distance < 0.0 {
-            return None;
-        }
-        let point = ray.at(distance);
+        let point = add(ray.origin64(), scale(ray.direction(), distance));
         let weight =
             |p: Vec3, q: Vec3| dot(cross(sub(q, p), sub(point, p)), normal) / (area * area);
         let weights = [weight(b, c), weight(c, a), weight(a, b)];
-        weights
-            .iter()
-            .all(|weight| *weight >= 0.0)
-            .then_some((distance, weights, along < 0.0))
+        Some((distance, weights, along < 0.0))
     }
 
     #[test]
@@ -509,11 +798,19 @@ mod tests {
                 continue;
             }
             let ray = Ray3::new(origin, direction);
-            let expected = plane_area_oracle(ray, triangle);
+            let oracle = plane_area_oracle(ray, triangle);
+            let expected = oracle.filter(|(distance, weights, _)| {
+                *distance >= 0.0 && weights.iter().all(|weight| *weight >= 0.0)
+            });
             let actual = ray_triangle(ray, triangle, f64::INFINITY, TriangleCulling::None);
-            // Skip inputs within rounding of an edge or of parallel, where
-            // the two formulations may legitimately disagree.
+            // Inputs within rounding of an edge, of the origin or of parallel
+            // may legitimately disagree. Judge that from the oracle's signed,
+            // unclamped data: the kernel clamps its own weights and distance,
+            // so they always look near-boundary.
             let near_boundary = |weights: [f64; 3]| weights.iter().any(|w| w.abs() < 1.0e-6);
+            let barely_outside = |distance: f64, weights: [f64; 3]| {
+                distance >= -1.0e-9 && weights.iter().all(|w| *w >= -1.0e-6)
+            };
             match (actual, expected) {
                 (Some(actual), Some((distance, weights, front))) => {
                     hits += 1;
@@ -527,10 +824,14 @@ mod tests {
                     assert_eq!(actual.facing == TriangleFacing::Front, front);
                 }
                 (None, None) => {}
-                (Some(actual), None) => assert!(
-                    near_boundary(actual.barycentric),
-                    "kernel hit, oracle missed: {ray:?} {triangle:?}"
-                ),
+                (Some(_), None) => match oracle {
+                    // Parallel within the oracle's coarser cutoff.
+                    None => {}
+                    Some((distance, weights, _)) => assert!(
+                        barely_outside(distance, weights),
+                        "kernel hit, oracle missed by {distance} {weights:?}: {ray:?} {triangle:?}"
+                    ),
+                },
                 (None, Some((_, weights, _))) => assert!(
                     near_boundary(weights),
                     "oracle hit, kernel missed: {ray:?} {triangle:?}"
@@ -561,6 +862,54 @@ mod tests {
         for (left, right) in hit.barycentric.iter().zip(base.barycentric) {
             assert!((left - right).abs() <= 1.0e-6);
         }
+    }
+
+    #[test]
+    fn exact_triple_products_match_integer_arithmetic() {
+        // y = 2^54 + small, given as the difference of 2^54 and -small, which
+        // f64 cannot hold, so its low parts matter; z nearly parallel to y,
+        // so the cross product cancels. i128 evaluates the same triple
+        // product exactly.
+        let mut state = 0x0141_c0de_u64;
+        let mut next = |bits: u32| -> i64 {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            ((state >> 11) as i64 >> (53 - bits)) - (1_i64 << (bits - 1))
+        };
+        let far = 1_i64 << 54;
+        let mut rounded = 0;
+        for round in 0..4096 {
+            let x: [i64; 3] = std::array::from_fn(|_| next(30));
+            let small: [i64; 3] = std::array::from_fn(|_| next(30) | 1);
+            let tweak: [i64; 3] = std::array::from_fn(|_| next(3));
+            let y: [i64; 3] = small.map(|value| far + value);
+            let z: [i64; 3] = std::array::from_fn(|axis| (y[axis] >> 22) + tweak[axis]);
+            let y_exact = exact_difference([far as f64; 3], small.map(|value| -value as f64));
+            rounded += usize::from(y_exact.iter().any(|[_, low]| *low != 0.0));
+            let z_exact = if round % 2 == 0 {
+                exact_vector(z.map(|value| value as f64))
+            } else {
+                let high = z.map(|value| (value >> 10 << 10) as f64);
+                let low = std::array::from_fn(|axis| (high[axis] as i64 - z[axis]) as f64);
+                exact_difference(high, low)
+            };
+            let exact = exact_triple(exact_vector(x.map(|value| value as f64)), y_exact, z_exact)
+                .estimate();
+            let [x, y, z] = [x, y, z].map(|vector| vector.map(i128::from));
+            let expected = x[0] * (y[1] * z[2] - y[2] * z[1])
+                + x[1] * (y[2] * z[0] - y[0] * z[2])
+                + x[2] * (y[0] * z[1] - y[1] * z[0]);
+            assert_eq!(
+                exact.signum() as i128 * i128::from(exact != 0.0),
+                expected.signum()
+            );
+            assert!(
+                (exact - expected as f64).abs() <= 1.0e-15 * (expected as f64).abs(),
+                "{exact} {expected}"
+            );
+        }
+        assert!(rounded > 4000, "fixture must need the low parts: {rounded}");
     }
 
     #[test]
