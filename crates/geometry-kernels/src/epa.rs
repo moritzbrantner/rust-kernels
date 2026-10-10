@@ -746,4 +746,112 @@ mod tests {
             Some(expected.status)
         );
     }
+
+    /// One scale point: `(dimensions, metrics)` as `(name, value)` pairs.
+    type WorkSample = (Vec<(&'static str, usize)>, Vec<(&'static str, usize)>);
+
+    /// Directory that `scripts/collect-work-evidence.sh` sets to collect
+    /// `coding-tooling/work-evidence/v1` samples. When it is set, the declared
+    /// work bounds are judged by `coding-tooling performance work` against
+    /// `.performance/contract.json`; otherwise this test asserts them itself.
+    fn work_evidence_dir() -> Option<std::path::PathBuf> {
+        std::env::var_os("RUST_KERNELS_WORK_EVIDENCE_DIR").map(Into::into)
+    }
+
+    /// Writes one operation's samples as `<dir>/<operation>.json`.
+    fn write_work_evidence(dir: &std::path::Path, operation: &str, samples: &[WorkSample]) {
+        fn fields(pairs: &[(&str, usize)]) -> String {
+            pairs
+                .iter()
+                .map(|(name, value)| format!("\"{name}\":{value}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        }
+        let samples = samples
+            .iter()
+            .map(|(dimensions, metrics)| {
+                format!(
+                    "{{\"dimensions\":{{{}}},\"metrics\":{{{}}}}}",
+                    fields(dimensions),
+                    fields(metrics)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        std::fs::write(
+            dir.join(format!("{operation}.json")),
+            format!("{{\"id\":\"{operation}\",\"samples\":[{samples}]}}\n"),
+        )
+        .expect("work evidence directory must be writable");
+    }
+
+    /// Maximum EPA iteration caps, as powers of two.
+    const ITERATION_CAPS: [usize; 6] = [1, 2, 4, 8, 16, 32];
+
+    #[test]
+    fn disabled_trace_copies_stay_zero_across_iteration_caps() {
+        let left = ConvexHull3::new(&[
+            [-1.2, -0.7, 0.0],
+            [1.0, -0.9, 0.0],
+            [1.25, 0.6, 0.0],
+            [-0.8, 1.1, 0.0],
+        ]);
+        let right = ConvexHull3::new(&[
+            [0.1, -0.8, 0.0],
+            [1.6, -0.3, 0.0],
+            [1.2, 1.0, 0.0],
+            [-0.1, 0.7, 0.0],
+        ]);
+        let gjk = gjk_intersection_planar_xy(&left, &right);
+        assert_eq!(gjk.status, GjkStatus::Intersecting);
+        let mut samples = Vec::new();
+        for max_iterations in ITERATION_CAPS {
+            let config = EpaConfig {
+                max_iterations,
+                ..EpaConfig::default()
+            };
+            super::SNAPSHOT_WORK.with(|work| work.set((0, 0)));
+            let result = super::epa_penetration_planar_xy_with_config(&left, &right, &gjk, config);
+            let (snapshots, copied_points) = super::SNAPSHOT_WORK.with(|work| work.get());
+
+            // Correctness first: the traced run is the oracle for the ordinary
+            // result, and it proves the counter observes real snapshot copies.
+            super::SNAPSHOT_WORK.with(|work| work.set((0, 0)));
+            let trace = epa_penetration_trace_planar_xy_with_config(&left, &right, &gjk, config);
+            assert_eq!(trace.result, result, "max_iterations={max_iterations}");
+            assert_eq!(
+                trace.steps.last().unwrap().terminal_status,
+                Some(result.status)
+            );
+            assert_eq!(
+                super::SNAPSHOT_WORK.with(|work| work.get()),
+                (
+                    trace.steps.len(),
+                    trace.steps.iter().map(|step| step.polytope.len()).sum()
+                )
+            );
+            assert!(!trace.steps.is_empty());
+
+            samples.push((
+                vec![("maxIterations", max_iterations)],
+                vec![
+                    ("trace-snapshots", snapshots),
+                    ("trace-support-point-copies", copied_points),
+                ],
+            ));
+        }
+
+        if let Some(dir) = work_evidence_dir() {
+            write_work_evidence(&dir, "epa-disabled-trace-copies", &samples);
+            return;
+        }
+        for (dimensions, metrics) in &samples {
+            assert_eq!(
+                (metrics[0].1, metrics[1].1),
+                (0, 0),
+                "max_iterations={}",
+                dimensions[0].1
+            );
+        }
+    }
 }

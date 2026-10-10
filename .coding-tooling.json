@@ -19,7 +19,8 @@
   "capabilityCommands": {
     ".": {
       "benchmark": ["cargo", "bench", "-p", "search-kernels", "--bench", "search"],
-      "benchmark:smoke": ["bash", "scripts/benchmark-smoke.sh"]
+      "benchmark:smoke": ["bash", "scripts/benchmark-smoke.sh"],
+      "performance:work": ["bash", "scripts/collect-work-evidence.sh"]
     }
   },
   "merge": {

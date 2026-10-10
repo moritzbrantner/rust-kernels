@@ -614,4 +614,94 @@ mod tests {
             Err(PageRankError::ZeroIterations)
         );
     }
+
+    /// One scale point: `(dimensions, metrics)` as `(name, value)` pairs.
+    type WorkSample = (Vec<(&'static str, usize)>, Vec<(&'static str, usize)>);
+
+    /// Directory that `scripts/collect-work-evidence.sh` sets to collect
+    /// `coding-tooling/work-evidence/v1` samples. When it is set, the declared
+    /// work bounds are judged by `coding-tooling performance work` against
+    /// `.performance/contract.json`; otherwise this test asserts them itself.
+    fn work_evidence_dir() -> Option<std::path::PathBuf> {
+        std::env::var_os("RUST_KERNELS_WORK_EVIDENCE_DIR").map(Into::into)
+    }
+
+    /// Writes one operation's samples as `<dir>/<operation>.json`.
+    fn write_work_evidence(dir: &std::path::Path, operation: &str, samples: &[WorkSample]) {
+        fn fields(pairs: &[(&str, usize)]) -> String {
+            pairs
+                .iter()
+                .map(|(name, value)| format!("\"{name}\":{value}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        }
+        let samples = samples
+            .iter()
+            .map(|(dimensions, metrics)| {
+                format!(
+                    "{{\"dimensions\":{{{}}},\"metrics\":{{{}}}}}",
+                    fields(dimensions),
+                    fields(metrics)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        std::fs::write(
+            dir.join(format!("{operation}.json")),
+            format!("{{\"id\":\"{operation}\",\"samples\":[{samples}]}}\n"),
+        )
+        .expect("work evidence directory must be writable");
+    }
+
+    /// Cycle lengths as powers of two; every vertex also has a self-loop, so
+    /// the stored edge count is twice the vertex count.
+    const CYCLE_VERTICES: [usize; 7] = [64, 128, 256, 512, 1024, 2048, 4096];
+
+    #[test]
+    fn iterative_tarjan_edge_visits_scale_linearly_in_stored_edges() {
+        let mut samples = Vec::new();
+        for vertices in CYCLE_VERTICES {
+            let adjacency: Vec<Vec<usize>> = (0..vertices)
+                .map(|vertex| vec![(vertex + 1) % vertices, vertex])
+                .collect();
+            let edges = adjacency.iter().map(Vec::len).sum::<usize>();
+
+            // The same driver loop as `strongly_connected_components`.
+            let mut state = super::TarjanState::new(vertices);
+            for root in 0..vertices {
+                if state.indices[root].is_none() {
+                    state.strong_connect(root, &adjacency);
+                }
+            }
+
+            // Correctness first: the public kernel and the instrumented state
+            // agree that the whole cycle is one component.
+            let expected = vec![(0..vertices).collect::<Vec<_>>()];
+            assert_eq!(
+                strongly_connected_components(0..vertices, |&vertex| adjacency[vertex].clone()),
+                expected,
+                "vertices={vertices}"
+            );
+            let mut components = state.components.clone();
+            for component in &mut components {
+                component.sort_unstable();
+            }
+            assert_eq!(components, expected, "vertices={vertices}");
+
+            samples.push((
+                vec![("edges", edges)],
+                vec![("visited-edges", state.edge_visits)],
+            ));
+        }
+
+        if let Some(dir) = work_evidence_dir() {
+            write_work_evidence(&dir, "scc-cycle-edge-visits", &samples);
+            return;
+        }
+        for (dimensions, metrics) in &samples {
+            // Each stored edge is visited exactly once.
+            assert_eq!(metrics[0].1, dimensions[0].1);
+            assert!(metrics[0].1 <= 8192);
+        }
+    }
 }
