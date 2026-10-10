@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "suite": "rust-kernels",
   "description": "Deterministic performance contracts for representative kernel workloads. Blocking evidence uses operation or instruction counts; ordinary shared-runner wall-clock timings remain informational.",
   "scenarios": [
@@ -443,6 +443,343 @@
           "budget": {
             "max": 0
           }
+        }
+      ]
+    }
+  ],
+  "operations": [
+    {
+      "id": "fenwick-linear-build",
+      "description": "Construct a Fenwick tree with the explicitly regrouped from_slice_linear builder over CountingValue items.",
+      "publicContract": "collection_kernels::FenwickTree::from_slice_linear",
+      "dimensions": {
+        "items": {
+          "description": "values passed to the builder"
+        }
+      },
+      "scalePoints": [
+        {
+          "items": 64
+        },
+        {
+          "items": 128
+        },
+        {
+          "items": 256
+        },
+        {
+          "items": 512
+        },
+        {
+          "items": 1024
+        },
+        {
+          "items": 2048
+        },
+        {
+          "items": 4096
+        }
+      ],
+      "metrics": [
+        {
+          "name": "add-assign-operations",
+          "unit": "operations",
+          "signal": "operation-count",
+          "budget": {
+            "max": 8191
+          },
+          "notes": "Exactly 2n - popcount(n) AddAssign calls (2n - 1 at these powers of two), asserted per scale point in crates/collection-kernels/tests/work_complexity.rs together with a non-increasing marginal-work check. No growth bound is declared: the shared linear bound v(x) * x0 <= v(x0) * x rejects affine counts with a negative fixed term such as 2n - 1, so the budget at 4096 items carries the contract until coding-tooling has a vocabulary for it."
+        }
+      ]
+    },
+    {
+      "id": "scc-cycle-edge-visits",
+      "description": "Heap-backed iterative Tarjan over a directed cycle where every vertex also has a self-loop, driven like strongly_connected_components.",
+      "publicContract": "graph_kernels::strongly_connected_components",
+      "dimensions": {
+        "edges": {
+          "description": "stored adjacency entries (two per vertex)"
+        }
+      },
+      "scalePoints": [
+        {
+          "edges": 128
+        },
+        {
+          "edges": 256
+        },
+        {
+          "edges": 512
+        },
+        {
+          "edges": 1024
+        },
+        {
+          "edges": 2048
+        },
+        {
+          "edges": 4096
+        },
+        {
+          "edges": 8192
+        }
+      ],
+      "metrics": [
+        {
+          "name": "visited-edges",
+          "unit": "operations",
+          "signal": "operation-count",
+          "budget": {
+            "max": 8192
+          },
+          "growth": [
+            {
+              "dimension": "edges",
+              "bound": "linear"
+            }
+          ],
+          "notes": "Test-only counter inside the Tarjan edge loop; each stored edge is visited exactly once."
+        }
+      ]
+    },
+    {
+      "id": "bounded-edit-comparisons",
+      "description": "Bounded Levenshtein distance between a sequence and its one-element shift at a fixed limit of two, counting element equality calls.",
+      "publicContract": "similarity_kernels::LevenshteinWorkspace::distance",
+      "dimensions": {
+        "elements": {
+          "description": "elements per input sequence"
+        },
+        "limit": {
+          "description": "fixed edit-distance limit"
+        }
+      },
+      "scalePoints": [
+        {
+          "elements": 128,
+          "limit": 2
+        },
+        {
+          "elements": 256,
+          "limit": 2
+        },
+        {
+          "elements": 512,
+          "limit": 2
+        },
+        {
+          "elements": 1024,
+          "limit": 2
+        },
+        {
+          "elements": 2048,
+          "limit": 2
+        },
+        {
+          "elements": 4096,
+          "limit": 2
+        }
+      ],
+      "metrics": [
+        {
+          "name": "equality-calls",
+          "unit": "operations",
+          "signal": "operation-count",
+          "budget": {
+            "max": 20484
+          },
+          "notes": "Exactly (2k + 1) n - k (k + 1) + 2 = 5n - 4 comparisons, asserted per scale point in crates/similarity-kernels/tests/work_complexity.rs together with a non-increasing marginal-work check; the full oracle needs n^2. No growth bound is declared because the shared linear bound rejects the negative fixed term from the truncated band corners; the budget is 5n + 4 at 4096 elements, matching the single-size scenario."
+        }
+      ]
+    },
+    {
+      "id": "bounded-edit-warm-allocations",
+      "description": "A repeated bounded Levenshtein query on a warmed workspace at a fixed limit of two.",
+      "publicContract": "similarity_kernels::LevenshteinWorkspace::distance",
+      "dimensions": {
+        "elements": {
+          "description": "elements per input sequence"
+        },
+        "limit": {
+          "description": "fixed edit-distance limit"
+        }
+      },
+      "scalePoints": [
+        {
+          "elements": 128,
+          "limit": 2
+        },
+        {
+          "elements": 256,
+          "limit": 2
+        },
+        {
+          "elements": 512,
+          "limit": 2
+        },
+        {
+          "elements": 1024,
+          "limit": 2
+        },
+        {
+          "elements": 2048,
+          "limit": 2
+        },
+        {
+          "elements": 4096,
+          "limit": 2
+        }
+      ],
+      "metrics": [
+        {
+          "name": "allocator-alloc-calls",
+          "unit": "calls",
+          "signal": "allocation-count",
+          "budget": {
+            "max": 0
+          },
+          "growth": [
+            {
+              "dimension": "elements",
+              "bound": "constant"
+            }
+          ]
+        },
+        {
+          "name": "allocator-realloc-calls",
+          "unit": "calls",
+          "signal": "allocation-count",
+          "budget": {
+            "max": 0
+          },
+          "growth": [
+            {
+              "dimension": "elements",
+              "bound": "constant"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "epa-disabled-trace-copies",
+      "description": "Planar EPA on a fixed overlapping quad pair with tracing disabled, across iteration caps.",
+      "publicContract": "geometry_kernels::epa::epa_penetration_planar_xy_with_config",
+      "dimensions": {
+        "maxIterations": {
+          "description": "EpaConfig::max_iterations"
+        }
+      },
+      "scalePoints": [
+        {
+          "maxIterations": 1
+        },
+        {
+          "maxIterations": 2
+        },
+        {
+          "maxIterations": 4
+        },
+        {
+          "maxIterations": 8
+        },
+        {
+          "maxIterations": 16
+        },
+        {
+          "maxIterations": 32
+        }
+      ],
+      "metrics": [
+        {
+          "name": "trace-snapshots",
+          "unit": "snapshots",
+          "signal": "operation-count",
+          "budget": {
+            "max": 0
+          },
+          "growth": [
+            {
+              "dimension": "maxIterations",
+              "bound": "constant"
+            }
+          ]
+        },
+        {
+          "name": "trace-support-point-copies",
+          "unit": "points",
+          "signal": "operation-count",
+          "budget": {
+            "max": 0
+          },
+          "growth": [
+            {
+              "dimension": "maxIterations",
+              "bound": "constant"
+            }
+          ],
+          "notes": "Test-only counter inside trace_snapshot; the traced run of the same query is checked to increment it before the disabled run counts as zero."
+        }
+      ]
+    },
+    {
+      "id": "gjk-easy-sphere-iterations",
+      "description": "Twelve easy sphere-pair GJK queries (six centers, both argument orders) at coordinate scales from 2^-30 to 2^24.",
+      "publicContract": "geometry_kernels::gjk::gjk_intersection",
+      "dimensions": {
+        "biasedScaleExponent": {
+          "description": "binary exponent e of the coordinate scale 2^e plus 31 (1 is 2^-30, 55 is 2^24)"
+        }
+      },
+      "scalePoints": [
+        {
+          "biasedScaleExponent": 1
+        },
+        {
+          "biasedScaleExponent": 7
+        },
+        {
+          "biasedScaleExponent": 21
+        },
+        {
+          "biasedScaleExponent": 31
+        },
+        {
+          "biasedScaleExponent": 41
+        },
+        {
+          "biasedScaleExponent": 55
+        }
+      ],
+      "metrics": [
+        {
+          "name": "max-query-iterations",
+          "unit": "iterations",
+          "signal": "operation-count",
+          "budget": {
+            "max": 8
+          },
+          "growth": [
+            {
+              "dimension": "biasedScaleExponent",
+              "bound": "constant"
+            }
+          ]
+        },
+        {
+          "name": "total-iterations",
+          "unit": "iterations",
+          "signal": "operation-count",
+          "budget": {
+            "max": 96
+          },
+          "growth": [
+            {
+              "dimension": "biasedScaleExponent",
+              "bound": "constant"
+            }
+          ],
+          "notes": "The analytic sphere oracle must agree first; iteration-limit and no-progress exits are not faster successes."
         }
       ]
     }
