@@ -27,6 +27,40 @@ face-plane enumeration over generated fixtures. Sphere tests compare the
 cross-product line-distance formulation with an independent quadratic oracle.
 Direction rescaling from subnormal through maximum finite f32 values is covered.
 
+## Ray and segment versus triangle
+
+`ray_triangle(ray, [a, b, c], max_distance, culling)` returns the hit distance
+(world space, like the other ray queries), point, barycentric weights of
+`a`, `b`, `c` and the facing. `segment_triangle(start, end, triangle, culling)`
+reports the normalized fraction between the endpoints instead.
+
+```rust
+use geometry_kernels::{Ray3, TriangleCulling, TriangleFacing, ray_triangle};
+
+let triangle = [[0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0]];
+let ray = Ray3::new([0.5, 0.5, 3.0], [0.0, 0.0, -1.0]);
+let hit = ray_triangle(ray, triangle, f64::INFINITY, TriangleCulling::BackFaces).unwrap();
+assert_eq!(hit.distance, 3.0);
+assert_eq!(hit.barycentric, [0.5, 0.25, 0.25]);
+assert_eq!(hit.facing, TriangleFacing::Front);
+```
+
+- The front face is the side the counter-clockwise normal `(b - a) × (c - a)`
+  points to. `TriangleCulling::BackFaces` rejects back-face hits;
+  `TriangleCulling::None` reports both with their facing.
+- Edges, vertices, distance zero and `max_distance` (segment endpoints) are
+  inclusive. Comparisons are exact in f64 after widening the f32 inputs.
+- Rays parallel to the plane, including coplanar rays crossing the triangle,
+  and degenerate (zero-area) triangles never hit. A zero-length segment never
+  hits.
+- The queries do not allocate. Triangle iteration, BVH traversal and collision
+  response stay with the consumer.
+
+Tests compare 8,192 generated queries with an independent plane-intersection
+and signed-area oracle (skipping inputs within rounding of an edge), cover
+front/back, edge, vertex, parallel, coplanar, degenerate and bounded cases, and
+check direction-scale and translation invariance.
+
 ## Continuous sphere/sphere contact
 
 `sphere_sphere_time_of_impact` returns the earliest contact for one sphere
@@ -44,8 +78,8 @@ assert_eq!(hit.time, 1.5);
 
 The kernel deliberately stops at time of impact. Collision response, impulses,
 timestep advancement, filtering, broad-phase traversal and scene authority
-remain consumer responsibilities. General convex CCD and triangle/mesh ray
-queries are separate follow-up decisions.
+remain consumer responsibilities. General convex CCD and mesh-level ray
+traversal are separate follow-up decisions.
 
 Generated tests compare 4,096 sweeps with a direct time-domain quadratic oracle
 and cover velocity scaling, bounded windows, stationary/receding motion and
@@ -58,7 +92,7 @@ cargo bench -p geometry-kernels --bench ray_queries
 ```
 
 The Divan suite measures deterministic batches of 64, 1,024 and 4,096 AABBs,
-spheres and sphere sweeps. Input construction is outside the timed region and
+spheres, sphere sweeps and triangles (hit-heavy, mixed and miss-heavy). Input construction is outside the timed region and
 every workload returns a checksum so the query loop cannot disappear. Raw
 wall-clock measurements remain informational.
 

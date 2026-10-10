@@ -201,3 +201,27 @@ fn retained_heightfield_queries_allocate_nothing_and_reuse_one_normal() {
     assert_eq!(REALLOCS.with(Cell::get), 0);
     assert_eq!(terrain.preparation(), preparation);
 }
+
+#[test]
+fn ray_and_segment_triangle_queries_allocate_nothing() {
+    use geometry_kernels::{Ray3, TriangleCulling, ray_triangle, segment_triangle};
+    let triangle = [[0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0]];
+    ALLOCS.with(|count| count.set(0));
+    REALLOCS.with(|count| count.set(0));
+    ENABLED.with(|enabled| enabled.set(true));
+    let mut hits = 0;
+    for step in 0..1024_u16 {
+        let x = f32::from(step % 32) * 0.1 - 0.5;
+        let y = f32::from(step / 32) * 0.1 - 0.5;
+        let ray = Ray3::new([x, y, 3.0], [0.0, 0.0, -1.0]);
+        hits += usize::from(
+            ray_triangle(ray, triangle, f64::INFINITY, TriangleCulling::BackFaces).is_some(),
+        );
+        hits += usize::from(
+            segment_triangle([x, y, 1.0], [x, y, -1.0], triangle, TriangleCulling::None).is_some(),
+        );
+    }
+    ENABLED.with(|enabled| enabled.set(false));
+    assert!(hits > 0);
+    assert_eq!(ALLOCS.with(Cell::get) + REALLOCS.with(Cell::get), 0);
+}
