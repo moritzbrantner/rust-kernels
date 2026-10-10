@@ -138,9 +138,24 @@ pub fn segment_triangle(
         intersect_exact_direction(origin, exact_delta, [a, b, c], 1.0, culling)?;
     Some(SegmentTriangleHit {
         fraction,
-        point: add(origin, scale(delta, fraction)),
+        point: segment_point(origin, end.map(f64::from), exact_delta, fraction),
         barycentric,
         facing,
+    })
+}
+
+/// The point at `fraction` along the segment, interpolated from the nearer
+/// endpoint with both parts of the exact segment vector. Fractions 0 and 1
+/// return `start` and `end` exactly, even where `end - start` rounds in f64.
+fn segment_point(start: Vec3, end: Vec3, exact_delta: [Exact; 3], fraction: f64) -> Vec3 {
+    std::array::from_fn(|axis| {
+        let [high, low] = exact_delta[axis];
+        if fraction <= 0.5 {
+            start[axis] + (high * fraction + low * fraction)
+        } else {
+            let remaining = 1.0 - fraction;
+            end[axis] - (high * remaining + low * remaining)
+        }
     })
 }
 
@@ -958,6 +973,42 @@ mod tests {
             );
         }
         assert!(rounded > 4000, "fixture must need the low parts: {rounded}");
+    }
+
+    #[test]
+    fn segment_hit_points_keep_exact_endpoints_when_the_vector_rounds() {
+        // end - start rounds in f64 (f32::MAX against 2^47), so interpolating
+        // with the rounded vector alone puts the end point at z = 0.
+        let plane = 2.0_f32.powi(47);
+        let triangle = [[0.0, 0.0, plane], [1.0, 0.0, plane], [0.0, 1.0, plane]];
+        let ends = segment_triangle(
+            [0.25, 0.25, f32::MAX],
+            [0.25, 0.25, plane],
+            triangle,
+            TriangleCulling::None,
+        )
+        .expect("segment ends on the triangle");
+        assert_eq!(ends.fraction, 1.0);
+        assert_eq!(ends.point, [0.25, 0.25, f64::from(plane)]);
+        let starts = segment_triangle(
+            [0.25, 0.25, plane],
+            [0.25, 0.25, -f32::MAX],
+            triangle,
+            TriangleCulling::None,
+        )
+        .expect("segment starts on the triangle");
+        assert_eq!(starts.fraction, 0.0);
+        assert_eq!(starts.point, [0.25, 0.25, f64::from(plane)]);
+        // Interior fractions still land on the plane.
+        let crossing = segment_triangle(
+            [0.25, 0.75, 3.0],
+            [0.25, -0.25, -1.0],
+            [[0.0, 0.0, 1.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0]],
+            TriangleCulling::None,
+        )
+        .expect("segment crosses the triangle");
+        assert_eq!(crossing.fraction, 0.5);
+        assert_eq!(crossing.point, [0.25, 0.25, 1.0]);
     }
 
     #[test]
