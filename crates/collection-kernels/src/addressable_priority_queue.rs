@@ -6,11 +6,24 @@ use std::sync::atomic::{AtomicU64, Ordering};
 static NEXT_QUEUE_ID: AtomicU64 = AtomicU64::new(1);
 
 fn allocate_queue_id() -> u64 {
-    NEXT_QUEUE_ID
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
-            current.checked_add(1)
-        })
-        .expect("exhausted addressable priority queue identities")
+    // A compare-exchange loop rather than `fetch_update`, which Rust 1.99
+    // deprecates in favour of `try_update` (unavailable on the older
+    // toolchains this crate supports).
+    let mut current = NEXT_QUEUE_ID.load(Ordering::Relaxed);
+    loop {
+        let next = current
+            .checked_add(1)
+            .expect("exhausted addressable priority queue identities");
+        match NEXT_QUEUE_ID.compare_exchange_weak(
+            current,
+            next,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        ) {
+            Ok(previous) => return previous,
+            Err(actual) => current = actual,
+        }
+    }
 }
 
 /// Opaque identity for an entry in an [`AddressablePriorityQueue`].
