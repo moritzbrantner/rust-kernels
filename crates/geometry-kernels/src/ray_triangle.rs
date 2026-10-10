@@ -15,7 +15,8 @@
 //!   distance (segment endpoints) count, and every other point misses. The
 //!   inside, behind-the-origin and beyond-the-bound tests use the exact signs
 //!   of their triple-product numerators for the f64 inputs (the widened f32
-//!   corners and origin, the unit ray direction or the raw segment vector):
+//!   corners and origin, the unit ray direction, or the exact segment vector
+//!   `end - start` even where f64 rounds it):
 //!   each numerator is computed in f64 and kept when it clears a
 //!   componentwise forward error bound, and is otherwise evaluated exactly
 //!   with error-free transformations (two-sum, two-product) into a
@@ -121,7 +122,11 @@ pub fn segment_triangle(
         "segment endpoints must be finite"
     );
     let origin = start.map(f64::from);
-    let delta = sub(end.map(f64::from), origin);
+    // The exact segment vector: f64 can round `end - start` when the
+    // coordinates differ widely in magnitude, so the exact fallbacks keep the
+    // tail and the endpoint bound stays exact.
+    let exact_delta = exact_difference(end.map(f64::from), origin);
+    let delta = exact_delta.map(|[high, _]| high);
     if delta == [0.0; 3] {
         return None;
     }
@@ -129,12 +134,28 @@ pub fn segment_triangle(
     // Intersect along the raw segment vector so the parameter already is the
     // fraction and the endpoint bound is compared without normalization
     // rounding.
-    let (fraction, barycentric, facing) = intersect(origin, delta, [a, b, c], 1.0, culling)?;
+    let (fraction, barycentric, facing) =
+        intersect_exact_direction(origin, exact_delta, [a, b, c], 1.0, culling)?;
     Some(SegmentTriangleHit {
         fraction,
-        point: add(origin, scale(delta, fraction)),
+        point: segment_point(origin, end.map(f64::from), exact_delta, fraction),
         barycentric,
         facing,
+    })
+}
+
+/// The point at `fraction` along the segment, interpolated from the nearer
+/// endpoint with both parts of the exact segment vector. Fractions 0 and 1
+/// return `start` and `end` exactly, even where `end - start` rounds in f64.
+fn segment_point(start: Vec3, end: Vec3, exact_delta: [Exact; 3], fraction: f64) -> Vec3 {
+    std::array::from_fn(|axis| {
+        let [high, low] = exact_delta[axis];
+        if fraction <= 0.5 {
+            start[axis] + (high * fraction + low * fraction)
+        } else {
+            let remaining = 1.0 - fraction;
+            end[axis] - (high * remaining + low * remaining)
+        }
     })
 }
 
@@ -159,9 +180,10 @@ fn ray_triangle_f64(
 /// its componentwise magnitude (see [`triple_magnitude`]). Forming the
 /// differences, the cross product and the dot product perturbs a computed
 /// triple product by at most about `7 ε` of that magnitude (Shewchuk's
-/// `orient3d` bound), and the derived numerators (`w` and the bound gap) add
-/// at most two more roundings; twice that leaves margin for rounding in the
-/// magnitude itself. Barring underflow, a computed numerator farther from zero
+/// `orient3d` bound), a segment vector rounded from its exact endpoint
+/// difference adds at most half an ulp, and the derived numerators (`w` and
+/// the bound gap) add at most two more roundings; twice that leaves margin
+/// for rounding in the magnitude itself. Barring underflow, a computed numerator farther from zero
 /// than this bound has the sign of the exact one.
 const ERROR_BOUND: f64 = 16.0 * f64::EPSILON;
 
@@ -204,7 +226,7 @@ fn certain_sign(
     error: f64,
     numerator: Numerator,
     origin: Vec3,
-    direction: Vec3,
+    direction: [Exact; 3],
     corners: [Vec3; 3],
 ) -> f64 {
     if value.abs() > error || error == 0.0 {
@@ -222,10 +244,9 @@ fn certain_sign(
 fn exact_numerator(
     numerator: Numerator,
     origin: Vec3,
-    direction: Vec3,
+    direction: [Exact; 3],
     [a, b, c]: [Vec3; 3],
 ) -> f64 {
-    let direction = exact_vector(direction);
     match numerator {
         Numerator::Determinant => determinant_numerator(direction, [a, b, c]).estimate(),
         Numerator::U => exact_triple(
@@ -278,10 +299,31 @@ fn parameter_numerator(origin: Vec3, [a, b, c]: [Vec3; 3]) -> Expansion<TRIPLE_T
 fn intersect(
     origin: Vec3,
     direction: Vec3,
+    triangle: [Vec3; 3],
+    max_parameter: f64,
+    culling: TriangleCulling,
+) -> Option<(f64, [f64; 3], TriangleFacing)> {
+    intersect_exact_direction(
+        origin,
+        exact_vector(direction),
+        triangle,
+        max_parameter,
+        culling,
+    )
+}
+
+/// [`intersect`] along a direction given exactly as `[high, low]` pairs. The
+/// f64 fast path uses the high parts; the error bound covers the dropped low
+/// parts (at most half an ulp each), and the exact fallbacks use both, so the
+/// decision is exact for the unrounded direction.
+fn intersect_exact_direction(
+    origin: Vec3,
+    exact_direction: [Exact; 3],
     [a, b, c]: [Vec3; 3],
     max_parameter: f64,
     culling: TriangleCulling,
 ) -> Option<(f64, [f64; 3], TriangleFacing)> {
+    let direction = exact_direction.map(|[high, _]| high);
     assert!(
         [a, b, c].iter().flatten().all(|value| value.is_finite()),
         "triangle corners must be finite"
@@ -309,7 +351,7 @@ fn intersect(
         determinant_error,
         Numerator::Determinant,
         origin,
-        direction,
+        exact_direction,
         corners,
     ) {
         0.0 => return None,
@@ -334,12 +376,26 @@ fn intersect(
     // so the point is inside the closed triangle exactly when none opposes
     // its sign.
     let u_raw = dot(to_origin, p);
-    let u = certain_sign(u_raw, u_error, Numerator::U, origin, direction, corners);
+    let u = certain_sign(
+        u_raw,
+        u_error,
+        Numerator::U,
+        origin,
+        exact_direction,
+        corners,
+    );
     if u * orientation < 0.0 {
         return None;
     }
     let v_raw = dot(direction, q);
-    let v = certain_sign(v_raw, v_error, Numerator::V, origin, direction, corners);
+    let v = certain_sign(
+        v_raw,
+        v_error,
+        Numerator::V,
+        origin,
+        exact_direction,
+        corners,
+    );
     if v * orientation < 0.0 {
         return None;
     }
@@ -349,7 +405,7 @@ fn intersect(
         determinant_error + u_error + v_error,
         Numerator::W,
         origin,
-        direction,
+        exact_direction,
         corners,
     );
     if w * orientation < 0.0 {
@@ -359,7 +415,14 @@ fn intersect(
     // Parameter numerator: behind the origin when its sign opposes the
     // determinant's.
     let t_raw = dot(edge_ac, q);
-    let t = certain_sign(t_raw, t_error, Numerator::T, origin, direction, corners);
+    let t = certain_sign(
+        t_raw,
+        t_error,
+        Numerator::T,
+        origin,
+        exact_direction,
+        corners,
+    );
     if t * orientation < 0.0 {
         return None;
     }
@@ -371,7 +434,7 @@ fn intersect(
             max_parameter * determinant_error + t_error,
             Numerator::BoundGap(max_parameter),
             origin,
-            direction,
+            exact_direction,
             corners,
         );
         if gap * orientation < 0.0 {
@@ -910,6 +973,42 @@ mod tests {
             );
         }
         assert!(rounded > 4000, "fixture must need the low parts: {rounded}");
+    }
+
+    #[test]
+    fn segment_hit_points_keep_exact_endpoints_when_the_vector_rounds() {
+        // end - start rounds in f64 (f32::MAX against 2^47), so interpolating
+        // with the rounded vector alone puts the end point at z = 0.
+        let plane = 2.0_f32.powi(47);
+        let triangle = [[0.0, 0.0, plane], [1.0, 0.0, plane], [0.0, 1.0, plane]];
+        let ends = segment_triangle(
+            [0.25, 0.25, f32::MAX],
+            [0.25, 0.25, plane],
+            triangle,
+            TriangleCulling::None,
+        )
+        .expect("segment ends on the triangle");
+        assert_eq!(ends.fraction, 1.0);
+        assert_eq!(ends.point, [0.25, 0.25, f64::from(plane)]);
+        let starts = segment_triangle(
+            [0.25, 0.25, plane],
+            [0.25, 0.25, -f32::MAX],
+            triangle,
+            TriangleCulling::None,
+        )
+        .expect("segment starts on the triangle");
+        assert_eq!(starts.fraction, 0.0);
+        assert_eq!(starts.point, [0.25, 0.25, f64::from(plane)]);
+        // Interior fractions still land on the plane.
+        let crossing = segment_triangle(
+            [0.25, 0.75, 3.0],
+            [0.25, -0.25, -1.0],
+            [[0.0, 0.0, 1.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0]],
+            TriangleCulling::None,
+        )
+        .expect("segment crosses the triangle");
+        assert_eq!(crossing.fraction, 0.5);
+        assert_eq!(crossing.point, [0.25, 0.25, 1.0]);
     }
 
     #[test]
