@@ -12,8 +12,11 @@
 //!   face hits; [`TriangleCulling::None`] reports both with their facing.
 //! - **Boundaries are inclusive.** Hits exactly on an edge or a vertex, at
 //!   distance zero (origin on the triangle) and exactly at the maximum
-//!   distance (segment endpoints) count. Comparisons are exact in f64 after
-//!   widening the f32 inputs, so results are deterministic.
+//!   distance (segment endpoints) count. The tests run in f64 after
+//!   widening the f32 inputs and admit each quantity within a bound on its
+//!   own rounding error (then clamp), so such hits are not lost to rounding;
+//!   results are deterministic. Segments are intersected along their raw
+//!   vector, so the endpoint bound is compared in fraction space.
 //! - **Parallel rays miss.** A ray whose direction lies in the triangle's
 //!   plane (within a relative tolerance), including a coplanar ray crossing
 //!   the triangle, reports no hit: a coplanar contact has no unique distance
@@ -112,33 +115,59 @@ pub fn segment_triangle(
     );
     let origin = start.map(f64::from);
     let delta = sub(end.map(f64::from), origin);
-    let length = length_squared(delta).sqrt();
-    if length == 0.0 {
+    if delta == [0.0; 3] {
         return None;
     }
-    let direction = scale(delta, length.recip());
     let [a, b, c] = triangle.map(|corner| corner.map(f64::from));
-    let hit = ray_triangle_f64(origin, direction, [a, b, c], length, culling)?;
+    // Intersect along the raw segment vector so the parameter already is the
+    // fraction and the endpoint bound is compared without normalization
+    // rounding.
+    let (fraction, barycentric, facing) = intersect(origin, delta, [a, b, c], 1.0, culling)?;
     Some(SegmentTriangleHit {
-        fraction: (hit.distance / length).min(1.0),
-        point: hit.point,
-        barycentric: hit.barycentric,
-        facing: hit.facing,
+        fraction,
+        point: add(origin, scale(delta, fraction)),
+        barycentric,
+        facing,
     })
 }
 
 fn ray_triangle_f64(
     origin: Vec3,
     direction: Vec3,
-    [a, b, c]: [Vec3; 3],
+    triangle: [Vec3; 3],
     max_distance: f64,
     culling: TriangleCulling,
 ) -> Option<RayTriangleHit> {
+    let (distance, barycentric, facing) =
+        intersect(origin, direction, triangle, max_distance, culling)?;
+    Some(RayTriangleHit {
+        distance,
+        point: add(origin, scale(direction, distance)),
+        barycentric,
+        facing,
+    })
+}
+
+/// Rounding allowance, in units of each quantity's own error scale, for the
+/// inclusive boundary tests (vertices, edges, distance zero and the bound).
+const BOUNDARY_TOLERANCE: f64 = 8.0 * f64::EPSILON;
+
+/// Möller–Trumbore along `direction` (any non-zero length): the hit
+/// parameter in units of `direction`, within `[0, max_parameter]`, with
+/// barycentric weights and facing. Boundary admission allows for the
+/// rounding of each term, then clamps, so hits exactly on vertices, edges,
+/// the origin or the bound are kept.
+fn intersect(
+    origin: Vec3,
+    direction: Vec3,
+    [a, b, c]: [Vec3; 3],
+    max_parameter: f64,
+    culling: TriangleCulling,
+) -> Option<(f64, [f64; 3], TriangleFacing)> {
     assert!(
         [a, b, c].iter().flatten().all(|value| value.is_finite()),
         "triangle corners must be finite"
     );
-    // Möller–Trumbore with a unit direction.
     let edge_ab = sub(b, a);
     let edge_ac = sub(c, a);
     let normal = cross(edge_ab, edge_ac);
@@ -146,10 +175,11 @@ fn ray_triangle_f64(
     if normal_length_squared == 0.0 {
         return None;
     }
+    let direction_length = length_squared(direction).sqrt();
     let p = cross(direction, edge_ac);
     // determinant = -(direction · normal).
     let determinant = dot(edge_ab, p);
-    if determinant.abs() <= PARALLEL_TOLERANCE * normal_length_squared.sqrt() {
+    if determinant.abs() <= PARALLEL_TOLERANCE * normal_length_squared.sqrt() * direction_length {
         return None;
     }
     let facing = if determinant > 0.0 {
@@ -162,25 +192,33 @@ fn ray_triangle_f64(
     }
     let inverse = determinant.recip();
     let to_origin = sub(origin, a);
-    let u = dot(to_origin, p) * inverse;
-    if !(0.0..=1.0).contains(&u) {
-        return None;
-    }
     let q = cross(to_origin, edge_ab);
-    let v = dot(direction, q) * inverse;
-    if v < 0.0 || u + v > 1.0 {
+    let norm = |vector: Vec3| length_squared(vector).sqrt();
+    // Each quotient's rounding error is bounded by its numerator's magnitude.
+    let u_error = BOUNDARY_TOLERANCE * norm(to_origin) * norm(p) * inverse.abs();
+    let v_error = BOUNDARY_TOLERANCE * direction_length * norm(q) * inverse.abs();
+    let t_error = BOUNDARY_TOLERANCE * norm(edge_ac) * norm(q) * inverse.abs();
+    let mut u = dot(to_origin, p) * inverse;
+    let mut v = dot(direction, q) * inverse;
+    if u < -u_error || v < -v_error || u + v > 1.0 + u_error + v_error {
         return None;
     }
-    let distance = dot(edge_ac, q) * inverse;
-    if !(0.0..=max_distance).contains(&distance) {
+    let parameter = dot(edge_ac, q) * inverse;
+    if parameter < -t_error || parameter > max_parameter + t_error {
         return None;
     }
-    Some(RayTriangleHit {
-        distance,
-        point: add(origin, scale(direction, distance)),
-        barycentric: [1.0 - u - v, u, v],
+    u = u.max(0.0);
+    v = v.max(0.0);
+    if u + v > 1.0 {
+        let sum = u + v;
+        u /= sum;
+        v /= sum;
+    }
+    Some((
+        parameter.clamp(0.0, max_parameter),
+        [(1.0 - u - v).max(0.0), u, v],
         facing,
-    })
+    ))
 }
 
 #[cfg(test)]
@@ -329,6 +367,35 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    #[test]
+    fn origins_on_vertices_and_segment_ends_on_the_plane_hit() {
+        // Rays starting exactly on each vertex, in generic directions.
+        let triangle = [[0.3, -1.7, 2.9], [4.1, 0.2, -0.6], [-2.2, 3.3, 1.4]];
+        for corner in triangle {
+            for direction in [[0.3, 0.9, -0.2], [-0.7, 0.1, 0.5], [0.2, -0.4, -0.9]] {
+                let ray = Ray3::new(corner, direction);
+                let hit = ray_triangle(ray, triangle, f64::INFINITY, TriangleCulling::None);
+                let hit = hit.unwrap_or_else(|| panic!("vertex {corner:?} {direction:?}"));
+                assert_eq!(hit.distance, 0.0);
+                assert!(hit.barycentric.iter().all(|w| (0.0..=1.0).contains(w)));
+            }
+        }
+        // Segments ending exactly on the triangle's plane, at generic points.
+        let mut state = 0x2545_f491_u32;
+        let mut next = || {
+            state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (state >> 8) as f32 / (1_u32 << 24) as f32
+        };
+        let flat = [[-3.0, -3.0, 0.75], [5.0, -3.0, 0.75], [-3.0, 5.0, 0.75]];
+        for _ in 0..512 {
+            let end = [next() * 2.0 - 1.0, next() * 2.0 - 1.0, 0.75];
+            let start = [next() * 6.0 - 3.0, next() * 6.0 - 3.0, next() * 4.0 + 1.0];
+            let hit = segment_triangle(start, end, flat, TriangleCulling::None)
+                .unwrap_or_else(|| panic!("segment {start:?} -> {end:?}"));
+            assert!((hit.fraction - 1.0).abs() <= 1.0e-12, "{}", hit.fraction);
+        }
     }
 
     /// Independent oracle: intersect the supporting plane, then classify the

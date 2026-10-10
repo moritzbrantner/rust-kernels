@@ -49,7 +49,9 @@ assert_eq!(hit.facing, TriangleFacing::Front);
   points to. `TriangleCulling::BackFaces` rejects back-face hits;
   `TriangleCulling::None` reports both with their facing.
 - Edges, vertices, distance zero and `max_distance` (segment endpoints) are
-  inclusive. Comparisons are exact in f64 after widening the f32 inputs.
+  inclusive. The tests run in f64 after widening the f32 inputs and admit
+  each quantity within a bound on its own rounding error before clamping,
+  so exact boundary hits are not lost to rounding.
 - Rays parallel to the plane, including coplanar rays crossing the triangle,
   and degenerate (zero-area) triangles never hit. A zero-length segment never
   hits.
