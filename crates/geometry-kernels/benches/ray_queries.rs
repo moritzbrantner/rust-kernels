@@ -2,7 +2,9 @@ use divan::{Bencher, black_box};
 use geometry_kernels::primitive3::{
     PrimitiveBody3, PrimitiveRayWork3, PrimitiveShape3, try_ray_cast,
 };
-use geometry_kernels::{Ray3, Sphere, ray_aabb, ray_sphere, sphere_sphere_time_of_impact};
+use geometry_kernels::{
+    Ray3, Sphere, TriangleCulling, ray_aabb, ray_sphere, ray_triangle, sphere_sphere_time_of_impact,
+};
 use spatial_kernels::Aabb;
 
 fn main() {
@@ -95,6 +97,49 @@ fn sphere_sweep_batch(bencher: Bencher, n: usize) {
                 )
             })
             .map(|hit| hit.time)
+            .sum::<f64>();
+        black_box(checksum)
+    });
+}
+
+/// Unit right triangles on a grid in the z = 0 plane; `hit_share` of them lie
+/// under the ray footprint (the rest are shifted out of the way).
+fn triangles(n: usize, hit_share: usize) -> Vec<[[f32; 3]; 3]> {
+    (0..n)
+        .map(|i| {
+            let x = (i % 64) as f32 * 1.5;
+            let y = ((i / 64) % 64) as f32 * 1.5;
+            // Every fourth slot is a candidate hit for hit_share = 1, all for 4.
+            let offset = if i % 4 < hit_share { 0.0 } else { 0.9 };
+            [
+                [x + offset, y + offset, 0.0],
+                [x + 1.0 + offset, y + offset, 0.0],
+                [x + offset, y + 1.0 + offset, 0.0],
+            ]
+        })
+        .collect()
+}
+
+/// Hit-heavy (4/4), mixed (2/4) and miss-heavy (0/4) batches: one ray per
+/// triangle aimed at the point (0.25, 0.25) of its unshifted slot.
+#[divan::bench(args = [64, 1024, 4096], consts = [0, 2, 4])]
+fn ray_triangle_batch<const HIT_SHARE: usize>(bencher: Bencher, n: usize) {
+    let values = triangles(n, HIT_SHARE);
+    let rays: Vec<Ray3> = (0..n)
+        .map(|i| {
+            let x = (i % 64) as f32 * 1.5 + 0.25;
+            let y = ((i / 64) % 64) as f32 * 1.5 + 0.25;
+            Ray3::new([x, y, 2.0], [0.01, 0.02, -1.0])
+        })
+        .collect();
+    bencher.bench_local(|| {
+        let checksum = black_box(&values)
+            .iter()
+            .zip(black_box(&rays))
+            .filter_map(|(triangle, ray)| {
+                ray_triangle(*ray, *triangle, f64::INFINITY, TriangleCulling::BackFaces)
+            })
+            .map(|hit| hit.distance)
             .sum::<f64>();
         black_box(checksum)
     });

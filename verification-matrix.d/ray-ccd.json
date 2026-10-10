@@ -25,6 +25,28 @@
       ]
     },
     {
+      "id": "ray-triangle",
+      "crate": "geometry-kernels",
+      "module": "crate::ray_triangle",
+      "sources": [
+        "crates/geometry-kernels/src/ray_triangle.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "n/a",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "deterministicPerformance: Per-query algorithmic work is constant with fixed dimensionality; size-scaled wall-clock batches are informational rather than a blocking complexity gate.",
+        "Moller-Trumbore ray/segment-triangle queries are checked against an independent plane-intersection and signed-area oracle on 8,192 generated fixtures.",
+        "Fixtures cover front/back faces with and without back-face culling, inclusive edges and vertices, parallel and coplanar rays, degenerate triangles, distance bounds and segment endpoints.",
+        "Direction magnitude and triangle translation are metamorphically tested; an allocation ratchet proves the queries allocate nothing.",
+        "criterion: Divan ray_queries benches include hit-heavy, mixed and miss-heavy ray_triangle batches; wall-clock timing is informational."
+      ]
+    },
+    {
       "id": "sphere-sphere-time-of-impact",
       "crate": "geometry-kernels",
       "module": "crate::continuous",
