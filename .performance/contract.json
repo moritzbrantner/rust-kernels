@@ -488,7 +488,13 @@
           "budget": {
             "max": 8191
           },
-          "notes": "Exactly 2n - popcount(n) AddAssign calls (2n - 1 at these powers of two), asserted per scale point in crates/collection-kernels/tests/work_complexity.rs together with a non-increasing marginal-work check. No growth bound is declared: the shared linear bound v(x) * x0 <= v(x0) * x rejects affine counts with a negative fixed term such as 2n - 1, so the budget at 4096 items carries the contract until coding-tooling has a vocabulary for it."
+          "notes": "Exactly 2n - popcount(n) AddAssign calls (2n - 1 at these powers of two), asserted per scale point in crates/collection-kernels/tests/work_complexity.rs together with a non-increasing marginal-work check. The shared linear bound uses a marginal-rate test (coding-tooling#309), which accepts the negative fixed term; the budget at 4096 items still rejects any extra work at the largest point.",
+          "growth": [
+            {
+              "dimension": "items",
+              "bound": "linear"
+            }
+          ]
         }
       ]
     },
@@ -588,7 +594,13 @@
           "budget": {
             "max": 20484
           },
-          "notes": "Exactly (2k + 1) n - k (k + 1) + 2 = 5n - 4 comparisons, asserted per scale point in crates/similarity-kernels/tests/work_complexity.rs together with a non-increasing marginal-work check; the full oracle needs n^2. No growth bound is declared because the shared linear bound rejects the negative fixed term from the truncated band corners; the budget is 5n + 4 at 4096 elements, matching the single-size scenario."
+          "notes": "Exactly (2k + 1) n - k (k + 1) + 2 = 5n - 4 comparisons, asserted per scale point in crates/similarity-kernels/tests/work_complexity.rs together with a non-increasing marginal-work check; the full oracle needs n^2. The shared linear bound uses a marginal-rate test (coding-tooling#309), which accepts the negative fixed term from the truncated band corners; the budget is 5n + 4 at 4096 elements, matching the single-size scenario.",
+          "growth": [
+            {
+              "dimension": "elements",
+              "bound": "linear"
+            }
+          ]
         }
       ]
     },
