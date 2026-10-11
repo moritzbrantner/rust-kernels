@@ -11,7 +11,8 @@ permissions:
 jobs:
   score-history:
     permissions:
+      actions: read
       contents: write
-    uses: moritzbrantner/reusable-workflows/.github/workflows/coding-tooling-score-history.yml@27bcfd648f5fdf3f08b3e4b1adc96ccce28508bc
+    uses: moritzbrantner/reusable-workflows/.github/workflows/coding-tooling-score-history.yml@a11ca7f3feaca0936803308cf4b150b4150cb99c
     with:
       tier: full
