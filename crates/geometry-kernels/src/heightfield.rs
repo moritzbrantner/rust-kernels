@@ -3,7 +3,7 @@
 
 use std::{error::Error, fmt, mem::size_of};
 
-use crate::math3::{Vec3, add, dot, length, scale, sub as vsub};
+use crate::math3::{Vec3, add, cross, dot, length, normalized, scale, sub as vsub};
 use crate::primitive3::{closest_point_triangle, closest_segment_points};
 use crate::ray_triangle::segment_triangle_f64;
 
@@ -38,6 +38,15 @@ pub struct HeightfieldContact3 {
     pub normal: Vec3,
     /// Closest point on the terrain.
     pub point: Vec3,
+}
+
+/// A convex polytope in world space for overlap tests: its vertices, outward face normals and
+/// edge directions (one per parallel edge class; length does not matter).
+#[derive(Clone, Copy, Debug)]
+pub struct ConvexPolytope3<'a> {
+    pub vertices: &'a [Vec3],
+    pub face_normals: &'a [Vec3],
+    pub edges: &'a [Vec3],
 }
 
 /// First hit of a segment against a heightfield.
@@ -412,6 +421,40 @@ impl PreparedHeightfield3 {
         best
     }
 
+    /// Overlap of the convex `polytope` (a box or wedge) with the enabled triangles under its
+    /// footprint, by the separating-axis test: face normals of both shapes and the cross
+    /// products of their edges. Whether they overlap is exact. For each overlapping triangle
+    /// the axis of least penetration against that triangle alone gives its depth
+    /// (`separation <= 0`) and normal (from the triangle toward the polytope); the deepest
+    /// triangle is reported, ties keeping the lower id. That depth can be smaller than the
+    /// polytope's depth below the whole surface (a thin plank leaves one triangle sideways).
+    #[must_use]
+    pub fn polytope_contact_counted(
+        &self,
+        polytope: ConvexPolytope3<'_>,
+        work: &mut HeightfieldWork3,
+    ) -> Option<HeightfieldContact3> {
+        work.queries += 1;
+        let (mut min, mut max) = ([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]);
+        for v in polytope.vertices {
+            min = [min[0].min(v[0]), min[1].min(v[2])];
+            max = [max[0].max(v[0]), max[1].max(v[2])];
+        }
+        let mut best: Option<HeightfieldContact3> = None;
+        self.visit_triangles_counted(min, max, work, |id, triangle, normal| {
+            let Some(contact) = polytope_triangle_contact(polytope, triangle, normal) else {
+                return;
+            };
+            if best.is_none_or(|b| contact.separation < b.separation) {
+                best = Some(HeightfieldContact3 {
+                    triangle: id,
+                    ..contact
+                });
+            }
+        });
+        best
+    }
+
     /// First contact of the capsule `p`–`q`/`radius` translated by `displacement` within
     /// `0..=1`, by conservative advancement over the triangles under the swept footprint.
     /// Starting in contact (separation <= 0) reports fraction 0. Returns `Err` when
@@ -729,6 +772,90 @@ fn cell_span(coordinates: &[f64], min: f64, max: f64) -> Option<(usize, usize)> 
 }
 
 /// Closest points between the segment `p`–`q` and a triangle, as a capsule contact.
+/// Separating-axis overlap of a convex polytope with one triangle (see
+/// [`PreparedHeightfield3::polytope_contact_counted`]).
+fn polytope_triangle_contact(
+    polytope: ConvexPolytope3<'_>,
+    triangle: [Vec3; 3],
+    triangle_normal: Vec3,
+) -> Option<HeightfieldContact3> {
+    let span = |points: &[Vec3], axis: Vec3| {
+        points
+            .iter()
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), p| {
+                let d = dot(*p, axis);
+                (lo.min(d), hi.max(d))
+            })
+    };
+    let centre = scale(add(add(triangle[0], triangle[1]), triangle[2]), 1.0 / 3.0);
+    let polytope_centre = scale(
+        polytope
+            .vertices
+            .iter()
+            .fold([0.0; 3], |sum, v| add(sum, *v)),
+        1.0 / polytope.vertices.len() as f64,
+    );
+    let mut best: Option<(f64, Vec3)> = None;
+    let mut test = |axis: Vec3| -> bool {
+        let Some(axis) = normalized(axis) else {
+            return true; // Parallel edges: no axis.
+        };
+        let (a_lo, a_hi) = span(polytope.vertices, axis);
+        let (b_lo, b_hi) = span(&triangle, axis);
+        let overlap = (a_hi - b_lo).min(b_hi - a_lo);
+        if overlap < 0.0 {
+            return false;
+        }
+        // Orient the axis from the triangle toward the polytope.
+        let axis = if dot(vsub(polytope_centre, centre), axis) < 0.0 {
+            scale(axis, -1.0)
+        } else {
+            axis
+        };
+        if best.is_none_or(|(depth, _)| overlap < depth) {
+            best = Some((overlap, axis));
+        }
+        true
+    };
+    if !test(triangle_normal) {
+        return None;
+    }
+    for &n in polytope.face_normals {
+        if !test(n) {
+            return None;
+        }
+    }
+    let triangle_edges = [
+        vsub(triangle[1], triangle[0]),
+        vsub(triangle[2], triangle[1]),
+        vsub(triangle[0], triangle[2]),
+    ];
+    for &e in polytope.edges {
+        for &f in &triangle_edges {
+            if !test(cross(e, f)) {
+                return None;
+            }
+        }
+    }
+    let (depth, normal) = best?;
+    // Witness: the polytope's deepest vertex along the normal, moved out by the depth.
+    let deepest = polytope
+        .vertices
+        .iter()
+        .copied()
+        .fold((f64::INFINITY, [0.0; 3]), |(lo, at), v| {
+            let d = dot(v, normal);
+            if d < lo { (d, v) } else { (lo, at) }
+        })
+        .1;
+    Some(HeightfieldContact3 {
+        triangle: 0,
+        separation: -depth,
+        normal,
+        point: add(deepest, scale(normal, depth)),
+    })
+}
+
 fn segment_triangle_contact(
     p: Vec3,
     q: Vec3,
