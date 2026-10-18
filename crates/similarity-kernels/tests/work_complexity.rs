@@ -104,6 +104,8 @@ impl Eq for Counted {}
 const LIMIT: usize = 2;
 /// Powers of two from 128 to 4096 elements per sequence.
 const ELEMENTS: [usize; 6] = [128, 256, 512, 1024, 2048, 4096];
+/// Limits varied at a fixed 1024 elements, for the O(n · k) product bound.
+const LIMITS: [usize; 4] = [1, 4, 8, 16];
 
 /// Two sequences at distance two: `right` is `left` shifted by one element.
 fn fixture(elements: usize) -> (Vec<u8>, Vec<u8>) {
@@ -128,10 +130,40 @@ fn assert_non_increasing_marginal_work(name: &str, points: &[(usize, usize)]) {
     }
 }
 
+/// The tolerant rate test of coding-tooling's work checker for a model `g` (here the product
+/// n · k), for the self-check: ordered by `g`, the least-squares rate dv/dg of the upper half of
+/// the points must not exceed 1.25× the lower half's (floored at 0) plus one unit over the
+/// upper half's span.
+fn assert_within_model(name: &str, mut points: Vec<(f64, usize)>) {
+    points.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let slope = |p: &[(f64, usize)]| {
+        let n = p.len() as f64;
+        let gm = p.iter().map(|q| q.0).sum::<f64>() / n;
+        let vm = p.iter().map(|q| q.1 as f64).sum::<f64>() / n;
+        let num: f64 = p.iter().map(|q| (q.0 - gm) * (q.1 as f64 - vm)).sum();
+        let den: f64 = p.iter().map(|q| (q.0 - gm).powi(2)).sum();
+        num / den
+    };
+    let half = points.len().div_ceil(2);
+    let lower = slope(&points[..half]);
+    let upper_points = &points[points.len() - half..];
+    let upper = slope(upper_points);
+    let span = upper_points[half - 1].0 - upper_points[0].0;
+    let allowed = 1.25 * lower.max(0.0) + 1.0 / span;
+    assert!(
+        upper <= allowed * (1.0 + 1e-9),
+        "{name} grows faster than its model: {points:?} (rates {lower} then {upper})"
+    );
+}
+
 #[test]
 fn bounded_edit_comparisons_scale_linearly_with_a_fixed_limit() {
     let mut samples = Vec::new();
-    for elements in ELEMENTS {
+    let scale = ELEMENTS
+        .iter()
+        .map(|&elements| (elements, LIMIT))
+        .chain(LIMITS.iter().map(|&limit| (1024, limit)));
+    for (elements, limit) in scale {
         let (left, right) = fixture(elements);
         // Correctness first: the full quadratic oracle fixes the distance.
         let exact = levenshtein(&left, &right);
@@ -141,12 +173,13 @@ fn bounded_edit_comparisons_scale_linearly_with_a_fixed_limit() {
         let right = right.into_iter().map(Counted).collect::<Vec<_>>();
         let mut workspace = LevenshteinWorkspace::new();
         EQUALITY_CALLS.with(|count| count.set(0));
-        let distance = workspace.distance(&left, &right, LIMIT);
+        let distance = workspace.distance(&left, &right, limit);
         let comparisons = EQUALITY_CALLS.with(Cell::get);
-        assert_eq!(distance, Some(exact), "elements={elements}");
+        let expected = (limit >= exact).then_some(exact);
+        assert_eq!(distance, expected, "elements={elements} limit={limit}");
 
         samples.push((
-            vec![("elements", elements), ("limit", LIMIT)],
+            vec![("elements", elements), ("limit", limit)],
             vec![("equality-calls", comparisons)],
         ));
     }
@@ -155,21 +188,40 @@ fn bounded_edit_comparisons_scale_linearly_with_a_fixed_limit() {
         write_work_evidence(&dir, "bounded-edit-comparisons", &samples);
         return;
     }
-    let points = samples
-        .iter()
-        .map(|(dimensions, metrics)| (dimensions[0].1, metrics[0].1))
-        .collect::<Vec<_>>();
-    for &(elements, comparisons) in &points {
-        // One prefix and one suffix probe, then the width-five band minus its
+    for (dimensions, metrics) in &samples {
+        let (elements, limit, comparisons) = (dimensions[0].1, dimensions[1].1, metrics[0].1);
+        if limit < 2 {
+            continue; // Rejected early: the distance exceeds the limit.
+        }
+        // One prefix and one suffix probe, then the width-(2k + 1) band minus its
         // two truncated corners: (2k + 1) n - k (k + 1) + 2 comparisons.
         assert_eq!(
             comparisons,
-            (2 * LIMIT + 1) * elements - LIMIT * (LIMIT + 1) + 2,
-            "elements={elements}"
+            (2 * limit + 1) * elements - limit * (limit + 1) + 2,
+            "elements={elements} limit={limit}"
         );
-        assert!(comparisons <= 20484, "elements={elements}");
     }
-    assert_non_increasing_marginal_work("equality-calls", &points);
+    let along = |fixed: &dyn Fn(usize, usize) -> bool, axis: usize| {
+        samples
+            .iter()
+            .filter(|(d, _)| fixed(d[0].1, d[1].1))
+            .map(|(d, m)| (d[axis].1, m[0].1))
+            .collect::<Vec<_>>()
+    };
+    let by_elements = along(&|_, limit| limit == LIMIT, 0);
+    assert!(by_elements.iter().all(|&(_, v)| v <= 20484));
+    assert_non_increasing_marginal_work("equality-calls by elements", &by_elements);
+    let mut by_limit = along(&|elements, _| elements == 1024, 1);
+    by_limit.sort_unstable();
+    by_limit.dedup();
+    assert_non_increasing_marginal_work("equality-calls by limit", &by_limit);
+    assert_within_model(
+        "equality-calls by elements · limit",
+        samples
+            .iter()
+            .map(|(d, m)| ((d[0].1 * d[1].1) as f64, m[0].1))
+            .collect(),
+    );
 }
 
 #[test]

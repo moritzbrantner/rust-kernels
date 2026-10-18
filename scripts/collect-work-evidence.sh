@@ -36,6 +36,8 @@ run_tests -p geometry-kernels --lib -- --exact \
   epa::tests::disabled_trace_copies_stay_zero_across_iteration_caps
 run_tests -p geometry-kernels --test work_complexity -- --exact \
   easy_gjk_sphere_iterations_do_not_grow_with_coordinate_scale
+run_tests -p bvh-kernels --test work_complexity -- --exact \
+  box_and_segment_queries_visit_logarithmically_many_nodes
 
 # Contract order; a missing fragment means a test did not run or failed.
 operations=(
@@ -45,6 +47,8 @@ operations=(
   bounded-edit-warm-allocations
   epa-disabled-trace-copies
   gjk-easy-sphere-iterations
+  bvh-aabb-query-nodes
+  bvh-segment-query-nodes
 )
 fragments=()
 for operation in "${operations[@]}"; do
