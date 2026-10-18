@@ -399,7 +399,6 @@ impl PreparedHeightfield3 {
         displacement: Vec3,
         max_iterations: u32,
     ) -> Result<Option<HeightfieldSweepHit3>, HeightfieldError3> {
-        let speed = length(displacement);
         let scale_bound = p
             .into_iter()
             .chain(q)
@@ -430,36 +429,54 @@ impl PreparedHeightfield3 {
             }
             count += 1;
         });
-        let candidates = || triangles[..count.min(64)].iter().chain(spill.iter());
-        let nearest = |time: f64| {
-            let offset = scale(displacement, time);
-            let (a, b) = (add(p, offset), add(q, offset));
-            let mut best: Option<HeightfieldContact3> = None;
-            for &(id, triangle, normal) in candidates() {
-                if let Some(c) = segment_triangle_contact(a, b, radius, triangle, normal)
-                    && best.is_none_or(|x| c.separation < x.separation)
-                {
-                    best = Some(HeightfieldContact3 { triangle: id, ..c });
-                }
-            }
-            best
-        };
+        // Distance from the translating capsule to one convex triangle is convex in time, so a
+        // Newton step from below never passes its first touch; the smallest step over all
+        // still-approaching triangles is a safe advance.
+        let mut approaching = [true; 64];
+        let mut approaching_spill = vec![true; spill.len()];
         let mut time = 0.0_f64;
         for _ in 0..max_iterations {
-            let Some(contact) = nearest(time) else {
-                return Ok(None);
-            };
-            if contact.separation <= tolerance {
+            let offset = scale(displacement, time);
+            let (a, b) = (add(p, offset), add(q, offset));
+            let mut step = f64::INFINITY;
+            let mut touching: Option<HeightfieldContact3> = None;
+            for k in 0..count {
+                let (id, triangle, normal) = if k < 64 { triangles[k] } else { spill[k - 64] };
+                let flag = if k < 64 {
+                    &mut approaching[k]
+                } else {
+                    &mut approaching_spill[k - 64]
+                };
+                if !*flag {
+                    continue;
+                }
+                let Some(c) = segment_triangle_contact(a, b, radius, triangle, normal) else {
+                    continue;
+                };
+                if c.separation <= tolerance {
+                    if touching.is_none_or(|t| c.separation < t.separation) {
+                        touching = Some(HeightfieldContact3 { triangle: id, ..c });
+                    }
+                    continue;
+                }
+                let rate = dot(displacement, c.normal);
+                if rate >= 0.0 {
+                    // Moving away: by convexity this triangle only gets farther.
+                    *flag = false;
+                    continue;
+                }
+                step = step.min((c.separation - tolerance * 0.5) / -rate);
+            }
+            if let Some(contact) = touching {
                 return Ok(Some(HeightfieldSweepHit3 {
                     fraction: time,
                     contact,
                 }));
             }
-            if speed == 0.0 {
+            if !step.is_finite() {
                 return Ok(None);
             }
-            // The capsule cannot reach any surface sooner than its separation allows.
-            time += (contact.separation - tolerance * 0.5) / speed;
+            time += step;
             if time > 1.0 {
                 return Ok(None);
             }
@@ -588,7 +605,8 @@ impl PreparedHeightfield3 {
 /// Range of cells whose closed extent overlaps `min..=max` along one axis.
 fn cell_span(coordinates: &[f64], min: f64, max: f64) -> Option<(usize, usize)> {
     let last = coordinates.len() - 1;
-    if max < coordinates[0] || min > coordinates[last] || min.is_nan() || max.is_nan() || min > max {
+    if max < coordinates[0] || min > coordinates[last] || min.is_nan() || max.is_nan() || min > max
+    {
         return None;
     }
     let lo = coordinates
