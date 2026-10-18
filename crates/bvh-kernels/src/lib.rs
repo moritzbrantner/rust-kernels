@@ -447,6 +447,112 @@ impl DynamicAabbTree {
         self.leaf_of(id).map(|index| self.node(index).bounds)
     }
 
+    /// Rebuilds the hierarchy top-down with a binned surface-area heuristic over the current
+    /// leaves. Leaves keep their fat bounds and IDs; query results are unchanged. Call after
+    /// many incremental inserts to restore query performance.
+    pub fn rebuild(&mut self) {
+        let mut leaves = Vec::with_capacity(self.len);
+        for index in 0..self.nodes.len() {
+            match self.nodes[index] {
+                Some(node) if node.is_leaf() => leaves.push(index),
+                Some(_) => self.release(index),
+                None => {}
+            }
+        }
+        self.root = (!leaves.is_empty()).then(|| self.build_sah(&mut leaves, None));
+    }
+
+    fn build_sah(&mut self, leaves: &mut [usize], parent: Option<usize>) -> usize {
+        if let [leaf] = leaves {
+            let node = self.node_mut(*leaf);
+            node.parent = parent;
+            node.height = 0;
+            return *leaf;
+        }
+        const BINS: usize = 16;
+        let centroid = |tree: &Self, leaf: usize, axis: usize| {
+            let b = tree.node_ref(leaf).bounds;
+            b.min[axis] + b.max[axis]
+        };
+        let mut best: Option<(f64, usize, f32)> = None;
+        for axis in 0..3 {
+            let (lo, hi) =
+                leaves
+                    .iter()
+                    .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), &l| {
+                        let c = centroid(self, l, axis);
+                        (lo.min(c), hi.max(c))
+                    });
+            if hi.partial_cmp(&lo) != Some(std::cmp::Ordering::Greater) {
+                continue;
+            }
+            let scale = BINS as f32 / (hi - lo);
+            let bin = |c: f32| (((c - lo) * scale) as usize).min(BINS - 1);
+            let mut counts = [0_usize; BINS];
+            let mut bounds: [Option<Aabb>; BINS] = [None; BINS];
+            for &l in leaves.iter() {
+                let b = bin(centroid(self, l, axis));
+                counts[b] += 1;
+                let leaf_bounds = self.node_ref(l).bounds;
+                bounds[b] = Some(bounds[b].map_or(leaf_bounds, |x| x.union(leaf_bounds)));
+            }
+            let mut right_area = [0.0_f64; BINS];
+            let mut acc: Option<Aabb> = None;
+            for b in (1..BINS).rev() {
+                if let Some(x) = bounds[b] {
+                    acc = Some(acc.map_or(x, |a| a.union(x)));
+                }
+                right_area[b] = acc.map_or(0.0, Aabb::surface_area);
+            }
+            let (mut left, mut left_count, mut right_count) = (None::<Aabb>, 0, leaves.len());
+            for b in 0..BINS - 1 {
+                if let Some(x) = bounds[b] {
+                    left = Some(left.map_or(x, |a| a.union(x)));
+                }
+                left_count += counts[b];
+                right_count -= counts[b];
+                if left_count == 0 || right_count == 0 {
+                    continue;
+                }
+                let cost = left.map_or(0.0, Aabb::surface_area) * left_count as f64
+                    + right_area[b + 1] * right_count as f64;
+                if best.is_none_or(|(c, ..)| cost < c) {
+                    best = Some((cost, axis, lo + (b + 1) as f32 / scale));
+                }
+            }
+        }
+        let mid = match best {
+            Some((_, axis, split)) => {
+                let mut mid = 0;
+                for i in 0..leaves.len() {
+                    if centroid(self, leaves[i], axis) < split {
+                        leaves.swap(i, mid);
+                        mid += 1;
+                    }
+                }
+                mid
+            }
+            None => leaves.len() / 2,
+        };
+        let mid = if mid == 0 || mid == leaves.len() {
+            leaves.len() / 2
+        } else {
+            mid
+        };
+        let placeholder = Aabb::new([0.0; 3], [0.0; 3]);
+        let index = self.allocate(DynamicNode::branch(placeholder, parent, 0, 0, 0));
+        let (l, r) = leaves.split_at_mut(mid);
+        let left = self.build_sah(l, Some(index));
+        let right = self.build_sah(r, Some(index));
+        let bounds = self
+            .node_ref(left)
+            .bounds
+            .union(self.node_ref(right).bounds);
+        let height = 1 + self.node_ref(left).height.max(self.node_ref(right).height);
+        *self.node_mut(index) = DynamicNode::branch(bounds, parent, left, right, height);
+        index
+    }
+
     /// Visits every body whose exact AABB overlaps `query`, in traversal order, without
     /// allocating. Sort the visited IDs if the caller needs a canonical order.
     pub fn visit_aabb(&self, query: Aabb, mut visit: impl FnMut(Body)) {
@@ -492,9 +598,9 @@ impl DynamicAabbTree {
         let Some(root) = self.root else {
             return;
         };
+        let segment = Segment::new(origin, delta, pad);
         let mut max_t = max_t;
-        let entry = |bounds: Aabb, max_t: f32| segment_entry(bounds, origin, delta, max_t, pad);
-        let Some(t) = entry(self.node(root).bounds, max_t) else {
+        let Some(t) = segment.entry(&self.node_ref(root).bounds, max_t) else {
             return;
         };
         let mut stack = [(0_usize, 0.0_f32); STACK_DEPTH];
@@ -506,32 +612,26 @@ impl DynamicAabbTree {
             if t > max_t {
                 continue;
             }
-            let node = self.node(index);
+            let node = self.node_ref(index);
             if let Some(body) = node.body {
-                if let Some(t) = entry(body.aabb, max_t) {
+                if let Some(t) = segment.entry(&body.aabb, max_t) {
                     max_t = visit(body, t);
                 }
                 continue;
             }
             let left = node.left.expect("branch must have left child");
             let right = node.right.expect("branch must have right child");
-            let tl = entry(self.node(left).bounds, max_t);
-            let tr = entry(self.node(right).bounds, max_t);
+            let tl = segment.entry(&self.node_ref(left).bounds, max_t);
+            let tr = segment.entry(&self.node_ref(right).bounds, max_t);
             // Push the farther child first so the nearer one is visited first.
-            let mut push = |index, t: Option<f32>| {
+            let (first, second) = match (tl, tr) {
+                (Some(a), Some(b)) if b < a => ((left, tl), (right, tr)),
+                _ => ((right, tr), (left, tl)),
+            };
+            for (index, t) in [first, second] {
                 if let Some(t) = t {
                     stack[len] = (index, t);
                     len += 1;
-                }
-            };
-            match (tl, tr) {
-                (Some(a), Some(b)) if b < a => {
-                    push(left, tl);
-                    push(right, tr);
-                }
-                _ => {
-                    push(right, tr);
-                    push(left, tl);
                 }
             }
         }
@@ -886,13 +986,55 @@ impl DynamicAabbTree {
         self.nodes[index].expect("tree node must exist")
     }
 
+    fn node_ref(&self, index: usize) -> &DynamicNode {
+        self.nodes[index].as_ref().expect("tree node must exist")
+    }
+
     fn node_mut(&mut self, index: usize) -> &mut DynamicNode {
         self.nodes[index].as_mut().expect("tree node must exist")
     }
 }
 
-/// Entry parameter of the segment `origin + t * delta`, `t` in `0..=max_t`, into `bounds`
-/// padded by `pad`, or `None` when it misses.
+/// A segment `origin + t * delta` prepared for repeated padded slab tests.
+struct Segment {
+    origin: [f32; 3],
+    inverse: [f32; 3],
+    parallel: [bool; 3],
+    pad: f32,
+}
+
+impl Segment {
+    fn new(origin: [f32; 3], delta: [f32; 3], pad: f32) -> Self {
+        Self {
+            origin,
+            inverse: delta.map(|d| if d == 0.0 { 0.0 } else { 1.0 / d }),
+            parallel: delta.map(|d| d == 0.0),
+            pad,
+        }
+    }
+
+    /// Entry parameter into `bounds` padded by `pad` for `t` in `0..=max_t`, or `None`.
+    fn entry(&self, bounds: &Aabb, max_t: f32) -> Option<f32> {
+        let (mut enter, mut exit) = (0.0_f32, max_t);
+        for axis in 0..3 {
+            let (lo, hi) = (bounds.min[axis] - self.pad, bounds.max[axis] + self.pad);
+            let o = self.origin[axis];
+            if self.parallel[axis] {
+                if o < lo || o > hi {
+                    return None;
+                }
+                continue;
+            }
+            let a = (lo - o) * self.inverse[axis];
+            let b = (hi - o) * self.inverse[axis];
+            enter = enter.max(a.min(b));
+            exit = exit.min(a.max(b));
+        }
+        (enter <= exit).then_some(enter)
+    }
+}
+
+#[cfg(test)]
 fn segment_entry(
     bounds: Aabb,
     origin: [f32; 3],
@@ -900,22 +1042,7 @@ fn segment_entry(
     max_t: f32,
     pad: f32,
 ) -> Option<f32> {
-    let (mut enter, mut exit) = (0.0_f32, max_t);
-    for axis in 0..3 {
-        let (lo, hi) = (bounds.min[axis] - pad, bounds.max[axis] + pad);
-        let d = delta[axis];
-        if d == 0.0 {
-            if origin[axis] < lo || origin[axis] > hi {
-                return None;
-            }
-            continue;
-        }
-        let a = (lo - origin[axis]) / d;
-        let b = (hi - origin[axis]) / d;
-        enter = enter.max(a.min(b));
-        exit = exit.min(a.max(b));
-    }
-    (enter <= exit).then_some(enter)
+    Segment::new(origin, delta, pad).entry(&bounds, max_t)
 }
 
 fn changed_node_indices(
@@ -1398,6 +1525,35 @@ mod tests {
         assert_eq!(
             tree.query_aabb(Aabb::from_center_half_extents([9.0, 0.0, 0.0], [0.5; 3])),
             vec![1000]
+        );
+    }
+
+    #[test]
+    fn rebuild_keeps_query_results_and_supports_further_updates() {
+        let bodies = scattered(500);
+        let mut tree = DynamicAabbTree::new(0.1);
+        for body in &bodies {
+            tree.insert(*body);
+        }
+        let query = Aabb::from_center_half_extents([0.0; 3], [8.0; 3]);
+        let before = tree.query_aabb(query);
+        let pairs = tree.overlapping_pairs();
+        tree.rebuild();
+        assert_eq!(tree.len(), 500);
+        assert_eq!(tree.node_count(), 999);
+        assert_eq!(tree.query_aabb(query), before);
+        assert_eq!(tree.overlapping_pairs(), pairs);
+        assert!(tree.height() <= 24);
+        tree.remove(7);
+        tree.insert(body(7, [50.0; 3], 1.0));
+        assert!(tree.update(body(8, [-50.0; 3], 1.0)));
+        assert_eq!(
+            tree.query_aabb(Aabb::from_center_half_extents([50.0; 3], [2.0; 3])),
+            vec![7]
+        );
+        assert_eq!(
+            tree.query_aabb(Aabb::from_center_half_extents([-50.0; 3], [2.0; 3])),
+            vec![8]
         );
     }
 }
