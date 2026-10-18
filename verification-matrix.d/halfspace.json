@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "issue": 52,
+  "kernels": [
+    {
+      "id": "f64-capsule-halfspace-queries",
+      "crate": "geometry-kernels",
+      "module": "crate::halfspace",
+      "sources": [
+        "crates/geometry-kernels/src/halfspace.rs"
+      ],
+      "oracleDifferential": "missing",
+      "propertyMetamorphic": "missing",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "n/a",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "Closed-form capsule/segment queries against an infinite plane: contact separation and point, linear sweep time of impact, and segment entry fraction (0 when the start is inside). A Cargo-native case covers a floor: separated contact, a landing sweep, parallel motion that misses, a segment entering from outside, starting inside, and receding.",
+        "deterministicPerformance: constant work per call with no loops or allocation; no work counters are reported.",
+        "criterion: no benchmark suite is added for these constant-time closed forms."
+      ]
+    }
+  ]
+}
