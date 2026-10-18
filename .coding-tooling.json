@@ -25,10 +25,6 @@
   },
   "merge": {
     "authority": "hosted",
-    "requiredChecks": [
-      "rust",
-      "registry",
-      "public-contract / public-contract / Coding Tooling Validation"
-    ]
+    "requiredChecks": ["merge-ready"]
   }
 }

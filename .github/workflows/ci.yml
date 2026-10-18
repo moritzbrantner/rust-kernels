@@ -128,3 +128,41 @@ jobs:
           name: llvm-cov-baseline-${{ github.sha }}
           path: target/llvm-cov-baseline/
           if-no-files-found: ignore
+
+  validate-hardening:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/hardening.yml
+
+  validate-mutation-baseline:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/mutation-baseline.yml
+
+  validate-public-contract:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/public-contract.yml
+
+  validate-runtime-evidence:
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/runtime-evidence.yml
+
+  merge-ready:
+    name: ${{ github.event_name == 'pull_request' && 'merge-ready' || 'validation-summary' }}
+    if: ${{ always() }}
+    needs: ["registry", "rust", "cargo-benchmarks", "performance-smoke", "validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: moritzbrantner/reusable-workflows/.github/actions/merge-ready@b0f25f241d76af2584dfc9e375084ff5c5cb97da
+        with:
+          needs: ${{ toJSON(needs) }}
+          required: '["registry", "rust", "cargo-benchmarks", "performance-smoke", "validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]'
+          allow-skipped: ${{ github.event_name != 'pull_request' && '["validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]' || github.base_ref != 'main' && '["validate-runtime-evidence"]' || '[]' }}
