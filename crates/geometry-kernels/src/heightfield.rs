@@ -475,60 +475,65 @@ impl PreparedHeightfield3 {
             }
             count += 1;
         });
-        // Distance from the translating capsule to one convex triangle is convex in time, so a
-        // Newton step from below never passes its first touch; the smallest step over all
-        // still-approaching triangles is a safe advance.
-        let mut approaching = [true; 64];
-        let mut approaching_spill = vec![true; spill.len()];
-        let mut time = 0.0_f64;
-        for _ in 0..max_iterations {
-            let offset = scale(displacement, time);
-            let (a, b) = (add(p, offset), add(q, offset));
-            let mut step = f64::INFINITY;
-            let mut touching: Option<HeightfieldContact3> = None;
-            for k in 0..count {
-                let (id, triangle, normal) = if k < 64 { triangles[k] } else { spill[k - 64] };
-                let flag = if k < 64 {
-                    &mut approaching[k]
-                } else {
-                    &mut approaching_spill[k - 64]
-                };
-                if !*flag {
-                    continue;
+        // Distance from the translating capsule to one convex triangle is convex in time, so
+        // Newton steps from below converge to that triangle's first touch without passing it.
+        // Each triangle is solved on its own; the earliest touch wins (ties by triangle id).
+        let length = dot(displacement, displacement).sqrt();
+        let mut best: Option<HeightfieldSweepHit3> = None;
+        for k in 0..count {
+            let (id, triangle, normal) = if k < 64 { triangles[k] } else { spill[k - 64] };
+            let mut time = 0.0_f64;
+            let mut iterations = 0;
+            loop {
+                if best.is_some_and(|b| time > b.fraction) {
+                    break;
                 }
+                if iterations == max_iterations {
+                    return Err(HeightfieldError3::NonFiniteComputation);
+                }
+                iterations += 1;
                 work.triangles_tested += 1;
-                let Some(c) = segment_triangle_contact(a, b, radius, triangle, normal) else {
-                    continue;
+                let offset = scale(displacement, time);
+                let Some(c) = segment_triangle_contact(
+                    add(p, offset),
+                    add(q, offset),
+                    radius,
+                    triangle,
+                    normal,
+                ) else {
+                    break;
                 };
                 if c.separation <= tolerance {
-                    if touching.is_none_or(|t| c.separation < t.separation) {
-                        touching = Some(HeightfieldContact3 { triangle: id, ..c });
+                    let hit = HeightfieldSweepHit3 {
+                        fraction: time,
+                        contact: HeightfieldContact3 { triangle: id, ..c },
+                    };
+                    if best.is_none_or(|b| {
+                        time < b.fraction || (time == b.fraction && id < b.contact.triangle)
+                    }) {
+                        best = Some(hit);
                     }
-                    continue;
+                    break;
+                }
+                // A lower bound on the time to touch, from the separation and full speed.
+                if time + (c.separation - tolerance) / length > 1.0 {
+                    break;
                 }
                 let rate = dot(displacement, c.normal);
                 if rate >= 0.0 {
                     // Moving away: by convexity this triangle only gets farther.
-                    *flag = false;
-                    continue;
+                    break;
                 }
-                step = step.min((c.separation - tolerance * 0.5) / -rate);
-            }
-            if let Some(contact) = touching {
-                return Ok(Some(HeightfieldSweepHit3 {
-                    fraction: time,
-                    contact,
-                }));
-            }
-            if !step.is_finite() {
-                return Ok(None);
-            }
-            time += step;
-            if time > 1.0 {
-                return Ok(None);
+                time += (c.separation - tolerance * 0.5) / -rate;
+                if time > 1.0 {
+                    break;
+                }
             }
         }
-        Err(HeightfieldError3::NonFiniteComputation)
+        if let Some(hit) = best {
+            return Ok(Some(hit));
+        }
+        Ok(None)
     }
 
     /// First hit of the segment `start`–`end` by a grid walk over the cells it crosses.
