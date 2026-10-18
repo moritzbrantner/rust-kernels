@@ -1,6 +1,6 @@
 //! Closed forms for a solid halfspace `{x : dot(x - point, normal) <= 0}` with a unit `normal`
-//! pointing out of the solid: capsule (sphere when the segment collapses) contact and
-//! translational sweep, and segment casts.
+//! pointing out of the solid: capsule (sphere when the segment collapses) and convex polytope
+//! (box, wedge: given by their vertices) contact and translational sweep, and segment casts.
 
 use crate::math3::{Vec3, add, dot, scale, sub};
 
@@ -64,6 +64,61 @@ pub fn capsule_halfspace_sweep(
     ))
 }
 
+/// Contact of the convex polytope with `vertices` (at least one): the deepest vertex decides,
+/// the first of equally deep ones.
+#[must_use]
+pub fn vertices_halfspace_contact(
+    vertices: &[Vec3],
+    point: Vec3,
+    normal: Vec3,
+) -> HalfspaceContact3 {
+    let mut deepest = (f64::INFINITY, [0.0; 3]);
+    for &v in vertices {
+        let height = dot(sub(v, point), normal);
+        if height < deepest.0 {
+            deepest = (height, v);
+        }
+    }
+    let (height, low) = deepest;
+    HalfspaceContact3 {
+        separation: height,
+        point: sub(low, scale(normal, height)),
+    }
+}
+
+/// First touch of the translating convex polytope, as [`capsule_halfspace_sweep`].
+#[must_use]
+pub fn vertices_halfspace_sweep(
+    vertices: &[Vec3],
+    displacement: Vec3,
+    point: Vec3,
+    normal: Vec3,
+) -> Option<(f64, HalfspaceContact3)> {
+    let start = vertices_halfspace_contact(vertices, point, normal);
+    if start.separation <= 0.0 {
+        return Some((0.0, start));
+    }
+    let rate = dot(displacement, normal);
+    if rate >= 0.0 {
+        return None;
+    }
+    let fraction = start.separation / -rate;
+    if fraction > 1.0 {
+        return None;
+    }
+    // Translation moves every vertex alike: the deepest vertex stays the deepest, and its
+    // projection on the plane moves by the tangential part of the offset.
+    let offset = scale(displacement, fraction);
+    let point = sub(add(start.point, offset), scale(normal, dot(offset, normal)));
+    Some((
+        fraction,
+        HalfspaceContact3 {
+            separation: 0.0,
+            point,
+        },
+    ))
+}
+
 /// Entry fraction of the segment `start`–`end` into the solid halfspace; 0 when it starts inside.
 #[must_use]
 pub fn segment_halfspace(start: Vec3, end: Vec3, point: Vec3, normal: Vec3) -> Option<f64> {
@@ -83,6 +138,34 @@ mod tests {
     use super::*;
 
     const UP: Vec3 = [0.0, 1.0, 0.0];
+
+    #[test]
+    fn polytope_contact_and_sweep_take_the_deepest_vertex() {
+        // A unit box at height 3, tilted so one corner is lowest.
+        let corners = [
+            [0.0, 2.0, 0.0],
+            [1.0, 2.5, 0.0],
+            [0.0, 2.5, 1.0],
+            [1.0, 3.0, 1.0],
+            [0.0, 3.0, 0.0],
+            [1.0, 3.5, 0.0],
+            [0.0, 3.5, 1.0],
+            [1.0, 4.0, 1.0],
+        ];
+        let c = vertices_halfspace_contact(&corners, [0.0; 3], UP);
+        assert_eq!((c.separation, c.point), (2.0, [0.0, 0.0, 0.0]));
+        let (t, hit) = vertices_halfspace_sweep(&corners, [2.0, -4.0, 0.0], [0.0; 3], UP).unwrap();
+        assert_eq!((t, hit.separation, hit.point), (0.5, 0.0, [1.0, 0.0, 0.0]));
+        assert!(vertices_halfspace_sweep(&corners, [1.0, 0.5, 0.0], [0.0; 3], UP).is_none());
+        assert!(vertices_halfspace_sweep(&corners, [0.0, -1.0, 0.0], [0.0; 3], UP).is_none());
+        // Overlapping: separation is the deepest vertex's (negative) height.
+        let sunk = vertices_halfspace_contact(&corners, [0.0, 2.25, 0.0], UP);
+        assert_eq!(sunk.separation, -0.25);
+        assert_eq!(
+            vertices_halfspace_sweep(&corners, [0.0, 1.0, 0.0], [0.0, 2.25, 0.0], UP),
+            Some((0.0, sunk))
+        );
+    }
 
     #[test]
     fn contact_sweep_and_segment_on_a_floor() {
