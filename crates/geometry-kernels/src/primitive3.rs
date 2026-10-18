@@ -1173,7 +1173,7 @@ fn update_pair(a: Vec3, b: Vec3, best: &mut (Vec3, Vec3), best_distance: &mut f6
     }
 }
 
-fn closest_point_triangle(point: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Vec3 {
+pub(crate) fn closest_point_triangle(point: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Vec3 {
     let ab = sub(b, a);
     let ac = sub(c, a);
     let ap = sub(point, a);

@@ -124,6 +124,7 @@ fn prepared_heightfield_surface_query(bencher: Bencher) {
             .map(|index| (f64::from(index) * 0.1).sin())
             .collect(),
         active_cells: None,
+        diagonal: geometry_kernels::heightfield::HeightfieldDiagonal3::Checkerboard,
     })
     .expect("finite benchmark geometry");
     bencher.bench_local(|| black_box(terrain.sample(black_box(31.2), black_box(20.7))));

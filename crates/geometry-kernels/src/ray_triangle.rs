@@ -78,6 +78,22 @@ pub struct SegmentTriangleHit {
     pub facing: TriangleFacing,
 }
 
+/// f64 segment-vs-triangle intersection for crate-internal mesh queries: the fraction along
+/// `end - start` and the hit point, front and back faces both reported.
+pub(crate) fn segment_triangle_f64(
+    start: Vec3,
+    end: Vec3,
+    triangle: [Vec3; 3],
+) -> Option<(f64, Vec3)> {
+    let exact_delta = exact_difference(end, start);
+    if exact_delta.map(|[high, _]| high) == [0.0; 3] {
+        return None;
+    }
+    let (fraction, _, _) =
+        intersect_exact_direction(start, exact_delta, triangle, 1.0, TriangleCulling::None)?;
+    Some((fraction, segment_point(start, end, exact_delta, fraction)))
+}
+
 /// Relative tolerance below which a ray counts as parallel to the plane: the
 /// sine of the angle between direction and plane, scaled by rounding error.
 const PARALLEL_TOLERANCE: f64 = 16.0 * f64::EPSILON;
