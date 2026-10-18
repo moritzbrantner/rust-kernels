@@ -564,7 +564,7 @@ impl DynamicAabbTree {
         let mut len = 1;
         while len > 0 {
             len -= 1;
-            let node = self.node(stack[len]);
+            let node = self.node_ref(stack[len]);
             if !node.bounds.overlaps(query) {
                 continue;
             }
