@@ -23,6 +23,8 @@ pub enum PrimitiveRayFeature3 {
     CapsulePositiveCap,
     /// Wedge faces: bottom, -X, slope, +Z, -Z (indices 0..5).
     WedgeFace(u8),
+    /// A heightfield triangle, by its `PreparedHeightfield3` triangle id.
+    HeightfieldTriangle(u32),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

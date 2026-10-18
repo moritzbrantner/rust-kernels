@@ -91,6 +91,7 @@ fn fixture(size: usize, scale: f64) -> HeightfieldData3 {
         rows,
         heights,
         active_cells: None,
+        diagonal: geometry_kernels::heightfield::HeightfieldDiagonal3::Checkerboard,
     }
 }
 
@@ -161,6 +162,7 @@ fn flat_tilted_steep_shared_diagonals_vertices_and_outer_edges_are_stable() {
                 rows,
                 heights,
                 active_cells: None,
+                diagonal: geometry_kernels::heightfield::HeightfieldDiagonal3::Checkerboard,
             };
             let triangles = mesh(&data);
             let prepared = PreparedHeightfield3::try_new(data.clone()).unwrap();
@@ -218,6 +220,7 @@ fn omitted_cells_preserve_present_shared_boundary_and_stable_triangle_ids() {
         rows: vec![0.0, 1.0, 2.0],
         heights: vec![0.0; 9],
         active_cells: Some(vec![true, true, true, false]),
+        diagonal: geometry_kernels::heightfield::HeightfieldDiagonal3::Checkerboard,
     };
     let triangles = mesh(&data);
     let prepared = PreparedHeightfield3::try_new(data).unwrap();
@@ -237,6 +240,7 @@ fn omitted_cells_preserve_present_shared_boundary_and_stable_triangle_ids() {
         rows: vec![0.0, 1.0],
         heights: vec![0.0; 4],
         active_cells: Some(vec![false]),
+        diagonal: geometry_kernels::heightfield::HeightfieldDiagonal3::Checkerboard,
     })
     .unwrap();
     assert_eq!(none.preparation().triangles_prepared, 0);
@@ -250,6 +254,7 @@ fn invalid_data_and_queries_fail_with_attempted_work_instead_of_clamping() {
         rows: vec![0.0, 1.0],
         heights: vec![0.0; 4],
         active_cells: None,
+        diagonal: geometry_kernels::heightfield::HeightfieldDiagonal3::Checkerboard,
     };
     for (mut data, reason, change) in [
         (good.clone(), HeightfieldError3::InvalidDimensions, 0),
@@ -291,6 +296,7 @@ fn very_small_flat_cells_and_large_negative_coordinates_have_explicit_numerical_
             rows: vec![0.0, scale],
             heights: vec![scale; 4],
             active_cells: None,
+            diagonal: geometry_kernels::heightfield::HeightfieldDiagonal3::Checkerboard,
         })
         .unwrap();
         let point = prepared
@@ -306,6 +312,7 @@ fn very_small_flat_cells_and_large_negative_coordinates_have_explicit_numerical_
         rows: vec![-1e9, -1e9 + 0.5],
         heights: vec![3.0; 4],
         active_cells: None,
+        diagonal: geometry_kernels::heightfield::HeightfieldDiagonal3::Checkerboard,
     })
     .unwrap();
     assert_eq!(
@@ -322,6 +329,7 @@ fn very_small_flat_cells_and_large_negative_coordinates_have_explicit_numerical_
         rows: vec![0.0, 1e-300],
         heights: vec![0.0, 1e300, 0.0, 1e300],
         active_cells: None,
+        diagonal: geometry_kernels::heightfield::HeightfieldDiagonal3::Checkerboard,
     };
     assert_eq!(
         PreparedHeightfield3::try_new(invalid).unwrap_err(),

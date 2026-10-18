@@ -167,6 +167,7 @@ fn retained_heightfield_queries_allocate_nothing_and_reuse_one_normal() {
         rows: (0..65).map(f64::from).collect(),
         heights: vec![0.0; 65 * 65],
         active_cells: None,
+        diagonal: geometry_kernels::heightfield::HeightfieldDiagonal3::Checkerboard,
     })
     .unwrap();
     let preparation = terrain.preparation();
