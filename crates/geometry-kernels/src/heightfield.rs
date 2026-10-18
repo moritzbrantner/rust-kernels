@@ -329,10 +329,11 @@ impl PreparedHeightfield3 {
 
     /// Visits the enabled triangles of every cell whose footprint overlaps the closed XZ box
     /// `min..max`, without allocating: triangle id, corners and upward normal.
-    pub fn visit_triangles(
+    pub fn visit_triangles_counted(
         &self,
         min: [f64; 2],
         max: [f64; 2],
+        work: &mut HeightfieldWork3,
         mut visit: impl FnMut(u32, [Vec3; 3], Vec3),
     ) {
         let Some((x0, x1)) = cell_span(&self.data.columns, min[0], max[0]) else {
@@ -344,16 +345,27 @@ impl PreparedHeightfield3 {
         let cells_x = self.data.columns.len() - 1;
         for cz in z0..=z1 {
             for cx in x0..=x1 {
+                work.cells_visited += 1;
                 let cell = cz * cells_x + cx;
                 if !self.active(cell) {
                     continue;
                 }
                 for triangle in 0..2 {
+                    work.triangles_tested += 1;
                     let id = cell * 2 + triangle;
                     visit(id as u32, self.vertices(cell, triangle), self.normals[id]);
                 }
             }
         }
+    }
+
+    pub fn visit_triangles(
+        &self,
+        min: [f64; 2],
+        max: [f64; 2],
+        visit: impl FnMut(u32, [Vec3; 3], Vec3),
+    ) {
+        self.visit_triangles_counted(min, max, &mut HeightfieldWork3::default(), visit);
     }
 
     /// Deepest contact of the capsule with segment `p`–`q` and `radius` among triangles whose
@@ -367,11 +379,24 @@ impl PreparedHeightfield3 {
         radius: f64,
         margin: f64,
     ) -> Option<HeightfieldContact3> {
+        self.capsule_contact_counted(p, q, radius, margin, &mut HeightfieldWork3::default())
+    }
+
+    /// [`Self::capsule_contact`], adding the cells and triangles visited to `work`.
+    pub fn capsule_contact_counted(
+        &self,
+        p: Vec3,
+        q: Vec3,
+        radius: f64,
+        margin: f64,
+        work: &mut HeightfieldWork3,
+    ) -> Option<HeightfieldContact3> {
+        work.queries += 1;
         let reach = radius + margin.max(0.0);
         let min = [p[0].min(q[0]) - reach, p[2].min(q[2]) - reach];
         let max = [p[0].max(q[0]) + reach, p[2].max(q[2]) + reach];
         let mut best: Option<HeightfieldContact3> = None;
-        self.visit_triangles(min, max, |id, triangle, normal| {
+        self.visit_triangles_counted(min, max, work, |id, triangle, normal| {
             let Some(contact) = segment_triangle_contact(p, q, radius, triangle, normal) else {
                 return;
             };
@@ -399,6 +424,27 @@ impl PreparedHeightfield3 {
         displacement: Vec3,
         max_iterations: u32,
     ) -> Result<Option<HeightfieldSweepHit3>, HeightfieldError3> {
+        self.capsule_sweep_counted(
+            p,
+            q,
+            radius,
+            displacement,
+            max_iterations,
+            &mut HeightfieldWork3::default(),
+        )
+    }
+
+    /// [`Self::capsule_sweep`], adding the cells and triangle tests to `work`.
+    pub fn capsule_sweep_counted(
+        &self,
+        p: Vec3,
+        q: Vec3,
+        radius: f64,
+        displacement: Vec3,
+        max_iterations: u32,
+        work: &mut HeightfieldWork3,
+    ) -> Result<Option<HeightfieldSweepHit3>, HeightfieldError3> {
+        work.queries += 1;
         let scale_bound = p
             .into_iter()
             .chain(q)
@@ -421,7 +467,7 @@ impl PreparedHeightfield3 {
         let mut triangles = [(0_u32, [[0.0; 3]; 3], [0.0; 3]); 64];
         let mut count = 0;
         let mut spill = Vec::new();
-        self.visit_triangles(min, max, |id, t, n| {
+        self.visit_triangles_counted(min, max, work, |id, t, n| {
             if count < triangles.len() {
                 triangles[count] = (id, t, n);
             } else {
@@ -429,105 +475,136 @@ impl PreparedHeightfield3 {
             }
             count += 1;
         });
-        // Distance from the translating capsule to one convex triangle is convex in time, so a
-        // Newton step from below never passes its first touch; the smallest step over all
-        // still-approaching triangles is a safe advance.
-        let mut approaching = [true; 64];
-        let mut approaching_spill = vec![true; spill.len()];
-        let mut time = 0.0_f64;
-        for _ in 0..max_iterations {
-            let offset = scale(displacement, time);
-            let (a, b) = (add(p, offset), add(q, offset));
-            let mut step = f64::INFINITY;
-            let mut touching: Option<HeightfieldContact3> = None;
-            for k in 0..count {
-                let (id, triangle, normal) = if k < 64 { triangles[k] } else { spill[k - 64] };
-                let flag = if k < 64 {
-                    &mut approaching[k]
-                } else {
-                    &mut approaching_spill[k - 64]
-                };
-                if !*flag {
-                    continue;
+        // Distance from the translating capsule to one convex triangle is convex in time, so
+        // Newton steps from below converge to that triangle's first touch without passing it.
+        // Each triangle is solved on its own; the earliest touch wins (ties by triangle id).
+        let length = dot(displacement, displacement).sqrt();
+        let mut best: Option<HeightfieldSweepHit3> = None;
+        for k in 0..count {
+            let (id, triangle, normal) = if k < 64 { triangles[k] } else { spill[k - 64] };
+            let mut time = 0.0_f64;
+            let mut iterations = 0;
+            loop {
+                if best.is_some_and(|b| time > b.fraction) {
+                    break;
                 }
-                let Some(c) = segment_triangle_contact(a, b, radius, triangle, normal) else {
-                    continue;
+                if iterations == max_iterations {
+                    return Err(HeightfieldError3::NonFiniteComputation);
+                }
+                iterations += 1;
+                work.triangles_tested += 1;
+                let offset = scale(displacement, time);
+                let Some(c) = segment_triangle_contact(
+                    add(p, offset),
+                    add(q, offset),
+                    radius,
+                    triangle,
+                    normal,
+                ) else {
+                    break;
                 };
                 if c.separation <= tolerance {
-                    if touching.is_none_or(|t| c.separation < t.separation) {
-                        touching = Some(HeightfieldContact3 { triangle: id, ..c });
+                    let hit = HeightfieldSweepHit3 {
+                        fraction: time,
+                        contact: HeightfieldContact3 { triangle: id, ..c },
+                    };
+                    if best.is_none_or(|b| {
+                        time < b.fraction || (time == b.fraction && id < b.contact.triangle)
+                    }) {
+                        best = Some(hit);
                     }
-                    continue;
+                    break;
+                }
+                // A lower bound on the time to touch, from the separation and full speed.
+                if time + (c.separation - tolerance) / length > 1.0 {
+                    break;
                 }
                 let rate = dot(displacement, c.normal);
                 if rate >= 0.0 {
                     // Moving away: by convexity this triangle only gets farther.
-                    *flag = false;
-                    continue;
+                    break;
                 }
-                step = step.min((c.separation - tolerance * 0.5) / -rate);
-            }
-            if let Some(contact) = touching {
-                return Ok(Some(HeightfieldSweepHit3 {
-                    fraction: time,
-                    contact,
-                }));
-            }
-            if !step.is_finite() {
-                return Ok(None);
-            }
-            time += step;
-            if time > 1.0 {
-                return Ok(None);
+                time += (c.separation - tolerance * 0.5) / -rate;
+                if time > 1.0 {
+                    break;
+                }
             }
         }
-        Err(HeightfieldError3::NonFiniteComputation)
+        if let Some(hit) = best {
+            return Ok(Some(hit));
+        }
+        Ok(None)
     }
 
     /// First hit of the segment `start`–`end` by a grid walk over the cells it crosses.
     #[must_use]
     pub fn cast_segment(&self, start: Vec3, end: Vec3) -> Option<HeightfieldSegmentHit3> {
-        let min = [start[0].min(end[0]), start[2].min(end[2])];
-        let max = [start[0].max(end[0]), start[2].max(end[2])];
-        let (x0, x1) = cell_span(&self.data.columns, min[0], max[0])?;
-        let (z0, z1) = cell_span(&self.data.rows, min[1], max[1])?;
-        let cells_x = self.data.columns.len() - 1;
+        self.cast_segment_counted(start, end, &mut HeightfieldWork3::default())
+    }
+
+    /// [`Self::cast_segment`], adding the cells crossed and triangles tested to `work`. Work is
+    /// linear in the cells the segment's XZ projection crosses, independent of terrain size.
+    pub fn cast_segment_counted(
+        &self,
+        start: Vec3,
+        end: Vec3,
+        work: &mut HeightfieldWork3,
+    ) -> Option<HeightfieldSegmentHit3> {
+        work.queries += 1;
+        let (columns, rows) = (&self.data.columns, &self.data.rows);
         let delta = vsub(end, start);
-        // Walk the cells in order of entry along the segment's XZ projection.
-        let entry = |cx: usize, cz: usize| -> Option<f64> {
-            let (lo, hi) = (
-                [self.data.columns[cx], self.data.rows[cz]],
-                [self.data.columns[cx + 1], self.data.rows[cz + 1]],
-            );
-            let (mut enter, mut exit) = (0.0_f64, 1.0_f64);
-            for (axis, d) in [(0, delta[0]), (1, delta[2])] {
-                let o = if axis == 0 { start[0] } else { start[2] };
-                if d == 0.0 {
-                    if o < lo[axis] || o > hi[axis] {
-                        return None;
-                    }
-                } else {
-                    let (a, b) = ((lo[axis] - o) / d, (hi[axis] - o) / d);
-                    enter = enter.max(a.min(b));
-                    exit = exit.min(a.max(b));
+        // Clip the XZ projection to the grid's extent.
+        let (mut enter, mut exit) = (0.0_f64, 1.0_f64);
+        for (o, d, lo, hi) in [
+            (start[0], delta[0], columns[0], columns[columns.len() - 1]),
+            (start[2], delta[2], rows[0], rows[rows.len() - 1]),
+        ] {
+            if d == 0.0 {
+                if o < lo || o > hi {
+                    return None;
                 }
+            } else {
+                let (a, b) = ((lo - o) / d, (hi - o) / d);
+                enter = enter.max(a.min(b));
+                exit = exit.min(a.max(b));
             }
-            (enter <= exit).then_some(enter)
+        }
+        if enter > exit {
+            return None;
+        }
+        let at = |t: f64| (start[0] + delta[0] * t, start[2] + delta[2] * t);
+        let cell_of = |coordinates: &[f64], value: f64, d: f64| {
+            let last = coordinates.len() - 2;
+            let i = coordinates
+                .partition_point(|&c| c <= value)
+                .saturating_sub(1)
+                .min(last);
+            // On a boundary, moving down: start in the lower cell.
+            if d < 0.0 && i > 0 && value == coordinates[i] {
+                i - 1
+            } else {
+                i
+            }
+        };
+        let (x, z) = at(enter);
+        let (mut cx, mut cz) = (cell_of(columns, x, delta[0]), cell_of(rows, z, delta[2]));
+        let cells_x = columns.len() - 1;
+        let boundary = |coordinates: &[f64], cell: usize, d: f64, o: f64| -> f64 {
+            if d > 0.0 {
+                (coordinates[cell + 1] - o) / d
+            } else if d < 0.0 {
+                (coordinates[cell] - o) / d
+            } else {
+                f64::INFINITY
+            }
         };
         let mut best: Option<HeightfieldSegmentHit3> = None;
-        for cz in z0..=z1 {
-            for cx in x0..=x1 {
-                let Some(enter) = entry(cx, cz) else {
-                    continue;
-                };
-                if best.is_some_and(|b| b.fraction < enter) {
-                    continue;
-                }
-                let cell = cz * cells_x + cx;
-                if !self.active(cell) {
-                    continue;
-                }
+        loop {
+            work.cells_visited += 1;
+            let cell = cz * cells_x + cx;
+            if self.active(cell) {
                 for triangle in 0..2 {
+                    work.triangles_tested += 1;
                     let id = cell * 2 + triangle;
                     let Some((fraction, point)) =
                         segment_triangle_f64(start, end, self.vertices(cell, triangle))
@@ -547,8 +624,37 @@ impl PreparedHeightfield3 {
                     }
                 }
             }
+            let tx = boundary(columns, cx, delta[0], start[0]);
+            let tz = boundary(rows, cz, delta[2], start[2]);
+            let leave = tx.min(tz).min(exit);
+            // A hit inside this cell's span is the earliest: later cells start after it.
+            if best.is_some_and(|b| b.fraction <= leave) || leave >= exit {
+                return best;
+            }
+            if tx <= tz {
+                if delta[0] > 0.0 {
+                    if cx + 1 >= cells_x {
+                        return best;
+                    }
+                    cx += 1;
+                } else {
+                    if cx == 0 {
+                        return best;
+                    }
+                    cx -= 1;
+                }
+            } else if delta[2] > 0.0 {
+                if cz + 2 > rows.len() - 1 {
+                    return best;
+                }
+                cz += 1;
+            } else {
+                if cz == 0 {
+                    return best;
+                }
+                cz -= 1;
+            }
         }
-        best
     }
 
     fn active(&self, cell: usize) -> bool {

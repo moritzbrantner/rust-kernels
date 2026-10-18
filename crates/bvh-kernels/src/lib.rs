@@ -555,15 +555,17 @@ impl DynamicAabbTree {
 
     /// Visits every body whose exact AABB overlaps `query`, in traversal order, without
     /// allocating. Sort the visited IDs if the caller needs a canonical order.
-    pub fn visit_aabb(&self, query: Aabb, mut visit: impl FnMut(Body)) {
+    pub fn visit_aabb(&self, query: Aabb, mut visit: impl FnMut(Body)) -> usize {
         let Some(root) = self.root else {
-            return;
+            return 0;
         };
+        let mut visited = 0;
         let mut stack = [0_usize; STACK_DEPTH];
         stack[0] = root;
         let mut len = 1;
         while len > 0 {
             len -= 1;
+            visited += 1;
             let node = self.node_ref(stack[len]);
             if !node.bounds.overlaps(query) {
                 continue;
@@ -578,15 +580,9 @@ impl DynamicAabbTree {
                 len += 2;
             }
         }
+        visited
     }
 
-    /// Visits bodies whose exact AABB, padded by `pad`, the segment `origin + t * delta`
-    /// enters for some `t` in `0..=max_t`, nearer subtrees first, without allocating.
-    ///
-    /// `visit` receives the body and its entry parameter and returns the new `max_t`: return
-    /// the current value to keep searching, or a smaller one (such as the best hit so far)
-    /// to prune everything entered later. Choose `pad` to cover the caller's rounding
-    /// tolerance: the slab test itself is plain `f32`.
     pub fn visit_segment(
         &self,
         origin: [f32; 3],
@@ -594,20 +590,22 @@ impl DynamicAabbTree {
         max_t: f32,
         pad: f32,
         mut visit: impl FnMut(Body, f32) -> f32,
-    ) {
+    ) -> usize {
         let Some(root) = self.root else {
-            return;
+            return 0;
         };
+        let mut visited = 0;
         let segment = Segment::new(origin, delta, pad);
         let mut max_t = max_t;
         let Some(t) = segment.entry(&self.node_ref(root).bounds, max_t) else {
-            return;
+            return 1;
         };
         let mut stack = [(0_usize, 0.0_f32); STACK_DEPTH];
         stack[0] = (root, t);
         let mut len = 1;
         while len > 0 {
             len -= 1;
+            visited += 1;
             let (index, t) = stack[len];
             if t > max_t {
                 continue;
@@ -635,6 +633,7 @@ impl DynamicAabbTree {
                 }
             }
         }
+        visited
     }
 
     /// Returns collider IDs whose exact AABBs overlap `query`, sorted by ID.
