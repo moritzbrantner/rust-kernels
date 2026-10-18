@@ -529,13 +529,15 @@ impl PreparedHeightfield3 {
                 }
                 for triangle in 0..2 {
                     let id = cell * 2 + triangle;
-                    if let Some((fraction, point)) =
+                    let Some((fraction, point)) =
                         segment_triangle_f64(start, end, self.vertices(cell, triangle))
-                        && best.is_none_or(|b| {
-                            fraction < b.fraction
-                                || (fraction == b.fraction && (id as u32) < b.triangle)
-                        })
-                    {
+                    else {
+                        continue;
+                    };
+                    if best.is_none_or(|b| {
+                        fraction < b.fraction
+                            || (fraction == b.fraction && (id as u32) < b.triangle)
+                    }) {
                         best = Some(HeightfieldSegmentHit3 {
                             triangle: id as u32,
                             fraction,
