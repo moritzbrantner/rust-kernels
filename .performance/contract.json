@@ -550,7 +550,7 @@
     },
     {
       "id": "bounded-edit-comparisons",
-      "description": "Bounded Levenshtein distance between a sequence and its one-element shift at a fixed limit of two, counting element equality calls.",
+      "description": "Bounded Levenshtein distance between a sequence and its one-element shift, counting element equality calls: elements scaled at a limit of two, and the limit scaled at 1024 elements.",
       "publicContract": "similarity_kernels::LevenshteinWorkspace::distance",
       "dimensions": {
         "elements": {
@@ -584,6 +584,22 @@
         {
           "elements": 4096,
           "limit": 2
+        },
+        {
+          "elements": 1024,
+          "limit": 1
+        },
+        {
+          "elements": 1024,
+          "limit": 4
+        },
+        {
+          "elements": 1024,
+          "limit": 8
+        },
+        {
+          "elements": 1024,
+          "limit": 16
         }
       ],
       "metrics": [
@@ -591,14 +607,27 @@
           "name": "equality-calls",
           "unit": "operations",
           "signal": "operation-count",
-          "budget": {
-            "max": 20484
-          },
-          "notes": "Exactly (2k + 1) n - k (k + 1) + 2 = 5n - 4 comparisons, asserted per scale point in crates/similarity-kernels/tests/work_complexity.rs together with a non-increasing marginal-work check; the full oracle needs n^2. The shared linear bound uses a marginal-rate test (coding-tooling#309), which accepts the negative fixed term from the truncated band corners; the budget is 5n + 4 at 4096 elements, matching the single-size scenario.",
+          "notes": "Exactly (2k + 1) n - k (k + 1) + 2 comparisons for limit k >= 2, asserted per scale point in crates/similarity-kernels/tests/work_complexity.rs; the full oracle needs n^2. Linear in elements at a fixed limit and in the limit at fixed elements (exact marginal-rate tests, which accept the negative fixed term from the truncated band corners), and O(n \u00b7 k) jointly across every point (tolerant product bound).",
           "growth": [
             {
               "dimension": "elements",
               "bound": "linear"
+            },
+            {
+              "dimension": "limit",
+              "bound": "linear"
+            },
+            {
+              "product": [
+                {
+                  "dimension": "elements",
+                  "bound": "linear"
+                },
+                {
+                  "dimension": "limit",
+                  "bound": "linear"
+                }
+              ]
             }
           ]
         }
@@ -792,6 +821,106 @@
             }
           ],
           "notes": "The analytic sphere oracle must agree first; iteration-limit and no-progress exits are not faster successes."
+        }
+      ]
+    },
+    {
+      "id": "bvh-aabb-query-nodes",
+      "description": "A small box query hitting one leaf over a rebuilt grid of unit boxes, counting tree nodes visited per query (mean of 64 queries).",
+      "publicContract": "bvh_kernels::DynamicAabbTree::visit_aabb",
+      "dimensions": {
+        "leaves": {
+          "description": "leaves in the tree"
+        }
+      },
+      "scalePoints": [
+        {
+          "leaves": 512
+        },
+        {
+          "leaves": 1024
+        },
+        {
+          "leaves": 2048
+        },
+        {
+          "leaves": 4096
+        },
+        {
+          "leaves": 8192
+        },
+        {
+          "leaves": 16384
+        },
+        {
+          "leaves": 32768
+        },
+        {
+          "leaves": 65536
+        }
+      ],
+      "metrics": [
+        {
+          "name": "nodes-per-query",
+          "unit": "nodes",
+          "signal": "operation-count",
+          "growth": [
+            {
+              "dimension": "leaves",
+              "bound": "logarithmic"
+            }
+          ],
+          "notes": "One descent per query: each result is checked against the grid cell it must hit; visits grow by a constant per doubling (crates/bvh-kernels/tests/work_complexity.rs)."
+        }
+      ]
+    },
+    {
+      "id": "bvh-segment-query-nodes",
+      "description": "A short vertical segment hitting one leaf over a rebuilt grid of unit boxes, counting tree nodes visited per query (mean of 64 queries).",
+      "publicContract": "bvh_kernels::DynamicAabbTree::visit_segment",
+      "dimensions": {
+        "leaves": {
+          "description": "leaves in the tree"
+        }
+      },
+      "scalePoints": [
+        {
+          "leaves": 512
+        },
+        {
+          "leaves": 1024
+        },
+        {
+          "leaves": 2048
+        },
+        {
+          "leaves": 4096
+        },
+        {
+          "leaves": 8192
+        },
+        {
+          "leaves": 16384
+        },
+        {
+          "leaves": 32768
+        },
+        {
+          "leaves": 65536
+        }
+      ],
+      "metrics": [
+        {
+          "name": "nodes-per-query",
+          "unit": "nodes",
+          "signal": "operation-count",
+          "growth": [
+            {
+              "dimension": "leaves",
+              "bound": "logarithmic"
+            }
+          ],
+          "notes": "One descent per query: each result is checked against the grid cell it must hit; visits grow by a constant per doubling (crates/bvh-kernels/tests/work_complexity.rs)."
         }
       ]
     }
