@@ -179,3 +179,25 @@ fn segment_cast_matches_exhaustive_triangles() {
         }
     }
 }
+
+#[test]
+fn segment_cast_work_follows_the_cells_crossed_not_the_terrain_size() {
+    use geometry_kernels::heightfield::HeightfieldWork3;
+    let field = hills(HeightfieldDiagonal3::Fixed);
+    // A diagonal segment high above the terrain crosses about 2 × 14 cells and hits nothing.
+    let mut work = HeightfieldWork3::default();
+    assert!(
+        field
+            .cast_segment_counted([-14.0, 20.0, -13.0], [14.0, 19.0, 13.0], &mut work)
+            .is_none()
+    );
+    assert!(work.cells_visited <= 30, "{work:?}");
+    // A short vertical ray visits one cell.
+    let mut work = HeightfieldWork3::default();
+    assert!(
+        field
+            .cast_segment_counted([0.5, 20.0, 0.5], [0.5, -20.0, 0.5], &mut work)
+            .is_some()
+    );
+    assert_eq!(work.cells_visited, 1);
+}
