@@ -421,11 +421,13 @@ impl PreparedHeightfield3 {
         best
     }
 
-    /// Deepest overlap of the convex `polytope` (a box or wedge) with the enabled triangles under
-    /// its footprint, by the separating-axis test: face normals of both shapes and the cross
-    /// products of their edges. A touching or overlapping pair reports the axis of least
-    /// penetration (`separation <= 0`, normal from the terrain toward the polytope; exact for
-    /// convex polytopes); a separated pair reports nothing. Ties keep the lower triangle id.
+    /// Overlap of the convex `polytope` (a box or wedge) with the enabled triangles under its
+    /// footprint, by the separating-axis test: face normals of both shapes and the cross
+    /// products of their edges. Whether they overlap is exact. For each overlapping triangle
+    /// the axis of least penetration against that triangle alone gives its depth
+    /// (`separation <= 0`) and normal (from the triangle toward the polytope); the deepest
+    /// triangle is reported, ties keeping the lower id. That depth can be smaller than the
+    /// polytope's depth below the whole surface (a thin plank leaves one triangle sideways).
     #[must_use]
     pub fn polytope_contact_counted(
         &self,
