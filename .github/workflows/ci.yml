@@ -61,7 +61,7 @@ jobs:
           cargo bench -p geometry-kernels --bench primitive3 -- --color never | tee target/cargo-benchmark-evidence/geometry-primitive3.txt
       - name: Upload raw Cargo benchmark evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: cargo-benchmark-evidence-${{ github.sha }}
           path: target/cargo-benchmark-evidence/
@@ -86,7 +86,7 @@ jobs:
         run: bash scripts/benchmark-smoke.sh
       - name: Upload performance evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: performance-smoke-${{ github.sha }}
           path: .artifacts/performance-smoke/
@@ -123,7 +123,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage baseline
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: llvm-cov-baseline-${{ github.sha }}
           path: target/llvm-cov-baseline/
