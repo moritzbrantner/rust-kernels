@@ -1146,24 +1146,52 @@ fn closest_point_wedge(point: Vec3, half: Vec3) -> Vec3 {
 }
 
 fn closest_segment_wedge(a: Vec3, b: Vec3, half: Vec3, work: &mut PrimitiveWork3) -> (Vec3, Vec3) {
-    let mut best = (a, wedge_vertices(half)[0]);
+    // The segment does not meet the wedge, so the closest pair is an endpoint against a face
+    // interior or the segment against an edge. An edge's Voronoi region lies in front of one
+    // of its two faces, so edges behind both faces along the whole segment are skipped.
+    let vertices = wedge_vertices(half);
+    let planes = wedge_planes(half);
+    let heights = planes.map(|(normal, limit)| [dot(normal, a) - limit, dot(normal, b) - limit]);
+    let in_front = heights.map(|[ha, hb]| ha > 0.0 || hb > 0.0);
+    let mut best = (a, vertices[0]);
     let mut best_distance = f64::INFINITY;
-    for triangle in wedge_triangles(half) {
-        for endpoint in [a, b] {
-            let candidate = closest_point_triangle(endpoint, triangle[0], triangle[1], triangle[2]);
-            update_pair(endpoint, candidate, &mut best, &mut best_distance);
+    for (face, &(normal, _)) in planes.iter().enumerate() {
+        for (endpoint, height) in [(a, heights[face][0]), (b, heights[face][1])] {
+            if height <= 0.0 {
+                continue;
+            }
+            let foot = sub(endpoint, scale(normal, height));
+            let inside = planes
+                .iter()
+                .enumerate()
+                .all(|(other, &(n, l))| other == face || dot(n, foot) <= l);
+            if inside {
+                update_pair(endpoint, foot, &mut best, &mut best_distance);
+            }
         }
-        for edge in [
-            (triangle[0], triangle[1]),
-            (triangle[1], triangle[2]),
-            (triangle[2], triangle[0]),
-        ] {
-            let candidate = closest_segment_segment(a, b, edge.0, edge.1, work);
+    }
+    for (i, j, left, right) in WEDGE_EDGES {
+        if in_front[left] || in_front[right] {
+            let candidate = closest_segment_segment(a, b, vertices[i], vertices[j], work);
             update_pair(candidate.0, candidate.1, &mut best, &mut best_distance);
         }
     }
     best
 }
+
+/// The wedge's nine edges: indices into [`wedge_vertices`] and of their two faces in
+/// [`wedge_planes`].
+const WEDGE_EDGES: [(usize, usize, usize, usize); 9] = [
+    (0, 2, 0, 4),
+    (2, 5, 0, 2),
+    (5, 3, 0, 3),
+    (3, 0, 0, 1),
+    (0, 1, 1, 4),
+    (1, 4, 1, 2),
+    (4, 3, 1, 3),
+    (1, 2, 2, 4),
+    (4, 5, 2, 3),
+];
 
 fn update_pair(a: Vec3, b: Vec3, best: &mut (Vec3, Vec3), best_distance: &mut f64) {
     let distance = length_squared(sub(b, a));
@@ -1662,6 +1690,42 @@ mod tests {
 
     fn body(shape: PrimitiveShape3, position: Vec3) -> PrimitiveBody3 {
         PrimitiveBody3::axis_aligned(shape, position, [0.0; 3])
+    }
+
+    #[test]
+    fn segment_wedge_closest_pair_matches_every_triangle() {
+        let half = [1.5, 0.75, 0.8];
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 11) as f64 / (1_u64 << 53) as f64 * 8.0 - 4.0
+        };
+        let mut work = PrimitiveWork3::default();
+        let mut checked = 0;
+        for _ in 0..2_000 {
+            let a = [next(), next(), next()];
+            let b = [next(), next(), next()];
+            if segment_wedge_interval(a, b, half).is_some() {
+                continue;
+            }
+            let mut brute = f64::INFINITY;
+            for triangle in wedge_triangles(half) {
+                for endpoint in [a, b] {
+                    let q = closest_point_triangle(endpoint, triangle[0], triangle[1], triangle[2]);
+                    brute = brute.min(length(sub(q, endpoint)));
+                }
+                for (p, q) in [(0, 1), (1, 2), (2, 0)] {
+                    let (x, y) = closest_segment_segment(a, b, triangle[p], triangle[q], &mut work);
+                    brute = brute.min(length(sub(y, x)));
+                }
+            }
+            let (x, y) = closest_segment_wedge(a, b, half, &mut work);
+            assert!((length(sub(y, x)) - brute).abs() < 1.0e-12, "{a:?} {b:?}");
+            checked += 1;
+        }
+        assert!(checked > 500);
     }
 
     #[test]
