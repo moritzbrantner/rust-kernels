@@ -1,1 +1,3 @@
 /target
+# A library workspace: consumers resolve their own lockfiles (not tracked here).
+/Cargo.lock
