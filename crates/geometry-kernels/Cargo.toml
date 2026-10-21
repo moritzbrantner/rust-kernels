@@ -10,7 +10,7 @@ description = "Small deterministic geometry and analytical intersection kernels"
 spatial-kernels = { path = "../spatial-kernels" }
 
 [dev-dependencies]
-criterion = "0.5.1"
+criterion = "=0.5.1"
 divan = "=0.1.21"
 
 [[bench]]
