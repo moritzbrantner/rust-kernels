@@ -1,5 +1,6 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use graph_kernels::{PageRankConfig, page_rank};
+use std::hint::black_box;
 
 const NODES: usize = 2_048;
 

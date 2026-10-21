@@ -9,7 +9,7 @@ description = "Small deterministic collection and data-structure kernels"
 [dependencies]
 
 [dev-dependencies]
-criterion = "=0.5.1"
+criterion = "=0.8.2"
 divan = "=0.1.21"
 proptest = "=1.12.0"
 

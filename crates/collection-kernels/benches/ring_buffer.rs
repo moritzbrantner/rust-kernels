@@ -1,5 +1,6 @@
 use collection_kernels::RingBuffer;
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 
 const WRAP_CAPACITY: usize = 1_024;
 const WRAP_OPERATIONS: usize = 8_192;
