@@ -1,7 +1,8 @@
 use std::hash::{Hash, Hasher};
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use graph_kernels::dijkstra;
+use std::hint::black_box;
 
 const NODES: u32 = 4_096;
 

@@ -1,5 +1,6 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use geometry_kernels::obb3::{Obb3, obb3_sat};
+use std::hint::black_box;
 
 fn obb3_sat_cases(c: &mut Criterion) {
     let axis_aligned = Obb3::new([0.0; 3], [1.0, 2.0, 0.75], [0.0; 3]);
