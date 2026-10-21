@@ -7,7 +7,7 @@ rust-version.workspace = true
 description = "Deterministic exact and approximate similarity kernels"
 
 [dev-dependencies]
-divan = "0.1.21"
+divan = "=0.1.21"
 
 [[bench]]
 name = "fuzzy"
