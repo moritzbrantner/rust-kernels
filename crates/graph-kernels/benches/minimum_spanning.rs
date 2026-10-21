@@ -1,5 +1,6 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use graph_kernels::{WeightedEdge, kruskal_minimum_spanning_forest};
+use std::hint::black_box;
 
 const VERTICES: usize = 4_096;
 const EDGES: usize = 32_768;

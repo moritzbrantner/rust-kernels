@@ -1,5 +1,6 @@
 use collection_kernels::AddressablePriorityQueue;
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 
 const ITEMS: usize = 10_000;
 
