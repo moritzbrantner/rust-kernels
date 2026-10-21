@@ -8,7 +8,32 @@ permissions:
   contents: read
 
 jobs:
+  docs-scope:
+    runs-on: ubuntu-latest
+    outputs:
+      docs-only: ${{ steps.classify.outputs.docs-only }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+      - id: classify
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          echo "docs-only=false" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then exit 0; fi
+          mapfile -d '' changed < <(git diff --no-renames --name-only -z "$BASE_SHA...$HEAD_SHA")
+          if (( ${#changed[@]} == 0 )); then exit 0; fi
+          for file in "${changed[@]}"; do
+            if [[ "$file" != *.md ]]; then exit 0; fi
+          done
+          echo "docs-only=true" >> "$GITHUB_OUTPUT"
+
   registry:
+    needs: docs-scope
+    if: needs.docs-scope.outputs.docs-only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -22,6 +47,8 @@ jobs:
       - run: python3 scripts/test_catalog_install.py
 
   rust:
+    needs: docs-scope
+    if: needs.docs-scope.outputs.docs-only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -33,6 +60,8 @@ jobs:
       - run: cargo test --workspace --all-features
 
   cargo-benchmarks:
+    needs: docs-scope
+    if: needs.docs-scope.outputs.docs-only != 'true'
     name: Cargo-native benchmark evidence
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -68,6 +97,8 @@ jobs:
           if-no-files-found: warn
 
   performance-smoke:
+    needs: docs-scope
+    if: needs.docs-scope.outputs.docs-only != 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -93,6 +124,8 @@ jobs:
           if-no-files-found: warn
 
   coverage-baseline:
+    needs: docs-scope
+    if: needs.docs-scope.outputs.docs-only != 'true'
     continue-on-error: true
     runs-on: ubuntu-latest
     steps:
@@ -130,24 +163,32 @@ jobs:
           if-no-files-found: ignore
 
   validate-hardening:
+    needs: docs-scope
+    if: github.event_name == 'pull_request' && needs.docs-scope.outputs.docs-only != 'true'
     if: github.event_name == 'pull_request'
     permissions:
       contents: read
     uses: ./.github/workflows/hardening.yml
 
   validate-mutation-baseline:
+    needs: docs-scope
+    if: github.event_name == 'pull_request' && needs.docs-scope.outputs.docs-only != 'true'
     if: github.event_name == 'pull_request'
     permissions:
       contents: read
     uses: ./.github/workflows/mutation-baseline.yml
 
   validate-public-contract:
+    needs: docs-scope
+    if: github.event_name == 'pull_request' && needs.docs-scope.outputs.docs-only != 'true'
     if: github.event_name == 'pull_request'
     permissions:
       contents: read
     uses: ./.github/workflows/public-contract.yml
 
   validate-runtime-evidence:
+    needs: docs-scope
+    if: github.event_name == 'pull_request' && github.base_ref == 'main' && needs.docs-scope.outputs.docs-only != 'true'
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     permissions:
       contents: read
@@ -156,7 +197,7 @@ jobs:
   merge-ready:
     name: ${{ github.event_name == 'pull_request' && 'merge-ready' || 'validation-summary' }}
     if: ${{ always() }}
-    needs: ["registry", "rust", "cargo-benchmarks", "performance-smoke", "validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]
+    needs: ["docs-scope", "registry", "rust", "cargo-benchmarks", "performance-smoke", "validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -164,5 +205,5 @@ jobs:
       - uses: moritzbrantner/reusable-workflows/.github/actions/merge-ready@b0f25f241d76af2584dfc9e375084ff5c5cb97da
         with:
           needs: ${{ toJSON(needs) }}
-          required: '["registry", "rust", "cargo-benchmarks", "performance-smoke", "validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]'
-          allow-skipped: ${{ github.event_name != 'pull_request' && '["validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]' || github.base_ref != 'main' && '["validate-runtime-evidence"]' || '[]' }}
+          required: '["docs-scope", "registry", "rust", "cargo-benchmarks", "performance-smoke", "validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]'
+          allow-skipped: ${{ needs.docs-scope.outputs.docs-only == 'true' && '["registry","rust","cargo-benchmarks","performance-smoke","validate-hardening","validate-mutation-baseline","validate-public-contract","validate-runtime-evidence"]' || github.event_name != 'pull_request' && '["validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]' || github.base_ref != 'main' && '["validate-runtime-evidence"]' || '[]' }}
