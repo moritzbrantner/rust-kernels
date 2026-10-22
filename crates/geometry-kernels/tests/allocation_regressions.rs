@@ -226,3 +226,41 @@ fn ray_and_segment_triangle_queries_allocate_nothing() {
     assert!(hits > 0);
     assert_eq!(ALLOCS.with(Cell::get) + REALLOCS.with(Cell::get), 0);
 }
+
+#[test]
+fn warmed_quickhull_rebuilds_allocate_nothing() {
+    use geometry_kernels::hull::{Hull3, QuickHullWork, quickhull2, quickhull3};
+    let mut state = 0x2545_f491_4f6c_dd1du64;
+    let mut unit = move || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        (state >> 11) as f64 / (1u64 << 53) as f64 * 2.0 - 1.0
+    };
+    let clouds: Vec<Vec<[f64; 3]>> = (0..4)
+        .map(|_| (0..2048).map(|_| [unit(), unit(), unit()]).collect())
+        .collect();
+    let flat: Vec<Vec<[f64; 2]>> = clouds
+        .iter()
+        .map(|cloud| cloud.iter().map(|p| [p[0], p[1]]).collect())
+        .collect();
+    let mut work = QuickHullWork::default();
+    let mut hull = Hull3::default();
+    let mut polygon = Vec::new();
+    for _ in 0..2 {
+        for (cloud, flat) in clouds.iter().zip(&flat) {
+            quickhull3(cloud, &mut work, &mut hull);
+            quickhull2(flat, &mut work, &mut polygon);
+        }
+    }
+    ALLOCS.with(|count| count.set(0));
+    REALLOCS.with(|count| count.set(0));
+    ENABLED.with(|enabled| enabled.set(true));
+    for (cloud, flat) in clouds.iter().zip(&flat) {
+        quickhull3(cloud, &mut work, &mut hull);
+        quickhull2(flat, &mut work, &mut polygon);
+    }
+    ENABLED.with(|enabled| enabled.set(false));
+    assert!(hull.triangles.len() > 4 && polygon.len() > 3);
+    assert_eq!(ALLOCS.with(Cell::get) + REALLOCS.with(Cell::get), 0);
+}

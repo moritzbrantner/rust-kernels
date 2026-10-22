@@ -6,6 +6,7 @@ pub mod gjk_distance;
 pub mod gjk_trace;
 pub mod halfspace;
 pub mod heightfield;
+pub mod hull;
 pub mod math3;
 pub mod planar;
 pub mod primitive3;
