@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "issue": 52,
+  "kernels": [
+    {
+      "id": "f64-quickhull-2d-3d",
+      "crate": "geometry-kernels",
+      "module": "crate::hull",
+      "sources": [
+        "crates/geometry-kernels/src/hull.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "2000 seeded integer 2D sets with heavy duplicate/collinear degeneracy match an exact i64 monotone chain vertex-for-vertex; 300 general-position 3D integer sets match a brute-force supporting-plane oracle.",
+        "1500 seeded small-range 3D integer sets stay closed (every directed edge paired, Euler V+F=E+2), keep every input below every face, emit only strictly extreme vertices, and are byte-identical after shuffling; float clouds with duplicates and a coplanar cap are identical across shuffles.",
+        "Warmed 2D/3D rebuilds allocate and reallocate zero times; uniform-cube 3D input stays under 12 distance tests per point at 1k/10k/100k points. Developer-facing Divan workloads cover uniform, sphere (all hull), clustered and interior-heavy distributions.",
+        "criterion: Divan quickhull suite only; no Criterion suite is added."
+      ]
+    }
+  ]
+}
