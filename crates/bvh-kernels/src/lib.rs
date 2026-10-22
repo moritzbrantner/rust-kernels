@@ -411,6 +411,42 @@ impl DynamicAabbTree {
         true
     }
 
+    /// Like [`Self::update`], but a reinserted leaf's fat AABB also stretches by
+    /// `displacement` along its direction (predictive fattening, as in Box2D), so a body that
+    /// keeps moving that way stays inside its leaf for several updates. Returns `true` when the
+    /// leaf was reinserted.
+    pub fn update_predicted(&mut self, body: Body, displacement: [f32; 3]) -> bool {
+        assert!(
+            displacement.iter().all(|d| d.is_finite()),
+            "predicted displacement must be finite"
+        );
+        let leaf = self
+            .leaf_of(body.id)
+            .expect("updated collider must already exist");
+        if self.node(leaf).bounds.contains(body.aabb) {
+            self.node_mut(leaf).body = Some(body);
+            return false;
+        }
+
+        let fat = body.aabb.expanded(self.fat_margin);
+        let (mut min, mut max) = (fat.min, fat.max);
+        for axis in 0..3 {
+            if displacement[axis] < 0.0 {
+                min[axis] += displacement[axis];
+            } else {
+                max[axis] += displacement[axis];
+            }
+        }
+        self.remove_leaf(leaf);
+        let node = self.node_mut(leaf);
+        node.bounds = Aabb::new(min, max);
+        node.body = Some(body);
+        node.parent = None;
+        node.height = 0;
+        self.insert_leaf(leaf);
+        true
+    }
+
     /// Runs the same update as [`Self::update`] while capturing before/after
     /// structural snapshots. This path intentionally allocates; normal updates
     /// remain allocation-free with respect to tracing.
@@ -1184,6 +1220,31 @@ mod tests {
 
     fn body(id: ColliderId, center: [f32; 3], half: f32) -> Body {
         Body::new(id, Aabb::from_center_half_extents(center, [half; 3]))
+    }
+
+    #[test]
+    fn predicted_updates_stretch_the_fat_bounds_along_the_motion() {
+        let mut tree = DynamicAabbTree::new(0.1);
+        tree.insert(body(1, [0.0, 0.0, 0.0], 0.5));
+        // A steady 0.3-per-update move to +X: the first update reinserts with room ahead,
+        // so the next two moves stay inside the leaf.
+        let step = [0.3, 0.0, 0.0];
+        assert!(tree.update_predicted(body(1, [0.3, 0.0, 0.0], 0.5), [0.6, 0.0, 0.0]));
+        assert!(!tree.update_predicted(body(1, [0.6, 0.0, 0.0], 0.5), step));
+        assert!(!tree.update_predicted(body(1, [0.9, 0.0, 0.0], 0.5), step));
+        let fat = tree.fat_bounds(1).unwrap();
+        let close = |a: f32, b: f32| (a - b).abs() < 1e-6;
+        assert!(close(fat.min[0], -0.3) && close(fat.min[1], -0.6) && close(fat.min[2], -0.6));
+        assert!(close(fat.max[0], 1.5) && close(fat.max[1], 0.6));
+        // Queries still see the exact body.
+        assert_eq!(
+            tree.query_aabb(Aabb::from_center_half_extents([1.3, 0.0, 0.0], [0.05; 3])),
+            [1]
+        );
+        assert!(
+            tree.query_aabb(Aabb::from_center_half_extents([-0.25, 0.0, 0.0], [0.01; 3]))
+                .is_empty()
+        );
     }
 
     fn fixture() -> Vec<Body> {
