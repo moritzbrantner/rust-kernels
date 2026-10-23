@@ -205,11 +205,11 @@ pub fn hopcroft_karp(
                 continue;
             }
             seen_right[right] = true;
-            if let Some(next) = search.right[right] {
-                if !seen_left[next] {
-                    seen_left[next] = true;
-                    queue.push(next);
-                }
+            if let Some(next) = search.right[right]
+                && !seen_left[next]
+            {
+                seen_left[next] = true;
+                queue.push(next);
             }
         }
     }

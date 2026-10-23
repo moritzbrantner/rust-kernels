@@ -103,7 +103,7 @@ where
 
 fn lowbit(index: usize) -> usize {
     debug_assert!(index > 0);
-    index & index.wrapping_neg()
+    index.isolate_lowest_one()
 }
 
 #[cfg(test)]
