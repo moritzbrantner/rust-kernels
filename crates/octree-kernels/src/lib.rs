@@ -300,7 +300,7 @@ fn enclosing_cube(bodies: &[Body]) -> Aabb {
     )
 }
 
-// Directed rounding without next_up/next_down, which are newer than our MSRV.
+// Directed rounding implemented by hand instead of f32::next_up/next_down.
 // At f32's extremes a finite cube may not fit: clamp only the padded part and
 // retain a conservative finite root box rather than panicking or losing bodies.
 fn round_outward(value: f64, up: bool) -> f32 {

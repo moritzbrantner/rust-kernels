@@ -495,10 +495,8 @@ fn run_sweep_and_prune(axis: Axis3, bodies: &[Body], trace: bool) -> SweepAndPru
         let mut expired = trace.then(Vec::new);
         active.retain(|&other| {
             let keep = bodies[other].aabb.max[axis_index] >= current_min;
-            if !keep {
-                if let Some(expired) = &mut expired {
-                    expired.push(bodies[other].id);
-                }
+            if !keep && let Some(expired) = &mut expired {
+                expired.push(bodies[other].id);
             }
             keep
         });

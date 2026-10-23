@@ -5,7 +5,7 @@ use std::hint::black_box;
 const NODES: usize = 2_048;
 
 fn neighbors(node: &usize) -> Vec<usize> {
-    if node % 17 == 0 {
+    if node.is_multiple_of(17) {
         Vec::new()
     } else {
         vec![
