@@ -451,6 +451,21 @@ pub fn try_swept_time(
     if !tolerance.is_finite() {
         return Err(PrimitiveSweepError3::NonFiniteComputation);
     }
+    // Relative to the pair's coordinates and sizes, so tiny pairs keep their resolution.
+    let magnitude = [
+        a.position,
+        b.position,
+        add(a.position, scale(a.velocity, dt)),
+        add(b.position, scale(b.velocity, dt)),
+    ]
+    .into_iter()
+    .flatten()
+    .map(f64::abs)
+    .fold(a.shape.radius().max(b.shape.radius()), f64::max);
+    let rounding = 8.0 * f64::EPSILON * magnitude;
+    if !rounding.is_finite() {
+        return Err(PrimitiveSweepError3::NonFiniteComputation);
+    }
     let mut time = 0.0;
     let mut current_a = a;
     let mut current_b = b;
@@ -470,7 +485,9 @@ pub fn try_swept_time(
         if !gap.is_finite() {
             return Err(PrimitiveSweepError3::NonFiniteComputation);
         }
-        if gap <= 0.0 {
+        // A gap within the separation's rounding is contact: far from the origin rounding can
+        // keep it just above zero, and the advance would creep until the budget ran out (#175).
+        if gap <= rounding {
             return Ok(Some(time));
         }
         let closing = -dot(displacement, contact.normal);

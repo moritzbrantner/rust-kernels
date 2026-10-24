@@ -153,3 +153,28 @@ fn all_supported_pair_orders_admit_analytic_center_crossings_and_prove_separatin
         }
     }
 }
+
+#[test]
+fn far_from_origin_contact_within_tolerance_is_a_hit() {
+    // rust-kernels#175 (mmorpg#427 vale-hub-walk): an offset-inflated capsule walking into a
+    // crate's vertical edge at x ≈ 15853 in world coordinates. Rounding leaves the gap about
+    // 7e-15 above contact; requiring gap <= 0 crept one time ulp per iteration until the
+    // budget ran out.
+    let widen = |v: [f32; 3]| v.map(f64::from);
+    let capsule = PrimitiveBody3::axis_aligned(
+        PrimitiveShape3::capsule(45.0, 35.25),
+        widen([15811.787, 385.7618, 2472.5217]),
+        [7.0, 0.0, 1.0],
+    );
+    let crate_box = PrimitiveBody3::axis_aligned(
+        PrimitiveShape3::cuboid([41.0, 250.0, 41.0]),
+        widen([15894.0, 527.0, 2519.0]),
+        [0.0; 3],
+    );
+    let mut work = PrimitiveWork3::default();
+    let fraction = try_swept_time(capsule, crate_box, 1.0, 0.0, 128, &mut work)
+        .unwrap()
+        .unwrap();
+    assert!((fraction - 0.894_596_6).abs() < 1e-6, "{fraction}");
+    assert!(work.sweep_iterations < 8, "{}", work.sweep_iterations);
+}
