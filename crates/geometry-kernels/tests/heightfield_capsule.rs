@@ -201,3 +201,56 @@ fn segment_cast_work_follows_the_cells_crossed_not_the_terrain_size() {
     );
     assert_eq!(work.cells_visited, 1);
 }
+
+/// A floor at y = 0 with a 1 m cliff of 0.5 m cells rising toward -x (an x < 0 plateau).
+fn cliff() -> PreparedHeightfield3 {
+    let columns: Vec<f64> = (0..9).map(|i| i as f64 * 0.5 - 2.0).collect();
+    let rows = columns.clone();
+    let heights = (0..81)
+        .map(|k| if columns[k % 9] < -1e-9 { 1.0 } else { 0.0 })
+        .collect();
+    PreparedHeightfield3::try_new(HeightfieldData3 {
+        columns,
+        rows,
+        heights,
+        active_cells: None,
+        diagonal: HeightfieldDiagonal3::Fixed,
+    })
+    .unwrap()
+}
+
+/// #396: a capsule touching both the floor and the cliff face at its foot hits only what it
+/// moves into: down onto the floor, sideways into the face, and nothing moving away or along.
+#[test]
+fn capsule_sweep_from_contact_reports_what_the_motion_runs_into() {
+    let field = cliff();
+    let r = 0.3;
+    // The face's outward normal and the capsule's sphere centre touching floor and face.
+    let face = {
+        let n = [2.0, 1.0, 0.0];
+        let l = (5.0_f64).sqrt();
+        [n[0] / l, n[1] / l, 0.0]
+    };
+    // Plane through (0, 0) with normal `face`: centre at height r over the floor, r from it.
+    let x = (r - face[1] * r) / face[0];
+    let p = [x, r, 0.0];
+    let q = [x, r + 1.0, 0.0];
+    let touching = field.capsule_contact(p, q, r, 1e-9).expect("touching");
+    assert!(touching.separation.abs() < 1e-9);
+    let sweep = |d: [f64; 3]| field.capsule_sweep(p, q, r, d, 64).unwrap();
+    let down = sweep([0.0, -0.1, 0.0]).expect("lands on the floor");
+    assert_eq!(down.fraction, 0.0);
+    assert!(down.contact.normal[1] > 0.999, "the floor: {down:?}");
+    let into = sweep([-0.1, 0.0, 0.0]).expect("runs into the face");
+    assert_eq!(into.fraction, 0.0);
+    assert!(
+        (into.contact.normal[0] - face[0]).abs() < 1e-9,
+        "the face: {into:?}"
+    );
+    // Up and away from the cliff: nothing.
+    for d in [[0.0, 0.1, 0.0], [0.1, 0.0, 0.0]] {
+        assert!(sweep(d).is_none(), "{d:?}: {:?}", sweep(d));
+    }
+    // Along the foot: neither the floor nor the face it starts touching stops it there.
+    assert!(sweep([0.0, 0.0, 0.1]).is_none_or(|hit| hit.fraction > 0.5));
+}

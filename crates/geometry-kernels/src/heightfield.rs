@@ -457,7 +457,12 @@ impl PreparedHeightfield3 {
 
     /// First contact of the capsule `p`–`q`/`radius` translated by `displacement` within
     /// `0..=1`, by conservative advancement over the triangles under the swept footprint.
-    /// Starting in contact (separation <= 0) reports fraction 0. Returns `Err` when
+    /// A triangle the capsule starts touching or overlapping is hit at fraction 0 when the
+    /// motion runs into it (`displacement` against its contact normal) and ignored when the
+    /// motion leaves it or runs along it, as Rapier's shape casts without
+    /// `stop_at_penetration`. Triangles touched at the same fraction resolve to the one the
+    /// motion meets most head-on, then the lower id: a capsule in a cliff's foot moving down
+    /// reports the floor it lands on rather than the face beside it. Returns `Err` when
     /// `max_iterations` do not settle the contact.
     pub fn capsule_sweep(
         &self,
@@ -520,7 +525,8 @@ impl PreparedHeightfield3 {
         });
         // Distance from the translating capsule to one convex triangle is convex in time, so
         // Newton steps from below converge to that triangle's first touch without passing it.
-        // Each triangle is solved on its own; the earliest touch wins (ties by triangle id).
+        // Each triangle is solved on its own; the earliest touch wins (ties: most head-on, then
+        // triangle id).
         let length = dot(displacement, displacement).sqrt();
         let mut best: Option<HeightfieldSweepHit3> = None;
         for k in 0..count {
@@ -547,12 +553,20 @@ impl PreparedHeightfield3 {
                     break;
                 };
                 if c.separation <= tolerance {
+                    let rate = dot(displacement, c.normal);
+                    if time == 0.0 && rate >= 0.0 {
+                        // Starts touching but moves away (or along it): no hit.
+                        break;
+                    }
                     let hit = HeightfieldSweepHit3 {
                         fraction: time,
                         contact: HeightfieldContact3 { triangle: id, ..c },
                     };
                     if best.is_none_or(|b| {
-                        time < b.fraction || (time == b.fraction && id < b.contact.triangle)
+                        let earlier = rate.total_cmp(&dot(displacement, b.contact.normal));
+                        time < b.fraction
+                            || (time == b.fraction
+                                && earlier.then(id.cmp(&b.contact.triangle)).is_lt())
                     }) {
                         best = Some(hit);
                     }
