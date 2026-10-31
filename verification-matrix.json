@@ -155,6 +155,24 @@
       "notes": []
     },
     {
+      "id": "wide-bvh",
+      "crate": "bvh-kernels",
+      "module": "crate::WideBvh",
+      "sources": [
+        "crates/bvh-kernels/src/wide.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "missing",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "missing",
+      "criterion": "missing",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "Segment and box visits are checked against brute force over the live leaves; segment_queries is a Divan microbenchmark, not a deterministic sentinel."
+      ]
+    },
+    {
       "id": "static-bvh-trace",
       "crate": "bvh-trace-kernels",
       "module": "crate::trace_static_bvh",
