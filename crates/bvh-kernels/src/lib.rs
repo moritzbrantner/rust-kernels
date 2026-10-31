@@ -1,5 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
+mod wide;
+pub use wide::WideBvh;
+
 use spatial_kernels::{
     Aabb, Body, BroadPhase, BroadPhaseResult, BroadPhaseStats, ColliderId, Pair,
 };

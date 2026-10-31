@@ -23,6 +23,7 @@ The repository starts with spatial/collision kernels and expands into small gene
 - `StaticBvh`, an immutable median-split bounding-volume hierarchy
 - deterministic AABB queries
 - `StaticBvhBroadPhase`, differential-tested against `NaiveBroadPhase`
+- `WideBvh`, a four-wide copy of a `DynamicAabbTree` (O(n)) for leaves that rarely change: one node visit is a four-lane slab or overlap test, so segment and box queries visit about `log4 n` nodes
 
 `geometry-kernels` supplies analytical relations, OBB/SAT, GJK, planar/3D EPA, distance-normalized ray queries, bounded sphere time-of-impact, and reusable f64 sphere/box/capsule/wedge contact + fixed-orientation sweep kernels. `octree-kernels` provides conservative hierarchical broad-phase detection; `spatial-kernels` also supplies sweep-and-prune and `bvh-kernels` has dynamic trees. Triangle/mesh rays and general convex continuous collision remain separate future work. See [the ray and CCD guide](docs/ray-and-ccd.md) [uniform primitive volume products](docs/primitive-volume.md), and [capsule intersection normals](docs/capsule-contact-normals.md). The [capsule row acceptance](docs/capsule-row-acceptance.md) records independent reference and bounded-work coverage. [Retained f64 heightfields](docs/heightfield-surface.md) provide bounded vertical surface queries with stable triangle identity and prepared normals.
 

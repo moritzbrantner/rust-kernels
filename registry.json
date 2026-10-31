@@ -781,8 +781,16 @@
           "target": "crates/bvh-kernels/src/lib.rs"
         },
         {
+          "path": "crates/bvh-kernels/src/wide.rs",
+          "target": "crates/bvh-kernels/src/wide.rs"
+        },
+        {
           "path": "crates/bvh-kernels/benches/dynamic_pairs.rs",
           "target": "crates/bvh-kernels/benches/dynamic_pairs.rs"
+        },
+        {
+          "path": "crates/bvh-kernels/benches/segment_queries.rs",
+          "target": "crates/bvh-kernels/benches/segment_queries.rs"
         }
       ],
       "provides": [
@@ -791,6 +799,13 @@
           "type": "data-structure",
           "symbols": [
             "StaticBvh"
+          ]
+        },
+        {
+          "name": "wide-bvh",
+          "type": "data-structure",
+          "symbols": [
+            "WideBvh"
           ]
         },
         {
