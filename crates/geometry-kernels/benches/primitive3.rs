@@ -115,6 +115,48 @@ fn capsule_row_contacts(bencher: Bencher) {
 }
 
 #[divan::bench]
+fn rotated_polytope_contacts(bencher: Bencher) {
+    let bodies = rotated_polytopes();
+    bencher.bench_local(|| {
+        let mut work = PrimitiveWork3::default();
+        for [a, b] in bodies {
+            black_box(query(black_box(a), black_box(b), black_box(&mut work)));
+        }
+    });
+}
+
+#[divan::bench]
+fn rotated_polytope_sweeps(bencher: Bencher) {
+    let bodies = rotated_polytopes();
+    bencher.bench_local(|| {
+        let mut work = PrimitiveWork3::default();
+        for [a, b] in bodies {
+            black_box(swept_time(
+                black_box(a),
+                black_box(b),
+                black_box(1.0 / 60.0),
+                black_box(0.02),
+                black_box(&mut work),
+            ));
+        }
+    });
+}
+
+/// Box/box, box/wedge and wedge/wedge poses whose edge cross products all count.
+fn rotated_polytopes() -> [[PrimitiveBody3; 2]; 3] {
+    let axes = [[0.6, 0.8, 0.0], [-0.48, 0.36, 0.8], [0.64, -0.48, 0.6]];
+    let cuboid = PrimitiveShape3::cuboid([1.0, 1.5, 2.0]);
+    let wedge = PrimitiveShape3::wedge([2.0, 1.0, 1.5]);
+    let left = |shape| PrimitiveBody3::axis_aligned(shape, [0.0; 3], [0.0; 3]);
+    let right = |shape| PrimitiveBody3::new(shape, [1.5, 0.5, -0.5], axes, [-30.0, 5.0, 0.0]);
+    [
+        [left(cuboid), right(cuboid)],
+        [left(cuboid), right(wedge)],
+        [left(wedge), right(wedge)],
+    ]
+}
+
+#[divan::bench]
 fn prepared_heightfield_surface_query(bencher: Bencher) {
     use geometry_kernels::heightfield::{HeightfieldData3, PreparedHeightfield3};
     let terrain = PreparedHeightfield3::try_new(HeightfieldData3 {
