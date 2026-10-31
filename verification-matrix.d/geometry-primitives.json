@@ -8,9 +8,18 @@
       "module": "crate::primitive3",
       "sources": [
         "crates/geometry-kernels/src/primitive3.rs",
+        "crates/geometry-kernels/src/primitive3/closest.rs",
+        "crates/geometry-kernels/src/primitive3/frame.rs",
+        "crates/geometry-kernels/src/primitive3/pairs.rs",
+        "crates/geometry-kernels/src/primitive3/polytope.rs",
+        "crates/geometry-kernels/src/primitive3/query.rs",
         "crates/geometry-kernels/src/primitive3/ray.rs",
         "crates/geometry-kernels/src/primitive3/ray/tests.rs",
-        "crates/geometry-kernels/src/primitive3/volume.rs"
+        "crates/geometry-kernels/src/primitive3/shape.rs",
+        "crates/geometry-kernels/src/primitive3/sweep.rs",
+        "crates/geometry-kernels/src/primitive3/tests.rs",
+        "crates/geometry-kernels/src/primitive3/volume.rs",
+        "crates/geometry-kernels/src/primitive3/wedge.rs"
       ],
       "oracleDifferential": "partial",
       "propertyMetamorphic": "present",
