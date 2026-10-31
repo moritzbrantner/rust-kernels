@@ -64,9 +64,11 @@ pub fn support_point(body: PrimitiveBody3, direction: Vec3, work: &mut Primitive
 }
 
 fn support_impl(body: PrimitiveBody3, direction: Vec3, work: Option<&mut PrimitiveWork3>) -> Vec3 {
-    let unit = unit_or_zero(direction);
     match body.shape.kind {
-        PrimitiveKind3::Sphere => add(body.position, scale(unit, body.shape.sphere_radius())),
+        PrimitiveKind3::Sphere => add(
+            body.position,
+            scale(unit_or_zero(direction), body.shape.sphere_radius()),
+        ),
         PrimitiveKind3::Box => {
             let half = body.shape.half_extents();
             let mut point = body.position;
@@ -89,23 +91,27 @@ fn support_impl(body: PrimitiveBody3, direction: Vec3, work: Option<&mut Primiti
                         1.0
                     },
             );
-            add(add(body.position, end), scale(unit, radius))
+            add(
+                add(body.position, end),
+                scale(unit_or_zero(direction), radius),
+            )
         }
         PrimitiveKind3::Wedge => {
             let vertices = wedge_vertices(body.shape.half_extents());
             if let Some(work) = work {
                 work.vertex_tests += vertices.len() as u64;
             }
-            let mut best = vertices[0];
-            let mut best_projection = dot(direction, rotate_local(body.axes, best));
+            let mut best = rotate_local(body.axes, vertices[0]);
+            let mut best_projection = dot(direction, best);
             for &vertex in &vertices[1..] {
-                let projection = dot(direction, rotate_local(body.axes, vertex));
+                let rotated = rotate_local(body.axes, vertex);
+                let projection = dot(direction, rotated);
                 if projection > best_projection {
-                    best = vertex;
+                    best = rotated;
                     best_projection = projection;
                 }
             }
-            add(body.position, rotate_local(body.axes, best))
+            add(body.position, best)
         }
     }
 }

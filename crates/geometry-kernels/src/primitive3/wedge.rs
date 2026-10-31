@@ -5,6 +5,8 @@ use super::frame::unit_or_zero;
 use super::query::PrimitiveWork3;
 use crate::math3::{Vec3, dot, length_squared, scale, sub};
 
+// `#[inline]` keeps these inlinable into `pairs` despite the codegen-unit split; measured.
+
 pub(super) fn wedge_vertices(half: Vec3) -> [Vec3; 6] {
     [
         [-half[0], -half[1], -half[2]],
@@ -16,6 +18,7 @@ pub(super) fn wedge_vertices(half: Vec3) -> [Vec3; 6] {
     ]
 }
 
+#[inline]
 pub(super) fn segment_face_penetration(
     a: Vec3,
     b: Vec3,
@@ -83,6 +86,7 @@ pub(super) fn wedge_inside_depth(point: Vec3, half: Vec3) -> Option<(Vec3, f64)>
     Some(best)
 }
 
+#[inline]
 pub(super) fn segment_wedge_interval(a: Vec3, b: Vec3, half: Vec3) -> Option<(f64, f64)> {
     let delta = sub(b, a);
     let mut enter = 0.0_f64;
@@ -123,6 +127,7 @@ pub(super) fn closest_point_wedge(point: Vec3, half: Vec3) -> Vec3 {
     best
 }
 
+#[inline]
 pub(super) fn closest_segment_wedge(
     a: Vec3,
     b: Vec3,

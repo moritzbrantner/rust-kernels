@@ -3,6 +3,9 @@
 use super::query::PrimitiveWork3;
 use crate::math3::{Vec3, add, cross, dot, length_squared, scale, sub};
 
+// `#[inline]` keeps these inlinable into `pairs` despite the codegen-unit split; measured.
+
+#[inline]
 pub(super) fn update_pair(a: Vec3, b: Vec3, best: &mut (Vec3, Vec3), best_distance: &mut f64) {
     let distance = length_squared(sub(b, a));
     if distance < *best_distance {
@@ -57,6 +60,7 @@ pub(crate) fn closest_point_triangle(point: Vec3, a: Vec3, b: Vec3, c: Vec3) -> 
     )
 }
 
+#[inline]
 pub(super) fn closest_point_segment(
     point: Vec3,
     a: Vec3,
@@ -99,6 +103,7 @@ pub fn closest_segment_points(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> Option<
         .then_some(points)
 }
 
+#[inline]
 pub(super) fn closest_segment_segment(
     p1: Vec3,
     q1: Vec3,
@@ -174,6 +179,7 @@ pub(super) fn closest_segment_segment(
     )
 }
 
+#[inline]
 pub(super) fn segment_aabb_interval(
     a: Vec3,
     b: Vec3,
@@ -205,6 +211,7 @@ pub(super) fn segment_aabb_interval(
     (exit >= 0.0 && enter <= 1.0).then_some((enter.max(0.0), exit.min(1.0)))
 }
 
+#[inline]
 pub(super) fn closest_segment_aabb(
     a: Vec3,
     b: Vec3,
@@ -281,6 +288,7 @@ pub(super) fn closest_segment_aabb(
     best
 }
 
+#[inline]
 pub(super) fn clamp_aabb(point: Vec3, half: Vec3) -> Vec3 {
     [
         point[0].clamp(-half[0], half[0]),
@@ -289,6 +297,7 @@ pub(super) fn clamp_aabb(point: Vec3, half: Vec3) -> Vec3 {
     ]
 }
 
+#[inline]
 pub(super) fn nearest_box_face(point: Vec3, half: Vec3) -> (Vec3, f64) {
     let mut axis = 0;
     let mut depth = half[0] - point[0].abs();
