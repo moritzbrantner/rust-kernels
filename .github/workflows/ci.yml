@@ -186,9 +186,31 @@ jobs:
   validate-runtime-evidence:
     needs: docs-scope
     if: github.event_name == 'pull_request' && github.base_ref == 'main' && needs.docs-scope.outputs.docs-only != 'true'
+    concurrency:
+      group: runtime-evidence-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     permissions:
       contents: read
-    uses: ./.github/workflows/runtime-evidence.yml
+    uses: moritzbrantner/reusable-workflows/.github/workflows/runtime-evidence.yml@0b7b7ec433e6cad058667251e31a0eca918366eb
+    with:
+      workloads: |
+        profiles/runtime-profiler/search.json
+        profiles/runtime-profiler/lru.json
+        profiles/runtime-profiler/traversal.json
+      workload_files: |
+        profiles/runtime-profiler/search.json
+        profiles/runtime-profiler/lru.json
+        profiles/runtime-profiler/traversal.json
+        scripts/profile-workload.sh
+      prime_command: |
+        for workload in search lru traversal; do
+          bash scripts/profile-workload.sh "$workload" >/dev/null
+        done
+      profiler_revision: 8280c95feb2a1075efa0480a9622e40c723e0b3a
+      moonlight_revision: a615843b6497cfa0e746224673592c107d969bda
+      artifact_name: runtime-moonlight
+      job_name: Kernel runtime evidence and behavior
+      check_worktree_clean: true
 
   merge-ready:
     name: ${{ github.event_name == 'pull_request' && 'merge-ready' || 'validation-summary' }}
