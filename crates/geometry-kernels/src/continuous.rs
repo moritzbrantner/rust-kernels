@@ -63,6 +63,72 @@ pub fn sphere_sphere_time_of_impact(
     })
 }
 
+
+/// Checked first-contact fraction for fixed-orientation spheres translated over one step.
+///
+/// Both center displacement and radius are scaled together before the line/sphere
+/// intersection, avoiding f64 squared-distance overflow and preserving tiny sweeps.
+/// This is the f64 primitive counterpart of the public sphere/ray CCD query.
+/// No collision response or discrete-contact policy lives here.
+pub(crate) fn try_sphere_sphere_fraction_f64(
+    initial_delta: Vec3,
+    displacement: Vec3,
+    combined_radius: f64,
+) -> Result<Option<f64>, ()> {
+    if !crate::math3::is_finite(initial_delta)
+        || !crate::math3::is_finite(displacement)
+        || !combined_radius.is_finite()
+        || combined_radius < 0.0
+    {
+        return Err(());
+    }
+
+    let magnitude = initial_delta
+        .into_iter()
+        .chain(displacement)
+        .chain([combined_radius])
+        .map(f64::abs)
+        .fold(0.0_f64, f64::max);
+    if magnitude == 0.0 {
+        return Ok(Some(0.0));
+    }
+    let delta = initial_delta.map(|value| value / magnitude);
+    let travel = displacement.map(|value| value / magnitude);
+    let radius = combined_radius / magnitude;
+    let radius_squared = radius * radius;
+    if length_squared(delta) <= radius_squared {
+        return Ok(Some(0.0));
+    }
+
+    let travel_squared = length_squared(travel);
+    if travel_squared == 0.0 {
+        return Ok(None);
+    }
+    let approach = -crate::math3::dot(delta, travel);
+    if approach <= 0.0 {
+        return Ok(None);
+    }
+
+    // The cross-product line distance is stable for tangencies, unlike
+    // subtracting nearly equal terms in a direct quadratic discriminant.
+    let perpendicular_squared =
+        length_squared(crate::math3::cross(delta, travel)) / travel_squared;
+    let boundary_tolerance =
+        4.0 * f64::EPSILON * perpendicular_squared.max(radius_squared);
+    if perpendicular_squared > radius_squared + boundary_tolerance {
+        return Ok(None);
+    }
+    let center_time = approach / travel_squared;
+    let half_chord =
+        ((radius_squared - perpendicular_squared).max(0.0) / travel_squared).sqrt();
+    let enter = center_time - half_chord;
+    if !enter.is_finite() || !half_chord.is_finite() {
+        return Err(());
+    }
+
+    Ok((enter <= 1.0 && center_time + half_chord >= 0.0).then_some(enter.max(0.0)))
+}
+
 fn robust_length(value: [f32; 3]) -> f64 {
     let maximum = value
         .iter()
