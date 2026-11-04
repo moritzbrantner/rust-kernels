@@ -1,5 +1,12 @@
 //! Capsule contact, capsule sweep and segment casts against heightfields, checked against
 //! exhaustive references over every triangle.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use geometry_kernels::heightfield::{HeightfieldData3, HeightfieldDiagonal3, PreparedHeightfield3};
 
 fn hills(diagonal: HeightfieldDiagonal3) -> PreparedHeightfield3 {

@@ -1,5 +1,12 @@
 //! New capabilities compared with simple independent references, not past versions.
 //! Both sides include per-query working storage. Input construction is excluded.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "benchmarks are not production code; a panic is the intended failure report"
+)]
+
 use divan::{Bencher, black_box};
 use graph_kernels::{CapacityEdge, dinic_max_flow, hopcroft_karp, hungarian_assignment};
 #[global_allocator]

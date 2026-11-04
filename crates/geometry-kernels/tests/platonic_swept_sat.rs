@@ -2,6 +2,12 @@
 //!
 //! Quick rerun: `cargo test -p geometry-kernels --locked --test platonic_swept_sat`.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 mod support;
 
 use geometry_kernels::math3::{Vec3, cross, dot, length, scale, sub};

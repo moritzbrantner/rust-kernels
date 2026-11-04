@@ -216,10 +216,12 @@ pub fn myers_levenshtein_bytes(pattern: &[u8], text: &[u8]) -> Result<usize, Mye
         if positive_horizontal & high_bit != 0 {
             score += 1;
         }
+        // `score` tracks the last DP row cell D[m][j] >= 0, and a negative
+        // horizontal delta means D[m][j] = D[m][j - 1] - 1, so the previous
+        // score was at least one. Debug builds still check the subtraction;
+        // the differential tests against `levenshtein` pin the invariant.
         if negative_horizontal & high_bit != 0 {
-            score = score
-                .checked_sub(1)
-                .expect("Myers distance invariant prevents a negative score");
+            score -= 1;
         }
 
         let shifted_positive = (positive_horizontal << 1) | 1;

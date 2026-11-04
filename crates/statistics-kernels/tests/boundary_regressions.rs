@@ -1,4 +1,11 @@
 //! Finite-observation push must preserve a representable mean.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use statistics_kernels::RunningStats;
 
 #[test]

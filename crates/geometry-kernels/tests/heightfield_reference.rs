@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use geometry_kernels::heightfield::{HeightfieldData3, HeightfieldError3, PreparedHeightfield3};
 
 fn mesh(data: &HeightfieldData3) -> Vec<(u32, [[f64; 3]; 3])> {

@@ -6,3 +6,6 @@ license.workspace = true
 description = "Small deterministic spatial and collision kernels"
 
 [dependencies]
+
+[lints]
+workspace = true

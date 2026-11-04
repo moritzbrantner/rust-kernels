@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use graph_kernels::{CapacityEdge, dinic_max_flow, hopcroft_karp};
 
 #[test]

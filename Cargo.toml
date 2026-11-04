@@ -19,3 +19,9 @@ resolver = "2"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/moritzbrantner/rust-kernels"
+
+[workspace.lints.clippy]
+# Production code must not panic through `unwrap`/`expect`; encode invariants
+# in types or control flow instead. Tests may use them (see `clippy.toml`).
+unwrap_used = "deny"
+expect_used = "deny"

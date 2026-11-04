@@ -1,5 +1,11 @@
 //! Straightforward-loop oracles and numerical properties for the combinators.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use noise_kernels::{
     Curl, DomainWarp, Fractal, Permutation, perlin2, perlin3, simplex2, simplex3, worley2, worley3,
 };

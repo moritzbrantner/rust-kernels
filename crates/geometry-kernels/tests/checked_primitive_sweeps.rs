@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use geometry_kernels::primitive3::{
     PrimitiveBody3, PrimitiveShape3, PrimitiveSweepError3, PrimitiveWork3, try_swept_time,
 };

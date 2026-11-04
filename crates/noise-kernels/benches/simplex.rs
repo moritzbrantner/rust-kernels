@@ -1,4 +1,11 @@
 //! Workload v1. Input generation is excluded from measured sampling.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "benchmarks are not production code; a panic is the intended failure report"
+)]
+
 use divan::{Bencher, black_box, counter::ItemsCount};
 use noise_kernels::{Permutation, simplex2, simplex3, simplex4};
 

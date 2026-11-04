@@ -10,3 +10,6 @@ spatial-kernels = { path = "../spatial-kernels" }
 
 [dev-dependencies]
 bvh-kernels = { path = "../bvh-kernels" }
+
+[lints]
+workspace = true

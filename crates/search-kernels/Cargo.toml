@@ -24,3 +24,6 @@ harness = false
 [[bench]]
 name = "boundary_cases"
 harness = false
+
+[lints]
+workspace = true

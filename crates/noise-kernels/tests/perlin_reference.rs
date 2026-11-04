@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use noise_kernels::{Permutation, perlin2, perlin3};
 
 const GRADIENTS: [[f64; 3]; 12] = [

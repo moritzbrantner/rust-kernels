@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use similarity_kernels::LevenshteinWorkspace;
 use std::{
     alloc::{GlobalAlloc, Layout, System},

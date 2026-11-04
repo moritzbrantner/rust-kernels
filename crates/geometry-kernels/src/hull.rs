@@ -572,14 +572,21 @@ fn build_polytope(points: &[Vec3], simplex: [u32; 4], eps: f64, work: &mut Quick
     for face in 0..4 {
         for edge in 0..3 {
             let v = work.faces[face].vertices;
-            let (from, to) = (v[edge], v[(edge + 1) % 3]);
-            let neighbor = (0..4)
-                .find(|&other| {
-                    let w = work.faces[other].vertices;
-                    (0..3).any(|e| w[e] == to && w[(e + 1) % 3] == from)
-                })
-                .expect("tetrahedron faces share every edge");
-            work.faces[face].neighbors[edge] = neighbor as u32;
+            // Edge `(v[edge], v[edge + 1])` lies in exactly one other face: the
+            // one that omits this face's third vertex. Faces were pushed
+            // opposite `d`, `c`, `b`, `a` in that order, and the simplex
+            // vertices are distinct.
+            let third = v[(edge + 2) % 3];
+            let neighbor = if third == d {
+                0
+            } else if third == c {
+                1
+            } else if third == b {
+                2
+            } else {
+                3
+            };
+            work.faces[face].neighbors[edge] = neighbor;
         }
     }
     for index in 0..points.len() as u32 {
@@ -653,11 +660,16 @@ fn collect_horizon(work: &mut QuickHullWork, start: u32, eye: Vec3, eps: f64, ep
         if other.epoch == epoch {
             continue;
         }
-        let shared = other
-            .neighbors
-            .iter()
-            .position(|&n| n == face)
-            .expect("face adjacency is symmetric") as u8;
+        // Face adjacency is symmetric, so `other` names `face` on one of its
+        // three edges.
+        let shared: u8 = if other.neighbors[0] == face {
+            0
+        } else if other.neighbors[1] == face {
+            1
+        } else {
+            2
+        };
+        debug_assert_eq!(other.neighbors[usize::from(shared)], face);
         work.distance_tests += 1;
         if other.distance(eye) > eps {
             work.faces[neighbor as usize].epoch = epoch;

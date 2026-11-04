@@ -132,10 +132,13 @@ fn reconstruct_path<N>(came_from: &HashMap<N, N>, goal: N, cost: u64) -> Path<N>
 where
     N: Clone + Eq + Hash,
 {
-    let mut nodes = vec![goal];
-    while let Some(previous) = came_from.get(nodes.last().expect("path always contains its goal")) {
-        nodes.push(previous.clone());
+    let mut nodes = Vec::new();
+    let mut current = goal;
+    while let Some(previous) = came_from.get(&current) {
+        let previous = previous.clone();
+        nodes.push(std::mem::replace(&mut current, previous));
     }
+    nodes.push(current);
     nodes.reverse();
     Path { cost, nodes }
 }

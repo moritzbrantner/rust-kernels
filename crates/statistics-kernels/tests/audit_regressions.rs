@@ -1,4 +1,11 @@
 //! Native regressions for the numerical audit at ddec70d.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use statistics_kernels::RunningStats;
 
 #[test]

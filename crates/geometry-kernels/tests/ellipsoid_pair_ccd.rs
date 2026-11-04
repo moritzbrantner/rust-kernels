@@ -1,6 +1,12 @@
 //! Shared-transform homothetic ellipsoid pair TOI (#190) against analytic fixtures and an
 //! independent generic reference (conservative advancement over GJK on support maps).
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 mod support;
 
 use geometry_kernels::math3::{Vec3, add, cross, dot, length, scale, sub};

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use geometry_kernels::{
     epa::epa_penetration_planar_xy, planar::gjk_intersection_planar_xy, support::ConvexHull3,
 };

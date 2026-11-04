@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use noise_kernels::{Permutation, simplex2, simplex3, simplex4};
 
 const F2: f64 = 0.366_025_403_784_438_65;

@@ -14,3 +14,6 @@ divan = "=0.1.21"
 [[bench]]
 name = "boundary_cases"
 harness = false
+
+[lints]
+workspace = true

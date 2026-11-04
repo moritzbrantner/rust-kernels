@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "benchmarks are not production code; a panic is the intended failure report"
+)]
+
 use collection_kernels::FenwickTree;
 use divan::{Bencher, counter::ItemsCount};
 

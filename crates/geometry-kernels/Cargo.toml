@@ -35,3 +35,6 @@ harness = false
 [[bench]]
 name = "polygon2"
 harness = false
+
+[lints]
+workspace = true

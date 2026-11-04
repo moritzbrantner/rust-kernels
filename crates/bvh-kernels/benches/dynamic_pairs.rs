@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "benchmarks are not production code; a panic is the intended failure report"
+)]
+
 use bvh_kernels::DynamicAabbTree;
 use divan::{Bencher, black_box};
 use spatial_kernels::{Aabb, Body, BroadPhase, NaiveBroadPhase};
