@@ -88,8 +88,18 @@ these kernels. The complete crate is also available through the source registry.
 derives one jittered feature point per lattice cell from the shared permutation
 (no global RNG) and returns exact `f1`/`f2` Euclidean distances, the offset to the
 nearest feature and a stable feature id; the search widens past the `3^N`
-neighbourhood only when a farther cell can still matter. Terrain composition and
-world-generation policy remain consumer-owned.
+neighbourhood only when a farther cell can still matter.
+
+Combinators take a caller-supplied `Sampler2`/`Sampler3` (any `Fn` closure) through
+generics, so base fields are monomorphised into the hot loops. `Fractal` validates
+an explicit octave/lacunarity/gain schedule once (zero octaves, more than 32,
+non-positive or non-finite lacunarity, negative or non-finite gain and overflowing
+schedules return `CombinatorError`) and provides normalised fBm, billow and
+feedback-free ridged sums in 2D/3D. `DomainWarp` displaces coordinates by
+per-axis offset samplers with a validated amplitude, and `Curl` builds 2D
+(scalar-potential) and 3D (vector-potential) curl fields with an explicit central
+difference epsilon. Terrain composition and world-generation policy remain
+consumer-owned.
 
 ### Statistics
 

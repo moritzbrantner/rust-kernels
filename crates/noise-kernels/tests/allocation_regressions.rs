@@ -1,4 +1,6 @@
-use noise_kernels::{Permutation, simplex2, simplex3, simplex4, worley2, worley3};
+use noise_kernels::{
+    Curl, DomainWarp, Fractal, Permutation, simplex2, simplex3, simplex4, worley2, worley3,
+};
 use std::{
     alloc::{GlobalAlloc, Layout, System},
     cell::Cell,
@@ -99,6 +101,37 @@ fn repeated_worley_sampling_allocates_nothing() {
             );
             sum += sample.f1 + sample.f2;
             sum += worley3(&permutation, corner, -corner, corner).f2;
+        }
+        sum
+    });
+
+    assert!(sum.is_finite());
+    assert_eq!((allocations, reallocations), (0, 0));
+}
+
+#[test]
+fn repeated_combinator_sampling_allocates_nothing() {
+    let permutation = Permutation::from_seed(0x1020_3040_5060_7080);
+    let fractal = Fractal::new(6, 2.0, 0.5).expect("valid schedule");
+    let warp = DomainWarp::new(1.5).expect("valid amplitude");
+    let curl = Curl::new(1e-3).expect("valid epsilon");
+    let base2 = |x, y| simplex2(&permutation, x, y);
+    let base3 = |x, y, z| simplex3(&permutation, x, y, z);
+    let cells3 = |x, y, z| worley3(&permutation, x, y, z).f1;
+
+    let (sum, allocations, reallocations) = allocation_counts(|| {
+        let mut sum = 0.0;
+        for index in 0..1024 {
+            let x = f64::from(index) * 0.03125;
+            let y = x * -0.5;
+            let z = x * 0.25;
+            sum += fractal.fbm2(&base2, x, y);
+            sum += fractal.billow3(&base3, x, y, z);
+            sum += fractal.ridged3(&cells3, x, y, z);
+            sum += warp.sample2(&base2, &base2, &|u, v| base2(v, u), x, y);
+            sum += warp.sample3(&cells3, &base3, &base3, &base3, x, y, z);
+            sum += curl.curl2(&|u, v| fractal.fbm2(&base2, u, v), x, y)[0];
+            sum += curl.curl3(&base3, &cells3, &base3, x, y, z)[2];
         }
         sum
     });

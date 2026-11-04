@@ -471,6 +471,32 @@
           }
         }
       ]
+    },
+    {
+      "id": "noise-combinator-allocations",
+      "kind": "micro",
+      "description": "Repeated fBm, billow, ridged, domain-warp and curl sampling over caller-supplied Simplex and Worley fields performs no heap allocation.",
+      "dimensions": {
+        "samples": 1024,
+        "octaves": 6,
+        "combinators": "fbm2,billow3,ridged3,warp2,warp3,curl2,curl3"
+      },
+      "correctnessEvidence": [
+        "crates/noise-kernels/tests/allocation_regressions.rs::repeated_combinator_sampling_allocates_nothing",
+        "crates/noise-kernels/tests/combinator_reference.rs::fractals_match_loop_oracles_over_perlin_simplex_and_worley"
+      ],
+      "metrics": [
+        {
+          "name": "allocator-calls",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 0
+          }
+        }
+      ]
     }
   ],
   "operations": [
