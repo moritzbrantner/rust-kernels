@@ -4,6 +4,7 @@
 //! collision filtering, sleeping, and CCD admission remain consumer responsibilities.
 
 mod closest;
+pub mod ellipsoid;
 mod frame;
 mod pairs;
 mod polytope;
