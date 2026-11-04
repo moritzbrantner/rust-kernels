@@ -179,11 +179,7 @@ fn fast_sphere_sphere_sweep(bencher: Bencher) {
         [-10.0, 0.1, 0.0],
         [5_760.0, 0.0, 0.0],
     );
-    let target = PrimitiveBody3::axis_aligned(
-        PrimitiveShape3::sphere(0.5),
-        [0.0; 3],
-        [0.0; 3],
-    );
+    let target = PrimitiveBody3::axis_aligned(PrimitiveShape3::sphere(0.5), [0.0; 3], [0.0; 3]);
     bencher.bench_local(|| {
         let mut work = PrimitiveWork3::default();
         black_box(swept_time(

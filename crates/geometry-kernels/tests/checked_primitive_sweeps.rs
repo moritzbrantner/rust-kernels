@@ -208,16 +208,33 @@ fn analytic_sphere_sweep_distinguishes_grazing_miss_and_initial_overlap() {
         [-5.0, 2.0, 0.0],
         [10.0, 0.0, 0.0],
     );
-    let target =
-        PrimitiveBody3::axis_aligned(PrimitiveShape3::sphere(1.0), [0.0; 3], [0.0; 3]);
+    let target = PrimitiveBody3::axis_aligned(PrimitiveShape3::sphere(1.0), [0.0; 3], [0.0; 3]);
     let mut work = PrimitiveWork3::default();
-    assert_eq!(try_swept_time(moving, target, 1.0, 0.0, 1, &mut work), Ok(Some(0.5)));
+    assert_eq!(
+        try_swept_time(moving, target, 1.0, 0.0, 1, &mut work),
+        Ok(Some(0.5))
+    );
     assert_eq!(work.sweep_iterations, 1);
-    let near = PrimitiveBody3 { position: [0.0, 2.000_000_5, 0.0], ..target };
-    let straight = PrimitiveBody3 { position: [-5.0, 0.0, 0.0], ..moving };
-    assert_eq!(try_swept_time(straight, near, 1.0, 0.0, 1, &mut work), Ok(None));
-    let overlapping = PrimitiveBody3 { position: [0.0, 0.0, 0.0], ..moving };
-    assert_eq!(try_swept_time(overlapping, target, 1.0, 0.0, 1, &mut work), Ok(Some(0.0)));
+    let near = PrimitiveBody3 {
+        position: [0.0, 2.000_000_5, 0.0],
+        ..target
+    };
+    let straight = PrimitiveBody3 {
+        position: [-5.0, 0.0, 0.0],
+        ..moving
+    };
+    assert_eq!(
+        try_swept_time(straight, near, 1.0, 0.0, 1, &mut work),
+        Ok(None)
+    );
+    let overlapping = PrimitiveBody3 {
+        position: [0.0, 0.0, 0.0],
+        ..moving
+    };
+    assert_eq!(
+        try_swept_time(overlapping, target, 1.0, 0.0, 1, &mut work),
+        Ok(Some(0.0))
+    );
 }
 
 #[test]
@@ -235,10 +252,19 @@ fn moving_sphere_budget_and_stationary_behavior_are_explicit() {
         Err(PrimitiveSweepError3::IterationLimit)
     );
     assert_eq!(work, PrimitiveWork3::default());
-    let stationary = PrimitiveBody3 { velocity: [0.0; 3], ..moving };
-    assert_eq!(try_swept_time(stationary, target, 1.0, 0.0, 0, &mut work), Ok(None));
+    let stationary = PrimitiveBody3 {
+        velocity: [0.0; 3],
+        ..moving
+    };
+    assert_eq!(
+        try_swept_time(stationary, target, 1.0, 0.0, 0, &mut work),
+        Ok(None)
+    );
     assert_eq!(work.sweep_iterations, 0);
-    assert_eq!(try_swept_time(moving, target, 1.0, 0.0, 1, &mut work), Ok(Some(0.25)));
+    assert_eq!(
+        try_swept_time(moving, target, 1.0, 0.0, 1, &mut work),
+        Ok(Some(0.25))
+    );
 }
 
 #[test]
@@ -251,7 +277,9 @@ fn sphere_analytic_path_preserves_extreme_scale_or_reports_overflow() {
         );
         let b = PrimitiveBody3::axis_aligned(PrimitiveShape3::sphere(scale), [0.0; 3], [0.0; 3]);
         let mut work = PrimitiveWork3::default();
-        let time = try_swept_time(a, b, 1.0, 0.0, 1, &mut work).unwrap().unwrap();
+        let time = try_swept_time(a, b, 1.0, 0.0, 1, &mut work)
+            .unwrap()
+            .unwrap();
         assert!((time - 0.25).abs() < 1.0e-12, "scale={scale}, time={time}");
         assert_eq!(work.sweep_iterations, 1);
     }
@@ -261,8 +289,7 @@ fn sphere_analytic_path_preserves_extreme_scale_or_reports_overflow() {
         [-1.0, 0.0, 0.0],
         [1.0, 0.0, 0.0],
     );
-    let b =
-        PrimitiveBody3::axis_aligned(PrimitiveShape3::sphere(f64::MAX), [0.0; 3], [0.0; 3]);
+    let b = PrimitiveBody3::axis_aligned(PrimitiveShape3::sphere(f64::MAX), [0.0; 3], [0.0; 3]);
     let mut work = PrimitiveWork3::default();
     assert_eq!(
         try_swept_time(a, b, 1.0, 0.0, 1, &mut work),
@@ -286,12 +313,10 @@ fn generated_sphere_sweeps_match_independent_quadratic_oracle() {
         let a_velocity: [f64; 3] = std::array::from_fn(|_| next() * 8.0 - 4.0);
         let b_velocity: [f64; 3] = std::array::from_fn(|_| next() * 8.0 - 4.0);
         let margin = next() * 0.5;
-        let a = PrimitiveBody3::axis_aligned(
-            PrimitiveShape3::sphere(a_radius), a_position, a_velocity,
-        );
-        let b = PrimitiveBody3::axis_aligned(
-            PrimitiveShape3::sphere(b_radius), b_position, b_velocity,
-        );
+        let a =
+            PrimitiveBody3::axis_aligned(PrimitiveShape3::sphere(a_radius), a_position, a_velocity);
+        let b =
+            PrimitiveBody3::axis_aligned(PrimitiveShape3::sphere(b_radius), b_position, b_velocity);
         let delta: [f64; 3] = std::array::from_fn(|i| b_position[i] - a_position[i]);
         let travel: [f64; 3] = std::array::from_fn(|i| b_velocity[i] - a_velocity[i]);
         let radius = a_radius + b_radius + margin;
@@ -311,11 +336,16 @@ fn generated_sphere_sweeps_match_independent_quadratic_oracle() {
         };
         let mut work = PrimitiveWork3::default();
         let actual = try_swept_time(a, b, 1.0, margin, 1, &mut work).unwrap();
-        assert_eq!(actual.is_some(), expected.is_some(),
-            "a={a:?}, b={b:?}, margin={margin}");
+        assert_eq!(
+            actual.is_some(),
+            expected.is_some(),
+            "a={a:?}, b={b:?}, margin={margin}"
+        );
         if let (Some(actual), Some(expected)) = (actual, expected) {
-            assert!((actual - expected).abs() <= 1.0e-9,
-                "actual={actual}, expected={expected}");
+            assert!(
+                (actual - expected).abs() <= 1.0e-9,
+                "actual={actual}, expected={expected}"
+            );
         }
     }
 }

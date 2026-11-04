@@ -63,7 +63,6 @@ pub fn sphere_sphere_time_of_impact(
     })
 }
 
-
 /// Checked first-contact fraction for fixed-orientation spheres translated over one step.
 ///
 /// Both center displacement and radius are scaled together before the line/sphere
@@ -111,16 +110,13 @@ pub(crate) fn try_sphere_sphere_fraction_f64(
 
     // The cross-product line distance is stable for tangencies, unlike
     // subtracting nearly equal terms in a direct quadratic discriminant.
-    let perpendicular_squared =
-        length_squared(crate::math3::cross(delta, travel)) / travel_squared;
-    let boundary_tolerance =
-        4.0 * f64::EPSILON * perpendicular_squared.max(radius_squared);
+    let perpendicular_squared = length_squared(crate::math3::cross(delta, travel)) / travel_squared;
+    let boundary_tolerance = 4.0 * f64::EPSILON * perpendicular_squared.max(radius_squared);
     if perpendicular_squared > radius_squared + boundary_tolerance {
         return Ok(None);
     }
     let center_time = approach / travel_squared;
-    let half_chord =
-        ((radius_squared - perpendicular_squared).max(0.0) / travel_squared).sqrt();
+    let half_chord = ((radius_squared - perpendicular_squared).max(0.0) / travel_squared).sqrt();
     let enter = center_time - half_chord;
     if !enter.is_finite() || !half_chord.is_finite() {
         return Err(());
