@@ -1,6 +1,6 @@
 # Bounded search and network optimization
 
-This expansion closes source-registry issue #76 and implements the three
+This expansion closes issue #76 and implements the three
 mechanisms proposed in issue #36. It adds no production dependencies. It does
 not add min-cost flow without a concrete consumer, nor tokenization, ranking,
 scheduling rules, implicit capacities, or application-level graph authority.
@@ -120,41 +120,11 @@ Its objective equals the returned primal cost. Exhaustive small signed matrices,
 random rectangular matrices, extreme costs, and the greedy counterexample are
 verified independently. Column-scan budgets protect dense scaling.
 
-## Source installation and update boundaries
-
-Both `search-kernels` and standalone `selection` now advertise `top_k_by`.
-`similarity-kernels` advertises every currently exported mechanism, including
-bounded distance, and is distributed as a dependency-free crate source set.
-The graph source set includes flow, matching and assignment. Crate entries
-include all `src` modules and every explicitly declared Cargo target: leaving
-out a benchmark file made even `cargo check --lib` fail for previous copied
-crates. Installed upstream manifests remain byte-for-byte identical; tests
-supply only consumer-owned workspace metadata and application wiring.
-
-```sh
-python3 scripts/source_registry.py install similarity-kernels graph-kernels --root ../consumer
-python3 scripts/source_registry.py status --root ../consumer --require-clean
-python3 scripts/test_catalog_install.py
-```
-
-Real-catalog tests import every advertised symbol, compile all installed targets,
-exercise mechanisms from a fresh executable, and verify file hashes afterward.
-They also cover idempotent installs, unchanged-layout upstream updates,
-local-divergence refusal, three-way conflict export and explicit acceptance.
-
-Existing installations whose file inventories change still report
-`layout-changed` and require explicit reconciliation. The update safety gate has
-not been bypassed or made to overwrite locally owned files. Newly installed
-similarity sources have complete layouts; source-registry APIs do not silently
-rewrite consumer Cargo workspaces or module wiring.
-
 ## Reproducible evidence
 
 ```sh
 cargo test -p similarity-kernels -p graph-kernels
 cargo test -p similarity-kernels -p graph-kernels --release
-python3 scripts/test_catalog_install.py
-cargo test -p similarity-kernels -p graph-kernels
 cargo bench -p similarity-kernels --bench expansion
 cargo bench -p graph-kernels --bench optimization
 ```
