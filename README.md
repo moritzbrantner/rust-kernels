@@ -84,9 +84,12 @@ these kernels. The complete crate is also available through the source registry.
 ### Noise
 
 `noise-kernels` provides a deterministic seeded `Permutation` plus allocation-free
-2D/3D Perlin and 2D/3D/4D Simplex sampling. The fixed permutation state is shared
-infrastructure for later Worley kernels; terrain composition and world-generation
-policy remain consumer-owned.
+2D/3D Perlin, 2D/3D/4D Simplex and 2D/3D Worley (cellular) sampling. Worley
+derives one jittered feature point per lattice cell from the shared permutation
+(no global RNG) and returns exact `f1`/`f2` Euclidean distances, the offset to the
+nearest feature and a stable feature id; the search widens past the `3^N`
+neighbourhood only when a farther cell can still matter. Terrain composition and
+world-generation policy remain consumer-owned.
 
 ### Statistics
 

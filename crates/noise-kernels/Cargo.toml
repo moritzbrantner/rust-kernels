@@ -17,3 +17,7 @@ harness = false
 [[bench]]
 name = "simplex"
 harness = false
+
+[[bench]]
+name = "worley"
+harness = false

@@ -445,6 +445,32 @@
           }
         }
       ]
+    },
+    {
+      "id": "worley-sampling-allocations",
+      "kind": "micro",
+      "description": "Repeated 2D and 3D Worley sampling from prebuilt permutation state, including exact ring-expansion inputs, performs no heap allocation.",
+      "dimensions": {
+        "samplesPerDimension": 2048,
+        "dimensions": "2D,3D"
+      },
+      "correctnessEvidence": [
+        "crates/noise-kernels/tests/allocation_regressions.rs::repeated_worley_sampling_allocates_nothing",
+        "crates/noise-kernels/tests/worley_reference.rs::worley2_matches_brute_force_neighbourhood_oracle",
+        "crates/noise-kernels/tests/worley_reference.rs::worley3_matches_brute_force_neighbourhood_oracle"
+      ],
+      "metrics": [
+        {
+          "name": "allocator-calls",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 0
+          }
+        }
+      ]
     }
   ],
   "operations": [

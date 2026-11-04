@@ -1,4 +1,4 @@
-use noise_kernels::{Permutation, simplex2, simplex3, simplex4};
+use noise_kernels::{Permutation, simplex2, simplex3, simplex4, worley2, worley3};
 use std::{
     alloc::{GlobalAlloc, Layout, System},
     cell::Cell,
@@ -70,6 +70,35 @@ fn repeated_simplex_sampling_allocates_nothing() {
                 coordinate * 0.25,
                 3.5,
             );
+        }
+        sum
+    });
+
+    assert!(sum.is_finite());
+    assert_eq!((allocations, reallocations), (0, 0));
+}
+
+#[test]
+fn repeated_worley_sampling_allocates_nothing() {
+    let permutation = Permutation::from_seed(0x1020_3040_5060_7080);
+
+    let (sum, allocations, reallocations) = allocation_counts(|| {
+        let mut sum = 0.0;
+        for index in 0..1024 {
+            let coordinate = f64::from(index) * 0.03125;
+            // Integer-adjacent inputs force the exact ring expansion path too.
+            let corner = f64::from(index) + 1e-6;
+            let sample = worley2(&permutation, coordinate, coordinate * -0.5);
+            sum += sample.f1 + sample.f2;
+            sum += worley2(&permutation, corner, -corner).f2;
+            let sample = worley3(
+                &permutation,
+                coordinate,
+                coordinate * -0.5,
+                coordinate * 0.25,
+            );
+            sum += sample.f1 + sample.f2;
+            sum += worley3(&permutation, corner, -corner, corner).f2;
         }
         sum
     });
