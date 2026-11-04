@@ -6,9 +6,11 @@
 
 import { DEFAULT_COMPETITOR_BASE, PROFILES, instantiateWasm, loadCompetitor } from "./bench/harness.js";
 import { NOISE_EXPORTS, runNoiseSuite } from "./bench/noise.js";
+import { SHAPE_EXPORTS, runShapesSuite } from "./bench/shapes.js";
 
 const SUITES = {
   noise: { exports: NOISE_EXPORTS, run: runNoiseSuite },
+  shapes: { exports: SHAPE_EXPORTS, run: runShapesSuite },
 };
 
 const params = new URLSearchParams(location.search);
