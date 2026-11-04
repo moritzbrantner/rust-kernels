@@ -171,3 +171,23 @@ fn prepared_heightfield_surface_query(bencher: Bencher) {
     .expect("finite benchmark geometry");
     bencher.bench_local(|| black_box(terrain.sample(black_box(31.2), black_box(20.7))));
 }
+
+#[divan::bench]
+fn fast_sphere_sphere_sweep(bencher: Bencher) {
+    let moving = PrimitiveBody3::axis_aligned(
+        PrimitiveShape3::sphere(0.25),
+        [-10.0, 0.1, 0.0],
+        [5_760.0, 0.0, 0.0],
+    );
+    let target = PrimitiveBody3::axis_aligned(PrimitiveShape3::sphere(0.5), [0.0; 3], [0.0; 3]);
+    bencher.bench_local(|| {
+        let mut work = PrimitiveWork3::default();
+        black_box(swept_time(
+            black_box(moving),
+            black_box(target),
+            black_box(1.0 / 60.0),
+            black_box(0.0),
+            black_box(&mut work),
+        ))
+    });
+}

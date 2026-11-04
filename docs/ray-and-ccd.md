@@ -98,6 +98,16 @@ spheres, sphere sweeps and triangles (hit-heavy, mixed and miss-heavy). Input co
 every workload returns a checksum so the query loop cannot disappear. Raw
 wall-clock measurements remain informational.
 
+## Analytic sphere–sphere primitive dispatch
+
+Moving sphere pairs in `primitive3::try_swept_time` take one closed-form f64
+relative-translation solve, including moving targets and the configured contact
+margin. Stationary pairs retain their single discrete-contact query. The analytic
+solve counts as one `sweep_iterations` unit and respects a zero iteration budget.
+The independent f32 `sphere_sphere_time_of_impact` API remains unchanged.
+Fixed-orientation translational CCD is still the only guarantee: neither angular
+sweeps nor post-impact response is owned by this geometry kernel.
+
 ## Checked fixed-orientation primitive sweeps
 
 `primitive3::try_swept_time(a, b, dt, margin, max_iterations, work)` supports
