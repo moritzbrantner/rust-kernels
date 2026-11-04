@@ -244,8 +244,7 @@ fn moving_sphere_budget_and_stationary_behavior_are_explicit() {
         [-4.0, 0.0, 0.0],
         [8.0, 0.0, 0.0],
     );
-    let target =
-        PrimitiveBody3::axis_aligned(PrimitiveShape3::sphere(1.0), [0.0; 3], [0.0; 3]);
+    let target = PrimitiveBody3::axis_aligned(PrimitiveShape3::sphere(1.0), [0.0; 3], [0.0; 3]);
     let mut work = PrimitiveWork3::default();
     assert_eq!(
         try_swept_time(moving, target, 1.0, 0.0, 0, &mut work),
