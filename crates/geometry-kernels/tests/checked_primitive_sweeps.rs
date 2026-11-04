@@ -330,7 +330,7 @@ fn generated_sphere_sweeps_match_independent_quadratic_oracle() {
                 None
             } else {
                 let time = (-bb - discriminant.sqrt()) / (2.0 * aa);
-                (time >= 0.0 && time <= 1.0).then_some(time)
+                (0.0..=1.0).contains(&time).then_some(time)
             }
         };
         let mut work = PrimitiveWork3::default();
