@@ -31,20 +31,13 @@ jobs:
           done
           echo "docs-only=true" >> "$GITHUB_OUTPUT"
 
-  registry:
+  verification-matrix:
     needs: docs-scope
     if: needs.docs-scope.outputs.docs-only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-      - run: python3 scripts/validate_registry.py
       - run: python3 scripts/validate_verification_matrix.py
-      - run: python3 scripts/test_standalone_registry.py
-      - run: python3 scripts/test_source_registry.py
-      - run: python3 scripts/test_source_contract.py
-      - run: python3 scripts/test_source_update.py
-      - run: python3 scripts/test_source_resolution.py
-      - run: python3 scripts/test_catalog_install.py
 
   rust:
     needs: docs-scope
@@ -215,7 +208,7 @@ jobs:
   merge-ready:
     name: ${{ github.event_name == 'pull_request' && 'merge-ready' || 'validation-summary' }}
     if: ${{ always() }}
-    needs: ["docs-scope", "registry", "rust", "cargo-benchmarks", "performance-smoke", "validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]
+    needs: ["docs-scope", "verification-matrix", "rust", "cargo-benchmarks", "performance-smoke", "validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -223,5 +216,5 @@ jobs:
       - uses: moritzbrantner/reusable-workflows/.github/actions/merge-ready@b0f25f241d76af2584dfc9e375084ff5c5cb97da
         with:
           needs: ${{ toJSON(needs) }}
-          required: '["docs-scope", "registry", "rust", "cargo-benchmarks", "performance-smoke", "validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]'
-          allow-skipped: ${{ needs.docs-scope.outputs.docs-only == 'true' && '["registry","rust","cargo-benchmarks","performance-smoke","validate-hardening","validate-mutation-baseline","validate-public-contract","validate-runtime-evidence"]' || github.event_name != 'pull_request' && '["validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]' || github.base_ref != 'main' && '["validate-runtime-evidence"]' || '[]' }}
+          required: '["docs-scope", "verification-matrix", "rust", "cargo-benchmarks", "performance-smoke", "validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]'
+          allow-skipped: ${{ needs.docs-scope.outputs.docs-only == 'true' && '["verification-matrix","rust","cargo-benchmarks","performance-smoke","validate-hardening","validate-mutation-baseline","validate-public-contract","validate-runtime-evidence"]' || github.event_name != 'pull_request' && '["validate-hardening", "validate-mutation-baseline", "validate-public-contract", "validate-runtime-evidence"]' || github.base_ref != 'main' && '["validate-runtime-evidence"]' || '[]' }}

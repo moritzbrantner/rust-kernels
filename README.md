@@ -79,7 +79,7 @@ BK-tree search and single-word byte-oriented Myers distance.
 `levenshtein_bounded` returns the exact distance up to a caller-selected limit;
 `LevenshteinWorkspace` reuses narrow scratch rows for repeated bounded queries.
 Tokenization, normalization, approximate-index policy and ranking remain outside
-these kernels. The complete crate is also available through the source registry.
+these kernels.
 
 ### Noise
 
@@ -105,73 +105,14 @@ consumer-owned.
 
 `statistics-kernels` contains `RunningStats`, a Welford-style streaming accumulator for count, mean, population/sample variance, and standard deviation. Accumulators can be merged without replaying observations, with tests against batch calculations and large-offset fixtures.
 
-## Registry
+## Consuming
 
-`registry.json` is a shadcn-inspired machine-readable catalog for an additional source-level integration path. It does not imply a `rust-kernels` CLI and does not replace normal Cargo dependencies.
-
-The registry has two first-class source lanes:
-
-- **crate items** describe coherent crate/source sets; and
-- **standalone-module items** describe one independently compilable algorithm or data-structure source file that lands at `src/kernels/<module>.rs`.
-
-Standalone status is verified, not assumed: CI invokes `rustc` directly on every registered standalone source file. Modules with hidden crate or external dependencies therefore stay crate-level until a dependency-aware source-set contract exists.
-
-For example, consumers can choose the integration boundary they actually want:
-
-```bash
-# Copy complete search and similarity source sets.
-python3 scripts/source_registry.py install search-kernels similarity-kernels --root ../consumer
-
-# Or own only one algorithm module.
-python3 scripts/source_registry.py install radix-sort --root ../consumer
-python3 scripts/source_registry.py install selection --root ../consumer
-```
-
-The granular install lands source under `src/kernels/`; the consumer remains responsible for wiring that module into its own `lib.rs`, `main.rs`, or public API. See [`docs/granular-registry.md`](docs/granular-registry.md) for the standalone-module contract and the initial granular catalog.
-
-Crate source sets include declared benchmark targets because Cargo validates their paths even for `--lib` builds. The consumer supplies workspace/package metadata for inherited manifest fields; installed manifests are not rewritten. Fresh-consumer compilation and provenance lifecycle tests protect this contract.
-
-Each registry item also describes tags and the algorithms or data structures it provides. Agents or external tooling can use that metadata to discover and copy a kernel while Cargo consumers can continue depending on the workspace crates normally.
-
-Copied source has an explicit provenance contract. A consumer records the exact upstream Git revision and SHA-256 hashes in `.rust-kernels.lock.json`, using [`provenance.schema.json`](provenance.schema.json). Local modification after copying is supported: the lock preserves the upstream base so tooling can distinguish local changes from upstream changes and reconstruct a real three-way update.
-
-The optional standard-library reference helpers exercise the contract without turning this repository into a CLI product:
-
-```bash
-# Copy source and create provenance.
-python3 scripts/source_registry.py install radix-sort --root ../consumer
-
-# See whether copied files have diverged locally.
-python3 scripts/source_registry.py status --root ../consumer
-
-# Compare recorded base, local source, and this checkout as the candidate upstream.
-python3 scripts/source_update.py plan --root ../consumer
-
-# Apply only a plan that is entirely safe; conflicts are never overwritten.
-python3 scripts/source_update.py apply --root ../consumer
-
-# Materialize exact base / ours / theirs evidence for real conflicts.
-python3 scripts/source_resolution.py export \
-  --root ../consumer \
-  --out ../consumer/.rust-kernels-merge
-
-# After resolving and testing a conflict, explicitly advance its provenance.
-python3 scripts/source_resolution.py accept radix-sort \
-  --root ../consumer \
-  --bundle ../consumer/.rust-kernels-merge/merge-bundle.json
-```
-
-See [`docs/provenance.md`](docs/provenance.md) for the lock and update contract and [`docs/source-resolution.md`](docs/source-resolution.md) for the human/coding-agent conflict handoff. The JSON registry and schemas remain the actual integration surface; agents and other tooling can implement the same protocol directly.
+Consumers depend on the workspace crates through Cargo git dependencies pinned to an exact `rev`.
 
 ## Development
 
 ```bash
-python3 scripts/validate_registry.py
-python3 scripts/test_standalone_registry.py
-python3 scripts/test_source_registry.py
-python3 scripts/test_catalog_install.py
-python3 scripts/test_source_update.py
-python3 scripts/test_source_resolution.py
+python3 scripts/validate_verification_matrix.py
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features

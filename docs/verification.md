@@ -16,9 +16,9 @@ States are `present`, `partial`, `missing`, `planned`, or `n/a`. `planned` is no
 
 ## CI semantics
 
-The existing blocking Rust checks remain unchanged: formatting, strict Clippy, and the full workspace test suite still decide Rust correctness. Registry/source-contract checks also remain blocking.
+The existing blocking Rust checks remain unchanged: formatting, strict Clippy, and the full workspace test suite still decide Rust correctness.
 
-`python3 scripts/validate_verification_matrix.py` is added to the existing registry job. It checks matrix structure and inventory only. Every `src/**/*.rs` implementation source in every Cargo workspace member must be owned by at least one kernel row or explicitly listed as a facade. Evidence states such as `missing` and `partial` do **not** fail this validation.
+`python3 scripts/validate_verification_matrix.py` runs as the blocking `verification-matrix` CI job. It checks matrix structure and inventory only. Every `src/**/*.rs` implementation source in every Cargo workspace member must be owned by at least one kernel row or explicitly listed as a facade. Evidence states such as `missing` and `partial` do **not** fail this validation.
 
 Coverage runs in a separate advisory job. It uses `cargo llvm-cov` across the workspace with all features and publishes:
 
