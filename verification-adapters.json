@@ -3,8 +3,10 @@
   "adapters": [
     {
       "crate": "rust-kernels-web-demo",
-      "role": "GitHub Pages WebAssembly adapter that delegates algorithm ownership to collection-kernels, search-kernels, spatial-kernels, and statistics-kernels",
+      "role": "GitHub Pages WebAssembly adapter that delegates algorithm ownership to collection-kernels, noise-kernels, search-kernels, spatial-kernels, and statistics-kernels, plus batched exports for the browser comparison page",
       "sources": [
+        "crates/web-demo/src/bench.rs",
+        "crates/web-demo/src/bench_noise.rs",
         "crates/web-demo/src/lib.rs"
       ]
     }

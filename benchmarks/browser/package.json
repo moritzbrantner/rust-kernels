@@ -1,0 +1,12 @@
+{
+  "name": "rust-kernels-browser-benchmarks",
+  "private": true,
+  "description": "Development-only browser comparison of rust-kernels (WASM) and pmndrs/math. Not part of any published crate or CI gate.",
+  "type": "module",
+  "scripts": {
+    "bench": "node run.mjs"
+  },
+  "devDependencies": {
+    "math": "0.1.0"
+  }
+}

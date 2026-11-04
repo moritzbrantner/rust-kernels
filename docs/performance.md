@@ -108,3 +108,7 @@ The Divan suite batches ray/AABB, ray/sphere and swept sphere/sphere queries at
 and each workload returns a checksum. Correctness is owned by independent Rust
 oracles and metamorphic tests; wall-clock results remain informational because
 these kernels have constant per-query algorithmic complexity.
+
+## Cross-runtime browser comparison
+
+[The browser comparison](browser-benchmarks.md) times rust-kernels through its WebAssembly boundary against pmndrs/math (npm `math`, pinned, development-only) on equivalent named workloads. Its wall-clock results are comparative evidence only and never a CI gate; Rust-internal regressions stay with the Divan and Iai-Callgrind evidence above.
