@@ -1,4 +1,11 @@
 //! Exact full-DP reference versus bounded queries on identical deterministic inputs.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "benchmarks are not production code; a panic is the intended failure report"
+)]
+
 use divan::{Bencher, black_box};
 use similarity_kernels::{LevenshteinWorkspace, levenshtein, levenshtein_bounded};
 #[global_allocator]

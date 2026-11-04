@@ -4,14 +4,21 @@ use spatial_kernels::{Aabb, Body, BroadPhaseResult, BroadPhaseStats, ColliderId,
 
 use crate::segment::Segment;
 
+/// A node is either a leaf holding one body or a branch with exactly two
+/// children; encoding this in the type makes "branch without a child" and
+/// "leaf without a body" unrepresentable.
+#[derive(Clone, Copy, Debug)]
+enum NodeKind {
+    Leaf(Body),
+    Branch { left: usize, right: usize },
+}
+
 #[derive(Clone, Copy, Debug)]
 struct DynamicNode {
     bounds: Aabb,
     parent: Option<usize>,
-    left: Option<usize>,
-    right: Option<usize>,
     height: i32,
-    body: Option<Body>,
+    kind: NodeKind,
 }
 
 impl DynamicNode {
@@ -19,10 +26,8 @@ impl DynamicNode {
         Self {
             bounds,
             parent: None,
-            left: None,
-            right: None,
             height: 0,
-            body: Some(body),
+            kind: NodeKind::Leaf(body),
         }
     }
 
@@ -30,15 +35,27 @@ impl DynamicNode {
         Self {
             bounds,
             parent,
-            left: Some(left),
-            right: Some(right),
             height,
-            body: None,
+            kind: NodeKind::Branch { left, right },
         }
     }
 
     const fn is_leaf(self) -> bool {
-        self.body.is_some()
+        matches!(self.kind, NodeKind::Leaf(_))
+    }
+
+    const fn body(self) -> Option<Body> {
+        match self.kind {
+            NodeKind::Leaf(body) => Some(body),
+            NodeKind::Branch { .. } => None,
+        }
+    }
+
+    const fn children(self) -> Option<(usize, usize)> {
+        match self.kind {
+            NodeKind::Leaf(_) => None,
+            NodeKind::Branch { left, right } => Some((left, right)),
+        }
     }
 }
 
@@ -75,7 +92,10 @@ pub struct DynamicAabbUpdateTrace {
 /// small movements can update the exact body without restructuring the tree.
 #[derive(Clone, Debug)]
 pub struct DynamicAabbTree {
-    nodes: Vec<Option<DynamicNode>>,
+    /// Node slab. Released slots keep their stale (`Copy`) contents and are
+    /// marked in `live`; every index reachable from `root` or `leaves` is live.
+    nodes: Vec<DynamicNode>,
+    live: Vec<bool>,
     free: Vec<usize>,
     root: Option<usize>,
     /// Leaf node per collider ID (`NO_LEAF` when absent). IDs index this table directly, so
@@ -104,6 +124,7 @@ impl DynamicAabbTree {
         );
         Self {
             nodes: Vec::new(),
+            live: Vec::new(),
             free: Vec::new(),
             root: None,
             leaves: Vec::new(),
@@ -152,20 +173,23 @@ impl DynamicAabbTree {
     pub fn debug_nodes(&self) -> Vec<DynamicAabbNodeSnapshot> {
         self.nodes
             .iter()
+            .zip(&self.live)
             .enumerate()
-            .filter_map(|(index, node)| {
-                let node = (*node)?;
-                Some(DynamicAabbNodeSnapshot {
+            .filter(|(_, (_, live))| **live)
+            .map(|(index, (node, _))| {
+                let body = node.body();
+                let children = node.children();
+                DynamicAabbNodeSnapshot {
                     index,
                     bounds: node.bounds,
-                    exact_bounds: node.body.map(|body| body.aabb),
+                    exact_bounds: body.map(|body| body.aabb),
                     height: node.height,
-                    body: node.body.map(|body| body.id),
+                    body: body.map(|body| body.id),
                     parent: node.parent,
-                    left: node.left,
-                    right: node.right,
+                    left: children.map(|(left, _)| left),
+                    right: children.map(|(_, right)| right),
                     is_root: self.root == Some(index),
-                })
+                }
             })
             .collect()
     }
@@ -187,22 +211,33 @@ impl DynamicAabbTree {
 
     pub fn remove(&mut self, id: ColliderId) -> Option<Body> {
         let leaf = self.leaf_of(id)?;
+        // `leaves` only addresses leaf nodes, so this always yields the body.
+        let body = self.node(leaf).body()?;
         self.leaves[id as usize] = NO_LEAF;
         self.len -= 1;
-        let body = self.node(leaf).body.expect("leaf must contain a body");
         self.remove_leaf(leaf);
         self.release(leaf);
         Some(body)
     }
 
+    /// Returns the leaf of a collider the caller promises is present.
+    fn existing_leaf(&self, id: ColliderId) -> usize {
+        let Some(leaf) = self.leaf_of(id) else {
+            panic!("updated collider must already exist");
+        };
+        leaf
+    }
+
     /// Updates an existing body. Returns `true` when the leaf had to be removed
     /// and reinserted because the exact AABB left its previous fat AABB.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no body with `body.id` is in the tree.
     pub fn update(&mut self, body: Body) -> bool {
-        let leaf = self
-            .leaf_of(body.id)
-            .expect("updated collider must already exist");
+        let leaf = self.existing_leaf(body.id);
         if self.node(leaf).bounds.contains(body.aabb) {
-            self.node_mut(leaf).body = Some(body);
+            self.node_mut(leaf).kind = NodeKind::Leaf(body);
             return false;
         }
 
@@ -210,7 +245,7 @@ impl DynamicAabbTree {
         self.remove_leaf(leaf);
         let node = self.node_mut(leaf);
         node.bounds = fat_bounds;
-        node.body = Some(body);
+        node.kind = NodeKind::Leaf(body);
         node.parent = None;
         node.height = 0;
         self.insert_leaf(leaf);
@@ -221,16 +256,19 @@ impl DynamicAabbTree {
     /// `displacement` along its direction (predictive fattening, as in Box2D), so a body that
     /// keeps moving that way stays inside its leaf for several updates. Returns `true` when the
     /// leaf was reinserted.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `displacement` is not finite or no body with `body.id` is in
+    /// the tree.
     pub fn update_predicted(&mut self, body: Body, displacement: [f32; 3]) -> bool {
         assert!(
             displacement.iter().all(|d| d.is_finite()),
             "predicted displacement must be finite"
         );
-        let leaf = self
-            .leaf_of(body.id)
-            .expect("updated collider must already exist");
+        let leaf = self.existing_leaf(body.id);
         if self.node(leaf).bounds.contains(body.aabb) {
-            self.node_mut(leaf).body = Some(body);
+            self.node_mut(leaf).kind = NodeKind::Leaf(body);
             return false;
         }
 
@@ -246,7 +284,7 @@ impl DynamicAabbTree {
         self.remove_leaf(leaf);
         let node = self.node_mut(leaf);
         node.bounds = Aabb::new(min, max);
-        node.body = Some(body);
+        node.kind = NodeKind::Leaf(body);
         node.parent = None;
         node.height = 0;
         self.insert_leaf(leaf);
@@ -256,17 +294,19 @@ impl DynamicAabbTree {
     /// Runs the same update as [`Self::update`] while capturing before/after
     /// structural snapshots. This path intentionally allocates; normal updates
     /// remain allocation-free with respect to tracing.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no body with `body.id` is in the tree.
     #[must_use]
     pub fn update_with_trace(&mut self, body: Body) -> DynamicAabbUpdateTrace {
-        let previous_fat_bounds = self
-            .fat_bounds(body.id)
-            .expect("updated collider must already exist");
+        let leaf = self.existing_leaf(body.id);
+        let previous_fat_bounds = self.node(leaf).bounds;
         let height_before = self.height();
         let before_nodes = self.debug_nodes();
+        // An update keeps the body in the same leaf node, reinserted or not.
         let reinserted = self.update(body);
-        let current_fat_bounds = self
-            .fat_bounds(body.id)
-            .expect("updated collider must still exist");
+        let current_fat_bounds = self.node(leaf).bounds;
         let height_after = self.height();
         let after_nodes = self.debug_nodes();
         let changed_nodes = changed_node_indices(&before_nodes, &after_nodes);
@@ -295,10 +335,13 @@ impl DynamicAabbTree {
     pub fn rebuild(&mut self) {
         let mut leaves = Vec::with_capacity(self.len);
         for index in 0..self.nodes.len() {
-            match self.nodes[index] {
-                Some(node) if node.is_leaf() => leaves.push(index),
-                Some(_) => self.release(index),
-                None => {}
+            if !self.live[index] {
+                continue;
+            }
+            if self.nodes[index].is_leaf() {
+                leaves.push(index);
+            } else {
+                self.release(index);
             }
         }
         self.root = (!leaves.is_empty()).then(|| self.build_sah(&mut leaves, None));
@@ -412,14 +455,17 @@ impl DynamicAabbTree {
             if !node.bounds.overlaps(query) {
                 continue;
             }
-            if let Some(body) = node.body {
-                if body.aabb.overlaps(query) {
-                    visit(body);
+            match node.kind {
+                NodeKind::Leaf(body) => {
+                    if body.aabb.overlaps(query) {
+                        visit(body);
+                    }
                 }
-            } else {
-                stack[len] = node.right.expect("branch must have right child");
-                stack[len + 1] = node.left.expect("branch must have left child");
-                len += 2;
+                NodeKind::Branch { left, right } => {
+                    stack[len] = right;
+                    stack[len + 1] = left;
+                    len += 2;
+                }
             }
         }
         visited
@@ -452,15 +498,15 @@ impl DynamicAabbTree {
             if t > max_t {
                 continue;
             }
-            let node = self.node_ref(index);
-            if let Some(body) = node.body {
-                if let Some(t) = segment.entry(&body.aabb, max_t) {
-                    max_t = visit(body, t);
+            let (left, right) = match self.node_ref(index).kind {
+                NodeKind::Leaf(body) => {
+                    if let Some(t) = segment.entry(&body.aabb, max_t) {
+                        max_t = visit(body, t);
+                    }
+                    continue;
                 }
-                continue;
-            }
-            let left = node.left.expect("branch must have left child");
-            let right = node.right.expect("branch must have right child");
+                NodeKind::Branch { left, right } => (left, right),
+            };
             let tl = segment.entry(&self.node_ref(left).bounds, max_t);
             let tr = segment.entry(&self.node_ref(right).bounds, max_t);
             // Push the farther child first so the nearer one is visited first.
@@ -491,13 +537,16 @@ impl DynamicAabbTree {
             if !node.bounds.overlaps(query) {
                 continue;
             }
-            if let Some(body) = node.body {
-                if body.aabb.overlaps(query) {
-                    hits.push(body.id);
+            match node.kind {
+                NodeKind::Leaf(body) => {
+                    if body.aabb.overlaps(query) {
+                        hits.push(body.id);
+                    }
                 }
-            } else {
-                stack.push(node.right.expect("branch must have right child"));
-                stack.push(node.left.expect("branch must have left child"));
+                NodeKind::Branch { left, right } => {
+                    stack.push(right);
+                    stack.push(left);
+                }
             }
         }
         hits.sort_unstable();
@@ -541,13 +590,9 @@ impl DynamicAabbTree {
         pairs: &mut Vec<Pair>,
         aabb_tests: &mut u64,
     ) {
-        let node = self.node(node_index);
-        if node.is_leaf() {
+        let NodeKind::Branch { left, right } = self.node(node_index).kind else {
             return;
-        }
-
-        let left = node.left.expect("branch must have left child");
-        let right = node.right.expect("branch must have right child");
+        };
         self.collect_within_dynamic(left, pairs, aabb_tests);
         self.collect_within_dynamic(right, pairs, aabb_tests);
         self.collect_cross_dynamic(left, right, pairs, aabb_tests);
@@ -566,46 +611,31 @@ impl DynamicAabbTree {
             return;
         }
 
-        match (left_node.body, right_node.body) {
-            (Some(left), Some(right)) => {
+        match (left_node.kind, right_node.kind) {
+            (NodeKind::Leaf(left), NodeKind::Leaf(right)) => {
                 *aabb_tests += 1;
                 if left.aabb.overlaps(right.aabb) {
                     pairs.push(Pair::new(left.id, right.id));
                 }
             }
-            (None, Some(_)) => {
-                self.collect_cross_dynamic(
-                    left_node.left.expect("branch must have left child"),
-                    right_index,
-                    pairs,
-                    aabb_tests,
-                );
-                self.collect_cross_dynamic(
-                    left_node.right.expect("branch must have right child"),
-                    right_index,
-                    pairs,
-                    aabb_tests,
-                );
+            (NodeKind::Branch { left, right }, NodeKind::Leaf(_)) => {
+                self.collect_cross_dynamic(left, right_index, pairs, aabb_tests);
+                self.collect_cross_dynamic(right, right_index, pairs, aabb_tests);
             }
-            (Some(_), None) => {
-                self.collect_cross_dynamic(
-                    left_index,
-                    right_node.left.expect("branch must have left child"),
-                    pairs,
-                    aabb_tests,
-                );
-                self.collect_cross_dynamic(
-                    left_index,
-                    right_node.right.expect("branch must have right child"),
-                    pairs,
-                    aabb_tests,
-                );
+            (NodeKind::Leaf(_), NodeKind::Branch { left, right }) => {
+                self.collect_cross_dynamic(left_index, left, pairs, aabb_tests);
+                self.collect_cross_dynamic(left_index, right, pairs, aabb_tests);
             }
-            (None, None) => {
-                let left_left = left_node.left.expect("branch must have left child");
-                let left_right = left_node.right.expect("branch must have right child");
-                let right_left = right_node.left.expect("branch must have left child");
-                let right_right = right_node.right.expect("branch must have right child");
+            (
+                NodeKind::Branch {
+                    left: left_left,
+                    right: left_right,
+                },
+                NodeKind::Branch {
+                    left: right_left,
+                    right: right_right,
+                },
+            ) => {
                 self.collect_cross_dynamic(left_left, right_left, pairs, aabb_tests);
                 self.collect_cross_dynamic(left_left, right_right, pairs, aabb_tests);
                 self.collect_cross_dynamic(left_right, right_left, pairs, aabb_tests);
@@ -622,10 +652,8 @@ impl DynamicAabbTree {
         };
 
         let leaf_bounds = self.node(leaf).bounds;
-        while !self.node(sibling).is_leaf() {
+        while let NodeKind::Branch { left, right } = self.node(sibling).kind {
             let current = self.node(sibling);
-            let left = current.left.expect("branch must have left child");
-            let right = current.right.expect("branch must have right child");
             let combined = current.bounds.union(leaf_bounds);
             let combined_area = combined.surface_area();
             let inheritance = 2.0 * (combined_area - current.bounds.surface_area());
@@ -663,21 +691,21 @@ impl DynamicAabbTree {
     }
 
     fn remove_leaf(&mut self, leaf: usize) {
-        if self.root == Some(leaf) {
+        // Only the root has no parent.
+        let Some(parent) = self.node(leaf).parent else {
+            debug_assert_eq!(self.root, Some(leaf));
             self.root = None;
-            self.node_mut(leaf).parent = None;
             return;
-        }
+        };
 
-        let parent = self
-            .node(leaf)
-            .parent
-            .expect("non-root leaf must have parent");
         let parent_node = self.node(parent);
-        let sibling = if parent_node.left == Some(leaf) {
-            parent_node.right.expect("branch must have right child")
-        } else {
-            parent_node.left.expect("branch must have left child")
+        let sibling = match parent_node.kind {
+            NodeKind::Branch { left, right } if left == leaf => right,
+            NodeKind::Branch { left, right } => {
+                assert_eq!(right, leaf, "parent must reference removed leaf");
+                left
+            }
+            NodeKind::Leaf(_) => panic!("parent must reference removed leaf"),
         };
         let grand_parent = parent_node.parent;
 
@@ -696,16 +724,13 @@ impl DynamicAabbTree {
     }
 
     fn replace_child(&mut self, parent: usize, old_child: usize, new_child: usize) {
-        let node = self.node_mut(parent);
-        if node.left == Some(old_child) {
-            node.left = Some(new_child);
-        } else {
-            assert_eq!(
-                node.right,
-                Some(old_child),
-                "parent must reference old child"
-            );
-            node.right = Some(new_child);
+        match &mut self.node_mut(parent).kind {
+            NodeKind::Branch { left, .. } if *left == old_child => *left = new_child,
+            NodeKind::Branch { right, .. } => {
+                assert_eq!(*right, old_child, "parent must reference old child");
+                *right = new_child;
+            }
+            NodeKind::Leaf(_) => panic!("parent must reference old child"),
         }
     }
 
@@ -721,20 +746,21 @@ impl DynamicAabbTree {
 
     fn balance(&mut self, a: usize) -> usize {
         let a_node = self.node(a);
-        if a_node.is_leaf() || a_node.height < 2 {
+        let NodeKind::Branch { left: b, right: c } = a_node.kind else {
+            return a;
+        };
+        if a_node.height < 2 {
             return a;
         }
-        let b = a_node.left.expect("branch must have left child");
-        let c = a_node.right.expect("branch must have right child");
         let balance = self.node(c).height - self.node(b).height;
 
-        if balance > 1 {
-            let c_node = self.node(c);
-            let f = c_node.left.expect("branch must have left child");
-            let g = c_node.right.expect("branch must have right child");
+        // A child at least two levels taller than its sibling has height >= 2,
+        // so it is a branch; a leaf here simply leaves `a` unrotated.
+        if balance > 1
+            && let NodeKind::Branch { left: f, right: g } = self.node(c).kind
+        {
             let old_parent = a_node.parent;
 
-            self.node_mut(c).left = Some(a);
             self.node_mut(c).parent = old_parent;
             self.node_mut(a).parent = Some(c);
             if let Some(parent) = old_parent {
@@ -743,29 +769,31 @@ impl DynamicAabbTree {
                 self.root = Some(c);
             }
 
-            if self.node(f).height > self.node(g).height {
-                self.node_mut(c).right = Some(f);
-                self.node_mut(a).right = Some(g);
-                self.node_mut(f).parent = Some(c);
-                self.node_mut(g).parent = Some(a);
+            let (taller, shorter) = if self.node(f).height > self.node(g).height {
+                (f, g)
             } else {
-                self.node_mut(c).right = Some(g);
-                self.node_mut(a).right = Some(f);
-                self.node_mut(g).parent = Some(c);
-                self.node_mut(f).parent = Some(a);
-            }
+                (g, f)
+            };
+            self.node_mut(c).kind = NodeKind::Branch {
+                left: a,
+                right: taller,
+            };
+            self.node_mut(a).kind = NodeKind::Branch {
+                left: b,
+                right: shorter,
+            };
+            self.node_mut(taller).parent = Some(c);
+            self.node_mut(shorter).parent = Some(a);
             self.sync_branch(a);
             self.sync_branch(c);
             return c;
         }
 
-        if balance < -1 {
-            let b_node = self.node(b);
-            let d = b_node.left.expect("branch must have left child");
-            let e = b_node.right.expect("branch must have right child");
+        if balance < -1
+            && let NodeKind::Branch { left: d, right: e } = self.node(b).kind
+        {
             let old_parent = a_node.parent;
 
-            self.node_mut(b).left = Some(a);
             self.node_mut(b).parent = old_parent;
             self.node_mut(a).parent = Some(b);
             if let Some(parent) = old_parent {
@@ -774,17 +802,21 @@ impl DynamicAabbTree {
                 self.root = Some(b);
             }
 
-            if self.node(d).height > self.node(e).height {
-                self.node_mut(b).right = Some(d);
-                self.node_mut(a).left = Some(e);
-                self.node_mut(d).parent = Some(b);
-                self.node_mut(e).parent = Some(a);
+            let (taller, shorter) = if self.node(d).height > self.node(e).height {
+                (d, e)
             } else {
-                self.node_mut(b).right = Some(e);
-                self.node_mut(a).left = Some(d);
-                self.node_mut(e).parent = Some(b);
-                self.node_mut(d).parent = Some(a);
-            }
+                (e, d)
+            };
+            self.node_mut(b).kind = NodeKind::Branch {
+                left: a,
+                right: taller,
+            };
+            self.node_mut(a).kind = NodeKind::Branch {
+                left: shorter,
+                right: c,
+            };
+            self.node_mut(taller).parent = Some(b);
+            self.node_mut(shorter).parent = Some(a);
             self.sync_branch(a);
             self.sync_branch(b);
             return b;
@@ -794,9 +826,9 @@ impl DynamicAabbTree {
     }
 
     fn sync_branch(&mut self, index: usize) {
-        let node = self.node(index);
-        let left = node.left.expect("branch must have left child");
-        let right = node.right.expect("branch must have right child");
+        let NodeKind::Branch { left, right } = self.node(index).kind else {
+            return;
+        };
         let left_node = self.node(left);
         let right_node = self.node(right);
         let current = self.node_mut(index);
@@ -806,33 +838,35 @@ impl DynamicAabbTree {
 
     fn allocate(&mut self, node: DynamicNode) -> usize {
         if let Some(index) = self.free.pop() {
-            self.nodes[index] = Some(node);
+            self.nodes[index] = node;
+            self.live[index] = true;
             index
         } else {
             let index = self.nodes.len();
-            self.nodes.push(Some(node));
+            self.nodes.push(node);
+            self.live.push(true);
             index
         }
     }
 
     fn release(&mut self, index: usize) {
         assert!(
-            self.nodes[index].take().is_some(),
+            std::mem::replace(&mut self.live[index], false),
             "released node must exist"
         );
         self.free.push(index);
     }
 
     fn node(&self, index: usize) -> DynamicNode {
-        self.nodes[index].expect("tree node must exist")
+        self.nodes[index]
     }
 
     fn node_ref(&self, index: usize) -> &DynamicNode {
-        self.nodes[index].as_ref().expect("tree node must exist")
+        &self.nodes[index]
     }
 
     fn node_mut(&mut self, index: usize) -> &mut DynamicNode {
-        self.nodes[index].as_mut().expect("tree node must exist")
+        &mut self.nodes[index]
     }
 }
 

@@ -28,3 +28,6 @@ harness = false
 [[bench]]
 name = "ring_buffer"
 harness = false
+
+[lints]
+workspace = true

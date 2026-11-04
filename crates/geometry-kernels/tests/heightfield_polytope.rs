@@ -1,5 +1,12 @@
 //! Box (convex polytope) overlap against heightfield surfaces by the separating-axis test,
 //! checked against closed forms on flat terrain and a sampled reference on hills.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use geometry_kernels::heightfield::{
     ConvexPolytope3, HeightfieldData3, HeightfieldDiagonal3, HeightfieldWork3, PreparedHeightfield3,
 };

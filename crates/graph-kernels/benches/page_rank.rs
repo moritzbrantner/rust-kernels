@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "benchmarks are not production code; a panic is the intended failure report"
+)]
+
 use criterion::{Criterion, criterion_group, criterion_main};
 use graph_kernels::{PageRankConfig, page_rank};
 use std::hint::black_box;

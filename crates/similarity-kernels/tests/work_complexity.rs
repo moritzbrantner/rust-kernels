@@ -3,6 +3,13 @@
 //! The scale series feeds the `bounded-edit-comparisons` and
 //! `bounded-edit-warm-allocations` operations in `.performance/contract.json`
 //! through `scripts/collect-work-evidence.sh`.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use similarity_kernels::{LevenshteinWorkspace, levenshtein};
 use std::{
     alloc::{GlobalAlloc, Layout, System},

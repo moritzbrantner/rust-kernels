@@ -2,6 +2,13 @@
 //!
 //! The scale series feeds the `gjk-easy-sphere-iterations` operation in
 //! `.performance/contract.json` through `scripts/collect-work-evidence.sh`.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use geometry_kernels::{Sphere, gjk::gjk_intersection, sphere_sphere};
 
 /// One scale point: `(dimensions, metrics)` as `(name, value)` pairs.

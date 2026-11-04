@@ -29,15 +29,20 @@ impl RunningStats {
         self.count == 0
     }
 
+    /// Adds one observation.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `value` is not finite or if the observation count would
+    /// exceed `u64::MAX`.
     pub fn push(&mut self, value: f64) {
         assert!(
             value.is_finite(),
             "running statistics require finite values"
         );
-        let new_count = self
-            .count
-            .checked_add(1)
-            .expect("running statistics count overflow");
+        let Some(new_count) = self.count.checked_add(1) else {
+            panic!("running statistics count overflow");
+        };
         let delta = value - self.mean;
         if delta.is_finite() {
             // Preserve the ordinary Welford evaluation order.
@@ -56,6 +61,11 @@ impl RunningStats {
         self.count = new_count;
     }
 
+    /// Adds every observation from `values`.
+    ///
+    /// # Panics
+    ///
+    /// Panics under the same conditions as [`Self::push`].
     pub fn extend(&mut self, values: impl IntoIterator<Item = f64>) {
         for value in values {
             self.push(value);
@@ -63,6 +73,10 @@ impl RunningStats {
     }
 
     /// Merges another accumulator without replaying observations.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the combined observation count would exceed `u64::MAX`.
     pub fn merge(&mut self, other: &Self) {
         if other.count == 0 {
             return;
@@ -72,10 +86,9 @@ impl RunningStats {
             return;
         }
 
-        let combined = self
-            .count
-            .checked_add(other.count)
-            .expect("running statistics count overflow");
+        let Some(combined) = self.count.checked_add(other.count) else {
+            panic!("running statistics count overflow");
+        };
         let left_count = self.count as f64;
         let right_count = other.count as f64;
         let combined_count = combined as f64;
@@ -249,5 +262,26 @@ mod tests {
     #[should_panic(expected = "running statistics require finite values")]
     fn rejects_non_finite_observations() {
         RunningStats::new().push(f64::NAN);
+    }
+
+    #[test]
+    fn count_overflow_panics_before_mutating_state() {
+        let saturated = RunningStats {
+            count: u64::MAX,
+            mean: 1.5,
+            m2: 2.0,
+        };
+
+        let mut pushed = saturated;
+        let push = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| pushed.push(3.0)));
+        assert!(push.is_err());
+        assert_eq!(pushed, saturated);
+
+        let mut merged = saturated;
+        let mut other = RunningStats::new();
+        other.push(4.0);
+        let merge = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| merged.merge(&other)));
+        assert!(merge.is_err());
+        assert_eq!(merged, saturated);
     }
 }

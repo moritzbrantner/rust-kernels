@@ -131,8 +131,9 @@ pub fn dinic_max_flow(
         next.fill(0);
         loop {
             path.clear();
+            // `bottlenecks[i]` is the minimum capacity along `path[..=i]`; the
+            // empty path is unconstrained, so its bottleneck is `u64::MAX`.
             bottlenecks.clear();
-            bottlenecks.push(u64::MAX);
             let mut node = source;
             loop {
                 if node == sink {
@@ -150,13 +151,8 @@ pub fn dinic_max_flow(
                 }
                 if let Some(index) = found {
                     path.push(index);
-                    bottlenecks.push(
-                        bottlenecks
-                            .last()
-                            .copied()
-                            .unwrap()
-                            .min(residual[index].capacity),
-                    );
+                    let bottleneck = bottlenecks.last().copied().unwrap_or(u64::MAX);
+                    bottlenecks.push(bottleneck.min(residual[index].capacity));
                     node = residual[index].to;
                 } else if let Some(index) = path.pop() {
                     bottlenecks.pop();
@@ -169,7 +165,8 @@ pub fn dinic_max_flow(
             if node != sink {
                 break;
             }
-            let amount = *bottlenecks.last().unwrap();
+            // `source != sink`, so reaching the sink means the path is non-empty.
+            let amount = bottlenecks.last().copied().unwrap_or(u64::MAX);
             for &index in &path {
                 residual[index].capacity -= amount;
                 // Each reverse pair sums to its original u64 capacity, even in

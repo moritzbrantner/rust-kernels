@@ -7,6 +7,13 @@
 //! vertical through integer points. Containment is then a 2D orientation test
 //! evaluated exactly in `i128`, and the distance from an exterior point to the
 //! closed triangle is derived from exact integer numerators.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use geometry_kernels::{Ray3, TriangleCulling, TriangleFacing, ray_triangle, segment_triangle};
 
 /// Largest coordinate magnitude used, so every value is an exact f32.

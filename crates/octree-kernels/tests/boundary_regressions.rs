@@ -1,4 +1,11 @@
 //! Conservative enclosure regressions; NaiveBroadPhase is the pair oracle.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use octree_kernels::OctreeBroadPhase;
 use spatial_kernels::{Aabb, Body, BroadPhase, NaiveBroadPhase};
 

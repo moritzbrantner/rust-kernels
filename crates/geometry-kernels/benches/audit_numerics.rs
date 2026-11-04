@@ -1,5 +1,12 @@
 //! Workload v1. Correctness probes are separate from allocation-profiled timing.
 //! `scripts/audit-evidence.py` compiles this exact harness against both revisions.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "benchmarks are not production code; a panic is the intended failure report"
+)]
+
 use divan::{Bencher, black_box};
 use geometry_kernels::{
     Sphere,

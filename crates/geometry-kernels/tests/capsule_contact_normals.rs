@@ -1,4 +1,11 @@
 //! Degenerate skeleton contacts must provide an actual separating direction.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use geometry_kernels::{
     math3::{Vec3, dot, scale, sub},
     primitive3::{PrimitiveBody3, PrimitiveShape3, PrimitiveWork3, query},

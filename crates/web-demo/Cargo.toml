@@ -16,3 +16,6 @@ noise-kernels = { path = "../noise-kernels" }
 search-kernels = { path = "../search-kernels" }
 spatial-kernels = { path = "../spatial-kernels" }
 statistics-kernels = { path = "../statistics-kernels" }
+
+[lints]
+workspace = true

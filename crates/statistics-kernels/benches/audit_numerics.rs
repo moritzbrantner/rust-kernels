@@ -1,4 +1,11 @@
 //! Workload v1. Setup is excluded; correctness is reported outside timing.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "benchmarks are not production code; a panic is the intended failure report"
+)]
+
 use divan::{Bencher, black_box, counter::ItemsCount};
 use statistics_kernels::RunningStats;
 

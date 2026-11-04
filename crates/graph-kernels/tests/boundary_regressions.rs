@@ -1,4 +1,11 @@
 //! Execute potentially aborting stack regressions in an isolated subprocess.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use graph_kernels::strongly_connected_components;
 
 #[test]

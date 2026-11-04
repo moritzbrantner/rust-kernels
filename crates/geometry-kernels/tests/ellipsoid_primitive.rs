@@ -5,6 +5,12 @@
 //! value must be at least the sampled one, and at most `SAMPLE_TOLERANCE` (relative to the
 //! support radius) larger, where `SAMPLE_TOLERANCE >= 1 - cos(grid spacing)`.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use geometry_kernels::math3::{Vec3, add, dot, length, scale, sub};
 use geometry_kernels::primitive3::ellipsoid::{
     ELLIPSOID_AXES_TOLERANCE, Ellipsoid3, EllipsoidBody3, EllipsoidError3, EllipsoidPose3,

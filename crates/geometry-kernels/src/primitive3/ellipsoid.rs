@@ -409,6 +409,11 @@ impl EllipsoidBody3 {
 
 /// Generic support mapping for GJK/EPA. A zero direction maps to local +X of the world, as
 /// for the crate's other support maps; non-finite directions panic like theirs.
+///
+/// # Panics
+///
+/// Panics if `direction` is not finite, or if the support point overflows f64 (use
+/// [`EllipsoidBody3::try_support_point`] to handle that as an error).
 impl SupportMap3 for EllipsoidBody3 {
     fn support_point(&self, direction: Vec3) -> Vec3 {
         assert!(is_finite(direction), "support direction must be finite");
@@ -417,8 +422,10 @@ impl SupportMap3 for EllipsoidBody3 {
         } else {
             direction
         };
-        self.try_support_point(direction)
-            .expect("validated ellipsoid support is representable")
+        match self.try_support_point(direction) {
+            Ok(point) => point,
+            Err(error) => panic!("ellipsoid support point is not representable: {error}"),
+        }
     }
 }
 

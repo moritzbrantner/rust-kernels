@@ -1,4 +1,11 @@
 //! Independent convex minimization and support certificates for the capsule row.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use geometry_kernels::{
     gjk_distance::{GjkDistanceConfig, GjkDistanceStatus, gjk_distance_with_config},
     math3::{Vec3, add, cross, dot, length, neg, scale, sub},

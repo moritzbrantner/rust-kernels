@@ -1,5 +1,12 @@
 //! Invariant, differential and fixture evidence for 2D polygon triangulation
 //! and Hertel–Mehlhorn convex decomposition.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use geometry_kernels::polygon2::{
     ConvexDecomposition2, Polygon2Error, Polygon2Summary, Polygon2Work, SimplicityCheck, Vec2,
     Winding, convex_decompose_polygon2, triangulate_polygon2, validate_simple_polygon2,

@@ -14,12 +14,15 @@ struct Node<K, V> {
 ///
 /// Lookup, insert/update, removal, and recency promotion are O(1) expected.
 /// Iteration runs from most-recently-used to least-recently-used.
+///
+/// Entries live densely in `nodes`: every index stored in `indices` or in a
+/// recency link addresses a live node, so node access needs no occupancy
+/// check. Removal swaps the last node into the vacated index and relinks it.
 #[derive(Clone, Debug)]
 pub struct LruCache<K, V> {
     capacity: usize,
     indices: HashMap<K, usize>,
-    nodes: Vec<Option<Node<K, V>>>,
-    free: Vec<usize>,
+    nodes: Vec<Node<K, V>>,
     most_recent: Option<usize>,
     least_recent: Option<usize>,
 }
@@ -34,7 +37,6 @@ where
             capacity,
             indices: HashMap::with_capacity(capacity),
             nodes: Vec::with_capacity(capacity),
-            free: Vec::new(),
             most_recent: None,
             least_recent: None,
         }
@@ -64,21 +66,21 @@ where
     #[must_use]
     pub fn peek(&self, key: &K) -> Option<&V> {
         let index = *self.indices.get(key)?;
-        self.nodes[index].as_ref().map(|node| &node.value)
+        Some(&self.nodes[index].value)
     }
 
     /// Reads and promotes the entry to most-recently-used.
     pub fn get(&mut self, key: &K) -> Option<&V> {
         let index = *self.indices.get(key)?;
         self.promote(index);
-        self.nodes[index].as_ref().map(|node| &node.value)
+        Some(&self.nodes[index].value)
     }
 
     /// Mutably reads and promotes the entry to most-recently-used.
     pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
         let index = *self.indices.get(key)?;
         self.promote(index);
-        self.nodes[index].as_mut().map(|node| &mut node.value)
+        Some(&mut self.nodes[index].value)
     }
 
     /// Inserts or updates an entry.
@@ -90,68 +92,40 @@ where
             return None;
         }
 
-        if self.len() < self.capacity {
-            return match self.indices.entry(key) {
-                Entry::Occupied(entry) => {
-                    let index = *entry.get();
-                    self.promote(index);
-                    let node = self.nodes[index]
-                        .as_mut()
-                        .expect("LRU index must be occupied");
-                    Some(std::mem::replace(&mut node.value, value))
-                }
-                Entry::Vacant(entry) => {
-                    let node_key = entry.key().clone();
-                    let index = if let Some(index) = self.free.pop() {
-                        index
-                    } else {
-                        self.nodes.push(None);
-                        self.nodes.len() - 1
-                    };
+        // A full cache with capacity > 0 is non-empty and so always has a
+        // least-recent entry; otherwise there is room for a new node.
+        let victim = if self.nodes.len() < self.capacity {
+            None
+        } else {
+            self.least_recent
+        };
 
-                    self.nodes[index] = Some(Node {
-                        key: node_key,
-                        value,
-                        previous: None,
-                        next: None,
-                    });
-                    entry.insert(index);
-                    self.attach_front(index);
-                    None
-                }
-            };
-        }
-
-        let victim_index = self
-            .least_recent
-            .expect("full LRU cache must have a least-recent entry");
         match self.indices.entry(key) {
             Entry::Occupied(entry) => {
                 let index = *entry.get();
                 self.promote(index);
-                let node = self.nodes[index]
-                    .as_mut()
-                    .expect("LRU index must be occupied");
-                Some(std::mem::replace(&mut node.value, value))
+                Some(std::mem::replace(&mut self.nodes[index].value, value))
             }
             Entry::Vacant(entry) => {
-                let node_key = entry.key().clone();
-                entry.insert(victim_index);
-
-                self.detach(victim_index);
-                let evicted = self.nodes[victim_index]
-                    .take()
-                    .expect("LRU index must be occupied");
-                let removed = self.indices.remove(&evicted.key);
-                debug_assert_eq!(removed, Some(victim_index));
-
-                self.nodes[victim_index] = Some(Node {
-                    key: node_key,
+                let node = Node {
+                    key: entry.key().clone(),
                     value,
                     previous: None,
                     next: None,
-                });
-                self.attach_front(victim_index);
+                };
+                if let Some(victim) = victim {
+                    entry.insert(victim);
+                    self.detach(victim);
+                    let evicted = std::mem::replace(&mut self.nodes[victim], node);
+                    let removed = self.indices.remove(&evicted.key);
+                    debug_assert_eq!(removed, Some(victim));
+                    self.attach_front(victim);
+                } else {
+                    let index = self.nodes.len();
+                    entry.insert(index);
+                    self.nodes.push(node);
+                    self.attach_front(index);
+                }
                 None
             }
         }
@@ -160,17 +134,17 @@ where
     pub fn remove(&mut self, key: &K) -> Option<V> {
         let index = self.indices.remove(key)?;
         self.detach(index);
-        let node = self.nodes[index]
-            .take()
-            .expect("LRU index must be occupied");
-        self.free.push(index);
+        let node = self.nodes.swap_remove(index);
+        if index < self.nodes.len() {
+            // The former last node now lives at `index`; repoint its links.
+            self.relocated(self.nodes.len(), index);
+        }
         Some(node.value)
     }
 
     pub fn clear(&mut self) {
         self.indices.clear();
         self.nodes.clear();
-        self.free.clear();
         self.most_recent = None;
         self.least_recent = None;
     }
@@ -192,19 +166,12 @@ where
 
     fn attach_front(&mut self, index: usize) {
         let old_front = self.most_recent;
-        {
-            let node = self.nodes[index]
-                .as_mut()
-                .expect("LRU index must be occupied");
-            node.previous = None;
-            node.next = old_front;
-        }
+        let node = &mut self.nodes[index];
+        node.previous = None;
+        node.next = old_front;
 
         if let Some(old_front) = old_front {
-            self.nodes[old_front]
-                .as_mut()
-                .expect("LRU index must be occupied")
-                .previous = Some(index);
+            self.nodes[old_front].previous = Some(index);
         } else {
             self.least_recent = Some(index);
         }
@@ -212,41 +179,51 @@ where
     }
 
     fn detach(&mut self, index: usize) {
-        let (previous, next) = {
-            let node = self.nodes[index]
-                .as_ref()
-                .expect("LRU index must be occupied");
-            (node.previous, node.next)
-        };
+        let node = &mut self.nodes[index];
+        let previous = node.previous.take();
+        let next = node.next.take();
 
         if let Some(previous) = previous {
-            self.nodes[previous]
-                .as_mut()
-                .expect("LRU index must be occupied")
-                .next = next;
+            self.nodes[previous].next = next;
         } else {
             self.most_recent = next;
         }
 
         if let Some(next) = next {
-            self.nodes[next]
-                .as_mut()
-                .expect("LRU index must be occupied")
-                .previous = previous;
+            self.nodes[next].previous = previous;
         } else {
             self.least_recent = previous;
         }
+    }
 
-        let node = self.nodes[index]
-            .as_mut()
-            .expect("LRU index must be occupied");
-        node.previous = None;
-        node.next = None;
+    /// Repoints every reference to the node moved from `from` to `to`.
+    fn relocated(&mut self, from: usize, to: usize) {
+        let node = &self.nodes[to];
+        let (previous, next) = (node.previous, node.next);
+
+        if let Some(previous) = previous {
+            self.nodes[previous].next = Some(to);
+        } else {
+            debug_assert_eq!(self.most_recent, Some(from));
+            self.most_recent = Some(to);
+        }
+
+        if let Some(next) = next {
+            self.nodes[next].previous = Some(to);
+        } else {
+            debug_assert_eq!(self.least_recent, Some(from));
+            self.least_recent = Some(to);
+        }
+
+        if let Some(slot) = self.indices.get_mut(&self.nodes[to].key) {
+            debug_assert_eq!(*slot, from);
+            *slot = to;
+        }
     }
 }
 
 struct LruIter<'a, K, V> {
-    nodes: &'a [Option<Node<K, V>>],
+    nodes: &'a [Node<K, V>],
     current: Option<usize>,
 }
 
@@ -255,7 +232,7 @@ impl<'a, K, V> Iterator for LruIter<'a, K, V> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let index = self.current?;
-        let node = self.nodes[index].as_ref()?;
+        let node = self.nodes.get(index)?;
         self.current = node.next;
         Some((&node.key, &node.value))
     }

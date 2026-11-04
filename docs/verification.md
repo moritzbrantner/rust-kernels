@@ -18,6 +18,8 @@ States are `present`, `partial`, `missing`, `planned`, or `n/a`. `planned` is no
 
 The existing blocking Rust checks remain unchanged: formatting, strict Clippy, and the full workspace test suite still decide Rust correctness.
 
+Production code may not call `unwrap()` or `expect()`: the workspace denies `clippy::unwrap_used` and `clippy::expect_used` (`[workspace.lints.clippy]`, inherited by every member through `[lints] workspace = true`), so ordinary strict Clippy enforces the shared fast tier's RUST-002 check (`cargo clippy --workspace --all-features -- -D clippy::unwrap_used -D clippy::expect_used`). Encode invariants in types or control flow, or return the existing error type when the failure is reachable; a documented caller-contract violation may still `assert!`/`panic!` under a `# Panics` doc section. A panic that is genuinely unavoidable uses one narrowly scoped `#[allow(clippy::expect_used, reason = "...")]` that states the invariant. Unit tests are exempt through `clippy.toml` (`allow-unwrap-in-tests`, `allow-expect-in-tests`); integration-test, benchmark and example target roots carry a crate-level `#![allow]` because they are not production code.
+
 `python3 scripts/validate_verification_matrix.py` runs as the blocking `verification-matrix` CI job. It checks matrix structure and inventory only. Every `src/**/*.rs` implementation source in every Cargo workspace member must be owned by at least one kernel row or explicitly listed as a facade. Evidence states such as `missing` and `partial` do **not** fail this validation.
 
 Coverage runs in a separate advisory job. It uses `cargo llvm-cov` across the workspace with all features and publishes:

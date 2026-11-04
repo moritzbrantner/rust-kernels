@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use geometry_kernels::{
     math3::{cross, dot, sub},
     primitive3::{PrimitiveShape3, PrimitiveVolumeError3, try_volume_properties},

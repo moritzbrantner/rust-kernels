@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "benchmarks are not production code; a panic is the intended failure report"
+)]
+
 use divan::{Bencher, black_box};
 use geometry_kernels::polygon2::{
     ConvexDecomposition2, Polygon2Work, SimplicityCheck, Vec2, convex_decompose_polygon2,

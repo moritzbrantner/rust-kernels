@@ -109,15 +109,17 @@ impl TestedPairs {
     fn new(body_count: usize) -> Self {
         let count = body_count as u128;
         let possible_pairs = count.saturating_mul(count.saturating_sub(1)) / 2;
-        if possible_pairs <= Self::MAX_DENSE_PAIRS {
-            let word_count = usize::try_from(possible_pairs.div_ceil(64))
-                .expect("dense pair marker size is bounded");
-            Self::Dense {
+        // The dense bound keeps the word count far below `usize::MAX`; a word
+        // count that still failed to convert would simply use sparse markers.
+        let dense_words = (possible_pairs <= Self::MAX_DENSE_PAIRS)
+            .then(|| usize::try_from(possible_pairs.div_ceil(64)).ok())
+            .flatten();
+        match dense_words {
+            Some(word_count) => Self::Dense {
                 words: vec![0; word_count],
                 body_count,
-            }
-        } else {
-            Self::Sparse(HashSet::new())
+            },
+            None => Self::Sparse(HashSet::new()),
         }
     }
 

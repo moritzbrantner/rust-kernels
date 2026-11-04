@@ -1,5 +1,12 @@
 //! First-hit segment queries over a static town of boxes: the binary `DynamicAabbTree` versus
 //! the four-wide `WideBvh`, and the cost of building the wide one.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "benchmarks are not production code; a panic is the intended failure report"
+)]
+
 use bvh_kernels::{DynamicAabbTree, WideBvh};
 use divan::{Bencher, black_box};
 use spatial_kernels::{Aabb, Body};

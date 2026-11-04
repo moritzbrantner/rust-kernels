@@ -2,6 +2,13 @@
 //!
 //! Fractal scenarios sweep octave counts (const generic) and point batches;
 //! warp and curl scenarios sweep point batches over Simplex base fields.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "benchmarks are not production code; a panic is the intended failure report"
+)]
+
 use divan::{Bencher, black_box, counter::ItemsCount};
 use noise_kernels::{Curl, DomainWarp, Fractal, Permutation, simplex2, simplex3, worley2};
 

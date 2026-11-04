@@ -6,6 +6,12 @@
 //! feature in an adjacent cell (`2 * sqrt(N)`), so offsets up to 4 cover every
 //! candidate in 2D and 3D.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests are not production code; a panic is the intended failure report"
+)]
+
 use noise_kernels::{
     Permutation, WorleySample, worley2, worley2_feature, worley3, worley3_feature,
 };

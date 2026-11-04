@@ -5,6 +5,12 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 static NEXT_QUEUE_ID: AtomicU64 = AtomicU64::new(1);
 
+#[allow(
+    clippy::expect_used,
+    reason = "queue identities must never repeat, otherwise a foreign handle could \
+              resolve in another queue; exhausting 2^64 ids is not reachable in practice \
+              and no fallback id would preserve handle isolation"
+)]
 fn allocate_queue_id() -> u64 {
     // A compare-exchange loop rather than `fetch_update`, which Rust 1.99
     // deprecates in favour of `try_update` (unavailable on the older
