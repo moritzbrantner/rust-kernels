@@ -27,7 +27,7 @@ const dist = path.join(root, "pages-dist");
 const competitorRoot = path.join(here, "node_modules", "math");
 
 function parseArgs(argv) {
-  const options = { build: true, profile: "full", suites: "noise", filter: "", out: null, repeat: 1 };
+  const options = { build: true, profile: "full", suites: "noise,shapes", filter: "", out: null, repeat: 1 };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     const next = () => {

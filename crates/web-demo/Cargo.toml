@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 collection-kernels = { path = "../collection-kernels" }
+geometry-kernels = { path = "../geometry-kernels" }
 noise-kernels = { path = "../noise-kernels" }
 search-kernels = { path = "../search-kernels" }
 spatial-kernels = { path = "../spatial-kernels" }
