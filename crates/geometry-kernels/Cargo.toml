@@ -31,3 +31,7 @@ harness = false
 [[bench]]
 name = "quickhull"
 harness = false
+
+[[bench]]
+name = "polygon2"
+harness = false
