@@ -133,3 +133,11 @@ sphere hit by `1e160` overflows the current squared-distance calculation. The
 checked query reports this failure rather than claiming collision absence.
 Angular trajectories and general convex continuous collision are outside this
 fixed-orientation contract.
+
+## Experimental tetrahedron/octahedron swept SAT
+
+`primitive3::platonic` is an experimental fixed-orientation translational swept
+SAT for regular tetrahedra, octahedra and boxes that shares the swept-SAT slab
+loop with the box/wedge path. It is not dispatched by `try_swept_time`. See
+[the experiment record](platonic-swept-sat.md) for the convention, evidence,
+measurements and per-shape conclusion.

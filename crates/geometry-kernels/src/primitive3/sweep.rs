@@ -3,7 +3,7 @@
 use super::polytope::{poly_axes, projection_interval};
 use super::query::{PrimitiveContact3, PrimitiveWork3, query_canonical};
 use super::shape::{PrimitiveBody3, PrimitivePair3};
-use crate::math3::{add, dot, scale, sub};
+use crate::math3::{Vec3, add, dot, scale, sub};
 
 /// Compatibility query that cannot distinguish a miss from a failed search.
 /// Use [`try_swept_time`] when a collision decision requires explicit failure handling.
@@ -198,17 +198,45 @@ fn poly_sweep_time(
     if !crate::math3::is_finite(displacement) {
         return Err(PrimitiveSweepError3::NonFiniteComputation);
     }
+    let interval = swept_sat_interval(
+        axes[..len].iter().copied(),
+        displacement,
+        margin,
+        max_iterations,
+        |axis| {
+            work.axes_tested += 1;
+            work.sweep_iterations += 1;
+            let (a_min, a_max) = projection_interval(a, axis, work);
+            let (b_min, b_max) = projection_interval(b, axis, work);
+            [a_min, a_max, b_min, b_max]
+        },
+    )?;
+    Ok(interval.map(|(enter, _)| enter))
+}
+
+/// Exact translational swept SAT over a caller-supplied candidate axis sequence.
+///
+/// `axes` may be generated lazily, so an early separating axis skips the rest.
+/// `project(axis)` returns `[a_min, a_max, b_min, b_max]`; it runs once per inspected axis
+/// and owns any work counting. `displacement` is `B`'s motion relative to `A` over the
+/// window. The result is the normalized `[enter, exit]` contact interval clipped to `[0, 1]`
+/// or `None` when one axis separates the whole window. Omitting a true separating axis can
+/// only admit extra contact, never hide one.
+pub(super) fn swept_sat_interval(
+    axes: impl IntoIterator<Item = Vec3>,
+    displacement: Vec3,
+    margin: f64,
+    max_iterations: u32,
+    mut project: impl FnMut(Vec3) -> [f64; 4],
+) -> Result<Option<(f64, f64)>, PrimitiveSweepError3> {
     let mut enter = 0.0_f64;
     let mut exit = 1.0_f64;
 
-    for (iteration, &axis) in axes[..len].iter().enumerate() {
+    for (iteration, axis) in axes.into_iter().enumerate() {
         if iteration as u64 >= u64::from(max_iterations) {
             return Err(PrimitiveSweepError3::IterationLimit);
         }
-        work.axes_tested += 1;
-        work.sweep_iterations += 1;
-        let (a_min, a_max) = projection_interval(a, axis, work);
-        let (b_min, b_max) = projection_interval(b, axis, work);
+        let [a_min, a_max, b_min, b_max] = project(axis);
         let velocity = dot(displacement, axis);
         if ![a_min, a_max, b_min, b_max, velocity]
             .into_iter()
@@ -239,5 +267,5 @@ fn poly_sweep_time(
         }
     }
 
-    Ok((exit >= 0.0 && enter <= 1.0).then_some(enter.max(0.0)))
+    Ok((exit >= 0.0 && enter <= 1.0).then_some((enter.max(0.0), exit)))
 }
