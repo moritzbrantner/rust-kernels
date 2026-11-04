@@ -39,7 +39,8 @@ impl std::error::Error for PrimitiveSweepError3 {}
 /// `Ok(None)` is a separating-plane miss; numerical failure and an exhausted search are
 /// errors. `max_iterations` bounds conservative advances or swept-SAT axes, including the
 /// query that admits a hit. Stationary curved pairs need one contact query and no iterations;
-/// polyhedral pairs always count the swept-SAT axes they inspect.
+/// moving sphere pairs use one analytic solve, and polyhedral pairs count
+/// the swept-SAT axes they inspect.
 /// The work counters include unsuccessful search work. Shape constructors validate dimensions;
 /// callers supply finite poses/velocities and the shape's applicable orthonormal axes.
 /// This does not sweep angular motion or promise support for arbitrary finite magnitudes.
@@ -80,6 +81,19 @@ pub fn try_swept_time(
         let contact = query_canonical(pair, a, b, work);
         validate_sweep_contact(contact)?;
         return Ok((contact.separation <= margin).then_some(0.0));
+    }
+    if pair == PrimitivePair3::SphereSphere {
+        if max_iterations == 0 {
+            return Err(PrimitiveSweepError3::IterationLimit);
+        }
+        work.sweep_iterations += 1;
+        let radius = a.shape.sphere_radius() + b.shape.sphere_radius() + margin;
+        return crate::continuous::try_sphere_sphere_fraction_f64(
+            sub(b.position, a.position),
+            displacement,
+            radius,
+        )
+        .map_err(|()| PrimitiveSweepError3::NonFiniteComputation);
     }
     let target = margin;
     let tolerance = 1.0e-9 * (1.0 + a.shape.radius() + b.shape.radius());
