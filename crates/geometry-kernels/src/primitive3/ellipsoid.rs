@@ -10,11 +10,19 @@
 //! extents, conservative outer/inner radii, fixed-orientation halfspace contact and
 //! translational sweep, material-point displacement certificates for rotating motion, and
 //! uniform-solid volume and principal inertia. Arbitrary ellipsoid pairs have no quadratic
-//! time of impact and no pair cast is provided here.
+//! time of impact; [`try_homothetic_pair_cast`] (#190) covers only the translating pair that
+//! shares one shape transform and reports every other pair as unsupported.
 
 use super::frame::unit_or_zero;
 use crate::math3::{Vec3, add, dot, is_finite, scale, sub};
 use crate::support::SupportMap3;
+
+mod pair;
+
+pub use pair::{
+    EllipsoidPairCast3, EllipsoidPairContact3, EllipsoidPairToi3, EllipsoidPairUnsupported3,
+    EllipsoidSharedFrame3, ScaledEllipsoidMotion3, try_homothetic_pair_cast,
+};
 
 /// Largest accepted `|dot(axis_i, axis_j) - delta_ij|` for pose axes.
 ///

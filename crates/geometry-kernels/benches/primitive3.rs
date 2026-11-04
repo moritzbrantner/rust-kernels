@@ -597,3 +597,124 @@ mod ellipsoid {
         });
     }
 }
+
+#[path = "../tests/support/ellipsoid_reference.rs"]
+mod ellipsoid_reference;
+
+mod ellipsoid_pair {
+    //! Shared-transform homothetic pair cast (#190) against the generic support-based
+    //! conservative-advancement reference on the same fixtures. Each sample is one batch of
+    //! `BATCH` complete casts over rotated frames; setup is outside the timed region.
+
+    use super::ellipsoid::{BATCH, RATIOS, frames, semiaxes};
+    use super::ellipsoid_reference::conservative_advancement;
+    use divan::{Bencher, black_box};
+    use geometry_kernels::math3::Vec3;
+    use geometry_kernels::primitive3::ellipsoid::{
+        Ellipsoid3, EllipsoidBody3, EllipsoidPairToi3, EllipsoidPose3, EllipsoidSharedFrame3,
+        ScaledEllipsoidMotion3, try_homothetic_pair_cast,
+    };
+
+    const DT: f64 = 1.0 / 60.0;
+
+    struct Fixture {
+        frame: EllipsoidSharedFrame3,
+        a: ScaledEllipsoidMotion3,
+        b: ScaledEllipsoidMotion3,
+        bodies: (EllipsoidBody3, EllipsoidBody3),
+    }
+
+    /// B (scale 0.5) starts 20 combined sizes away and closes on A (scale 1) within the step
+    /// with a lateral offset of 0.3 combined inner radii: every fixture hits.
+    fn fixtures(ratio: &str) -> Vec<Fixture> {
+        let (base, center) = semiaxes(ratio);
+        let shape = Ellipsoid3::try_new(base).expect("valid semiaxes");
+        let size = 1.5 * base.into_iter().fold(0.0, f64::max);
+        let inner = 1.5 * base.into_iter().fold(f64::INFINITY, f64::min);
+        frames()
+            .into_iter()
+            .enumerate()
+            .map(|(index, axes)| {
+                let t = index as f64 * 0.9;
+                let direction = [t.cos() * 0.6, 0.8, t.sin() * 0.6];
+                let offset: Vec3 = std::array::from_fn(|i| 20.0 * size * direction[i]);
+                let lateral = [0.3 * inner * t.sin(), 0.0, -0.3 * inner * t.cos()];
+                let velocity: Vec3 = std::array::from_fn(|i| (lateral[i] - offset[i]) / DT);
+                let a = ScaledEllipsoidMotion3 {
+                    center,
+                    velocity: [0.0; 3],
+                    scale: 1.0,
+                };
+                let b = ScaledEllipsoidMotion3 {
+                    center: std::array::from_fn(|i| center[i] + offset[i]),
+                    velocity,
+                    scale: 0.5,
+                };
+                let pose = |c| EllipsoidPose3::try_new(c, axes).expect("orthonormal axes");
+                let half = Ellipsoid3::try_new(base.map(|v| v * 0.5)).expect("valid semiaxes");
+                Fixture {
+                    frame: EllipsoidSharedFrame3::try_new(shape, axes).expect("valid frame"),
+                    a,
+                    b,
+                    bodies: (
+                        EllipsoidBody3::new(shape, pose(a.center)),
+                        EllipsoidBody3::new(half, pose(b.center)),
+                    ),
+                }
+            })
+            .collect()
+    }
+
+    #[divan::bench(args = RATIOS)]
+    fn shared_frame_cast(bencher: Bencher, ratio: &str) {
+        let fixtures = fixtures(ratio);
+        assert_eq!(fixtures.len(), BATCH);
+        assert!(fixtures.iter().all(|fixture| matches!(
+            fixture.frame.try_cast(fixture.a, fixture.b, DT),
+            Ok(EllipsoidPairToi3::Hit { .. })
+        )));
+        bencher.bench_local(|| {
+            for fixture in black_box(&fixtures) {
+                let _ = black_box(fixture.frame.try_cast(fixture.a, fixture.b, DT));
+            }
+        });
+    }
+
+    /// Includes the exact orientation/proportionality checks and frame construction.
+    #[divan::bench(args = RATIOS)]
+    fn checked_pair_cast(bencher: Bencher, ratio: &str) {
+        let fixtures = fixtures(ratio);
+        bencher.bench_local(|| {
+            for fixture in black_box(&fixtures) {
+                let (a, b) = fixture.bodies;
+                let _ = black_box(try_homothetic_pair_cast(
+                    a,
+                    fixture.a.velocity,
+                    b,
+                    fixture.b.velocity,
+                    DT,
+                ));
+            }
+        });
+    }
+
+    #[divan::bench(args = RATIOS)]
+    fn generic_reference_cast(bencher: Bencher, ratio: &str) {
+        let fixtures = fixtures(ratio);
+        bencher.bench_local(|| {
+            for fixture in black_box(&fixtures) {
+                let (a, b) = fixture.bodies;
+                let size = a.shape.outer_radius() * 1.5;
+                black_box(conservative_advancement(
+                    a,
+                    fixture.a.velocity,
+                    b,
+                    fixture.b.velocity,
+                    DT,
+                    1e-9 * size,
+                    100_000,
+                ));
+            }
+        });
+    }
+}

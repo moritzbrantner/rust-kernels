@@ -58,9 +58,9 @@ gives the median per call. Timing is advisory developer evidence.
 
 | Kernel | 1:1:1 | 1.5:1:1 | 4:1:1 | adverse 1e4:1:1e-3 | Existing kernels |
 | --- | --- | --- | --- | --- | --- |
-| Support point | 38.2 ns | 38.6 ns | 38.3 ns | 38.3 ns | sphere 13.4, capsule 14.1, box 17.4 ns |
-| AABB extents | 10.1 ns | 10.2 ns | 10.2 ns | 10.2 ns | sphere 1.2, capsule 1.8, box 2.6 ns |
-| Halfspace cast | 20.9 ns | 21.8 ns | 21.6 ns | 21.7 ns | sphere/capsule halfspace 11.7 ns, box vs slab swept SAT 1171 ns |
+| Support point | 39.0 ns | 38.9 ns | 38.9 ns | 38.8 ns | sphere 12.8, capsule 14.2, box 17.9 ns |
+| AABB extents | 9.7 ns | 9.7 ns | 9.7 ns | 9.7 ns | sphere 0.9, capsule 1.5, box 2.6 ns |
+| Halfspace cast | 20.8 ns | 21.8 ns | 21.9 ns | 21.7 ns | sphere/capsule halfspace 11.4 ns, box vs slab swept SAT 1264 ns |
 
 Cost does not depend on aspect ratio. The support map is about 3× a sphere or
 capsule support (one square root and one reciprocal plus a 3×3 transform); the
@@ -79,4 +79,84 @@ Focused commands:
 ```sh
 cargo test -p geometry-kernels --test ellipsoid_primitive
 cargo bench -p geometry-kernels --bench primitive3 -- ellipsoid
+```
+
+## Shared-transform homothetic pair cast (#190)
+
+Two ellipsoids `cA + sA L ball` and `cB + sB L ball` sharing one transform
+`L = R diag(a,b,c)` map under `L⁻¹` to spheres of radii `sA` and `sB`; with fixed
+orientations and constant velocities the relative center moves linearly there,
+so first contact is the sphere root of `‖p' + v' t‖ = sA + sB`. The cast reuses
+the crate's checked sphere–sphere fraction (`continuous`, from #192) rather than
+another quadratic solver.
+
+- `EllipsoidSharedFrame3::try_new(base, axes)` precomputes the rows of
+  `L⁻¹ = diag(1/a,1/b,1/c) R⁻¹` with the exact adjugate inverse of the supplied
+  axes (not `Rᵀ`). `try_cast(a, b, dt)` takes `ScaledEllipsoidMotion3 { center,
+  velocity, scale }` for each body.
+- `try_homothetic_pair_cast(a, va, b, vb, dt)` accepts two posed
+  `EllipsoidBody3` only when the axes are bitwise identical and the semiaxes are
+  exactly proportional, decided by comparing exact double-length products
+  (`mul_add` error terms) after exact power-of-two normalization. Everything else
+  is `EllipsoidPairCast3::Unsupported(DifferentOrientation |
+  NonHomotheticShapes | UnverifiableProportion)`; there is no tolerance-based
+  acceptance, and f64 semiaxes that are only nominally proportional (`0.1` vs
+  `0.1 * 3.0`) are rejected. Callers with a known shared base use the frame API.
+- Results are `InitiallyOverlapping` (strict interior overlap at the start),
+  `Hit { fraction, contact }` (including a touching start at `0`) or `Miss`.
+  The witness is `cA(t) + L (sA u')` and the normal is the normalized
+  `L⁻ᵀ u'`, the outward normal of A towards B; spherical impulse or inertia in
+  transformed coordinates is not provided.
+- The sphere-space contact radius is widened by a bound on the transform's
+  rounding (`16ε` times the absolute row/vector products), so grazing paths
+  within rounding report contact slightly early instead of being missed. The
+  widening scales with the frame's axis-ratio condition number: a 1e8 needle
+  reports contact up to about `1e-6` early in the fixtures. A later f32 consumer
+  must still narrow conservatively at its own boundary.
+
+Out of scope: differently shaped or oriented pairs, angular motion and margins
+(an offset ellipsoid is not an ellipsoid). **The generic ellipsoid pair
+fallback is absent**: unsupported pairs carry no collision conclusion.
+
+Evidence (`tests/ellipsoid_pair_ccd.rs`): analytic head-on, diagonal, overlapping,
+stationary, separating, short and crossing paths; 32 seeded exact tangencies
+(hit near `t = 1/2`) with `1 ± 1e-9` offsets (hit/miss); near-zero displacements;
+1e-140..1e140 scale covariance through the checked entry; a 1e4:1:1e-4 needle;
+inverse-transpose normals; and 600 seeded pairs over 1:1:1, 1.5:1:1, 4:1:1,
+0.3:2:0.7 and 10:1:0.2 frames (a quarter at 400 combined sizes per 1/60 s step)
+against an independent reference: conservative advancement on GJK distance over
+the analytic `SupportMap3`, stepping by the separating-plane lower bound
+(`tests/support/ellipsoid_reference.rs`). The last run had 445 hits (109
+high-speed) and 155 misses with identical classification, no unresolved
+reference search, and hit times within `200 * tolerance / closing` (worst
+observed 89). Every hit witness satisfies both independent implicit equations
+`‖diag(1/s) Rᵀ (x - c)‖ = 1` and has opposite surface normals.
+
+### Measurements (#190)
+
+Same fingerprint as above; `cargo bench -p geometry-kernels --bench primitive3 --
+ellipsoid_pair`. Each sample casts 64 hitting fixtures (B at 20 combined sizes,
+closing within one 1/60 s step, rotated frames); median per call:
+
+| Cast | 1:1:1 | 1.5:1:1 | 4:1:1 | adverse 1e4:1:1e-3 |
+| --- | --- | --- | --- | --- |
+| `EllipsoidSharedFrame3::try_cast` (prepared) | 166 ns | 171 ns | 166 ns | 166 ns |
+| `try_homothetic_pair_cast` (checks + frame) | 190 ns | 191 ns | 191 ns | 191 ns |
+| Generic CA/GJK reference | 36.3 µs | 50.8 µs | 54.7 µs | 50.4 µs |
+
+For comparison the existing analytic `fast_sphere_sphere_sweep` call through
+`try_swept_time` measured 92 ns in the same run. The exact precondition checks and
+frame construction add about 25 ns. The
+specialized cast is about 220–330× cheaper than the generic support-based search
+on the same fixtures and does not depend on aspect ratio.
+
+**Conclusion (#190): retain experimental.** The cast is exact in its declared
+domain, explicit outside it and far cheaper than the generic path, but no
+consumer needs ellipsoid pairs and the generic fallback that unsupported pairs
+would require does not exist. Promotion requires a distinct consumer/parity
+issue; this change does not expand the Physics Engine API.
+
+```sh
+cargo test -p geometry-kernels --test ellipsoid_pair_ccd
+cargo bench -p geometry-kernels --bench primitive3 -- ellipsoid_pair
 ```
