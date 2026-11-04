@@ -9,6 +9,7 @@ pub mod heightfield;
 pub mod hull;
 pub mod math3;
 pub mod planar;
+pub mod polygon2;
 pub mod primitive3;
 pub mod primitives;
 pub mod ray;

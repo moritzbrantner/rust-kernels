@@ -303,3 +303,41 @@ fn experimental_platonic_swept_sat_allocates_nothing() {
     assert_eq!(ALLOCS.with(Cell::get), 0);
     assert_eq!(REALLOCS.with(Cell::get), 0);
 }
+
+#[test]
+fn warmed_polygon2_triangulation_and_decomposition_allocate_nothing() {
+    use geometry_kernels::polygon2::{
+        ConvexDecomposition2, Polygon2Work, SimplicityCheck, convex_decompose_polygon2,
+        triangulate_polygon2,
+    };
+    let polygons: Vec<Vec<[f64; 2]>> = [64usize, 512, 128]
+        .iter()
+        .map(|&n| {
+            (0..n)
+                .map(|i| {
+                    let t = i as f64 / n as f64 * std::f64::consts::TAU;
+                    let r = if i % 2 == 0 { 1.0 } else { 0.4 };
+                    [r * t.cos(), r * t.sin()]
+                })
+                .collect()
+        })
+        .collect();
+    let mut work = Polygon2Work::default();
+    let mut triangles = Vec::new();
+    let mut pieces = ConvexDecomposition2::default();
+    let mut run = |work: &mut Polygon2Work| {
+        for polygon in &polygons {
+            triangulate_polygon2(polygon, SimplicityCheck::Validate, work, &mut triangles).unwrap();
+            convex_decompose_polygon2(polygon, SimplicityCheck::Validate, work, &mut pieces)
+                .unwrap();
+        }
+    };
+    run(&mut work);
+    ALLOCS.with(|count| count.set(0));
+    REALLOCS.with(|count| count.set(0));
+    ENABLED.with(|enabled| enabled.set(true));
+    run(&mut work);
+    ENABLED.with(|enabled| enabled.set(false));
+    assert!(pieces.len() > 1);
+    assert_eq!(ALLOCS.with(Cell::get) + REALLOCS.with(Cell::get), 0);
+}
