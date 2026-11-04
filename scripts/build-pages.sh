@@ -12,4 +12,9 @@ cp \
   target/wasm32-unknown-unknown/release/rust_kernels_web_demo.wasm \
   pages-dist/pkg/rust_kernels_web_demo.wasm
 
+# Revision identity for benchmarks.html output; "dirty" marks uncommitted changes.
+revision="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+if git diff --quiet HEAD -- 2>/dev/null; then dirty=false; else dirty=true; fi
+printf '{"revision":"%s","dirty":%s}\n' "$revision" "$dirty" > pages-dist/build-info.json
+
 printf 'Pages artifact ready: %s\n' "$(du -sh pages-dist | cut -f1)"

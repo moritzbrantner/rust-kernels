@@ -543,3 +543,99 @@ input:focus-visible {
     transition: none;
   }
 }
+
+/* Browser comparison page (benchmarks.html) */
+.bench-section {
+  margin-top: 3rem;
+}
+
+.bench-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem 1.5rem;
+}
+
+.bench-controls fieldset {
+  display: flex;
+  gap: 1rem;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+  border-radius: 0.5rem;
+}
+
+.bench-controls label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.bench-controls fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.bench-metadata {
+  display: grid;
+  gap: 0.35rem;
+  margin: 1.5rem 0 0;
+  font-size: 0.9rem;
+}
+
+.bench-metadata div {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.bench-metadata dt {
+  font-weight: 700;
+}
+
+.bench-metadata dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.bench-note {
+  max-width: 62rem;
+  opacity: 0.72;
+}
+
+.bench-table-wrap {
+  overflow-x: auto;
+}
+
+.bench-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.bench-table th,
+.bench-table td {
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.bench-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bench-table .warn {
+  font-weight: 700;
+}
+
+.bench-sanity {
+  font-size: 0.9rem;
+}
+
+#bench-json {
+  max-height: 24rem;
+  overflow: auto;
+  font-size: 0.8rem;
+}

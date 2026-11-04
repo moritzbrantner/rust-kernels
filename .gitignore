@@ -1,3 +1,6 @@
 /target
 # A library workspace: consumers resolve their own lockfiles (not tracked here).
 /Cargo.lock
+/pages-dist
+/benchmarks/browser/node_modules
+/benchmarks/browser/results
