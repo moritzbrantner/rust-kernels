@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "issue": 52,
+  "kernels": [
+    {
+      "id": "f64-experimental-ellipsoid",
+      "crate": "geometry-kernels",
+      "module": "crate::primitive3::ellipsoid",
+      "sources": [
+        "crates/geometry-kernels/src/primitive3/ellipsoid.rs"
+      ],
+      "oracleDifferential": "partial",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "n/a",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "Experimental (#189): validated triaxial semiaxes with a separate orthonormal pose; not part of the PrimitiveShape3 pair matrix and not consumed by Physics Engine.",
+        "Support, support radius, AABB extents and halfspace sweeps are checked against an independent 96x192 latitude/longitude sampled surface (inscribed hull) at a named 1.1e-3 relative tolerance across 1:1:1, 1.5:1:1, 4:1:1, 0.3:2:0.7 and 50:0.05:1 shapes; inertia is checked against midpoint grid integration.",
+        "Radius containment, orientation invariance, positive direction scaling and 1e-150..1e150 scale covariance are metamorphic properties; both rotating-motion displacement certificates bound every sampled material point.",
+        "deterministicPerformance: Every query is a fixed closed-form scalar sequence with no iteration or scratch; Divan cases in benches/primitive3.rs are developer evidence.",
+        "criterion: Developer timings use the existing Divan primitive3 suite (ellipsoid module); no Criterion suite is added."
+      ]
+    }
+  ]
+}
