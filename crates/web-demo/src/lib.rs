@@ -1,3 +1,7 @@
+mod bench;
+mod bench_noise;
+mod bench_shapes;
+
 use std::sync::OnceLock;
 
 use collection_kernels::{FenwickTree, UnionFind};

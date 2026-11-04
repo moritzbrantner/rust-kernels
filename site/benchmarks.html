@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Browser comparison of rust-kernels (Rust → WebAssembly) and pmndrs/math (JavaScript) on equivalent named workloads."
+    />
+    <title>rust-kernels — browser comparison</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <p class="eyebrow">Comparative evidence · not a CI gate</p>
+        <h1>Browser comparison</h1>
+        <p class="lede">
+          Runs equivalent named workloads through the rust-kernels WebAssembly boundary and through
+          <a href="https://github.com/pmndrs/math">pmndrs/math</a> (npm package <code>math</code>, pinned
+          version) in this browser tab. Inputs, seeds and sizes are identical for both engines. Results
+          depend on this machine and browser; correctness is owned by the repository's Cargo tests.
+        </p>
+        <nav class="actions" aria-label="Project links">
+          <a class="button" href="./index.html">Algorithm laboratory</a>
+          <a class="button" href="https://github.com/moritzbrantner/rust-kernels/blob/main/docs/browser-benchmarks.md">Method and recorded results</a>
+        </nav>
+        <p class="runtime-status" id="bench-status" aria-live="polite">Loading…</p>
+      </header>
+
+      <section class="bench-section" aria-labelledby="bench-controls-title">
+        <h2 id="bench-controls-title">Run</h2>
+        <form class="bench-controls" onsubmit="return false">
+          <fieldset>
+            <legend>Suites</legend>
+            <label><input type="checkbox" data-suite value="noise" checked /> noise</label>
+            <label><input type="checkbox" data-suite value="shapes" checked /> collision &amp; shapes</label>
+          </fieldset>
+          <label>
+            Profile
+            <select id="bench-profile">
+              <option value="quick">quick</option>
+              <option value="full" selected>full</option>
+            </select>
+          </label>
+          <label>
+            Scenario filter
+            <input id="bench-filter" type="text" placeholder="e.g. worley" />
+          </label>
+          <button class="button primary" id="bench-run" type="button" disabled>Run</button>
+        </form>
+        <dl class="bench-metadata" id="bench-metadata"></dl>
+      </section>
+
+      <section class="bench-section" aria-labelledby="bench-results-title">
+        <h2 id="bench-results-title">Results</h2>
+        <p class="bench-note">
+          ns/item is the median per-batch time divided by the batch size. <strong>rust kernel</strong>
+          has inputs already in linear memory; <strong>rust e2e</strong> adds copying inputs in and
+          outputs out of linear memory. <strong>js/rust</strong> is pmndrs time over the rust kernel
+          time: above 1 means rust-kernels is faster. The check column is a sanity cross-check, not an
+          oracle.
+        </p>
+        <div class="bench-table-wrap">
+          <table class="bench-table">
+            <thead>
+              <tr>
+                <th scope="col">suite</th>
+                <th scope="col">scenario</th>
+                <th scope="col">size</th>
+                <th scope="col" class="num">rust kernel ns/item</th>
+                <th scope="col" class="num">rust e2e ns/item</th>
+                <th scope="col" class="num">pmndrs ns/item</th>
+                <th scope="col" class="num">js/rust</th>
+                <th scope="col">check</th>
+              </tr>
+            </thead>
+            <tbody id="bench-rows"></tbody>
+          </table>
+        </div>
+        <h3>Shared invariants</h3>
+        <ul class="bench-sanity" id="bench-sanity"></ul>
+        <details>
+          <summary>Raw JSON</summary>
+          <pre id="bench-json"></pre>
+        </details>
+      </section>
+    </main>
+
+    <noscript>This page needs JavaScript to run the benchmarks.</noscript>
+    <script type="module" src="./benchmarks.js"></script>
+  </body>
+</html>
