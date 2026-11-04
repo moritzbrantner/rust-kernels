@@ -6,7 +6,6 @@
 mod closest;
 mod frame;
 mod pairs;
-/// Experimental tetrahedron/octahedron swept-SAT fixture (issue #188); not in the pair matrix.
 pub mod platonic;
 mod polytope;
 mod query;
