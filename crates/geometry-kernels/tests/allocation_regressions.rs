@@ -264,3 +264,42 @@ fn warmed_quickhull_rebuilds_allocate_nothing() {
     assert!(hull.triangles.len() > 4 && polygon.len() > 3);
     assert_eq!(ALLOCS.with(Cell::get) + REALLOCS.with(Cell::get), 0);
 }
+
+#[test]
+fn experimental_platonic_swept_sat_allocates_nothing() {
+    use geometry_kernels::primitive3::platonic::{
+        PlatonicBody3, PlatonicShape3, PlatonicWork3, try_platonic_swept_interval,
+    };
+    let rotated = [[0.6, 0.8, 0.0], [-0.48, 0.36, 0.8], [0.64, -0.48, 0.6]];
+    let shapes = [
+        PlatonicShape3::tetrahedron(1.0),
+        PlatonicShape3::octahedron(1.0),
+        PlatonicShape3::cuboid([1.0, 0.75, 1.25]),
+    ];
+    let mut work = PlatonicWork3::default();
+    ALLOCS.with(|count| count.set(0));
+    REALLOCS.with(|count| count.set(0));
+    ENABLED.with(|enabled| enabled.set(true));
+    let mut hits = 0;
+    for _ in 0..512 {
+        for left in shapes {
+            for right in shapes {
+                let a = PlatonicBody3::axis_aligned(left, [0.0; 3], [0.0; 3]);
+                let b = PlatonicBody3::new(right, [3.0, 0.2, -0.1], rotated, [-360.0, 0.0, 0.0]);
+                let result = std::hint::black_box(try_platonic_swept_interval(
+                    std::hint::black_box(a),
+                    std::hint::black_box(b),
+                    1.0 / 60.0,
+                    0.0,
+                    64,
+                    &mut work,
+                ));
+                hits += usize::from(matches!(result, Ok(Some(_))));
+            }
+        }
+    }
+    ENABLED.with(|enabled| enabled.set(false));
+    assert_eq!(hits, 512 * 9);
+    assert_eq!(ALLOCS.with(Cell::get), 0);
+    assert_eq!(REALLOCS.with(Cell::get), 0);
+}

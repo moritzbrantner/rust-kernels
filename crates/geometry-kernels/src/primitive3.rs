@@ -6,6 +6,7 @@
 mod closest;
 mod frame;
 mod pairs;
+pub mod platonic;
 mod polytope;
 mod query;
 mod ray;
