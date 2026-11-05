@@ -544,6 +544,27 @@
       ]
     },
     {
+      "id": "separated-segment-convex-hull-distance-3d",
+      "crate": "geometry-kernels",
+      "module": "crate::segment_hull",
+      "sources": [
+        "crates/geometry-kernels/src/segment_hull.rs"
+      ],
+      "oracleDifferential": "partial",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "partial",
+      "criterion": "n/a",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "Analytic face, edge, corner and diagonal-corner-distance cases use a cube built with QuickHull. A deterministic 400-segment box-distance comparison exercises the physics-engine consumer.",
+        "A crossing/touching segment returns None so consumers retain a penetration-capable fallback. Translation invariance, deterministic work counters and AABB feature pruning have Cargo-native regression tests.",
+        "The Greyhaven static-rock Rapier oracle checks capsule cast timing and work on the real 32-point authored asset; wall-clock measurements are advisory outside controlled runners.",
+        "criterion: The consumer's end-to-end oracle and deterministic feature-work counters are the representative performance evidence for this narrow static-hull query; a stand-alone microbenchmark is deferred."
+      ]
+    },
+    {
       "id": "geometry-math3",
       "crate": "geometry-kernels",
       "module": "crate::math3",
