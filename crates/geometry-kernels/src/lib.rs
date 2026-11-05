@@ -14,6 +14,7 @@ pub mod primitive3;
 pub mod primitives;
 pub mod ray;
 pub mod ray_triangle;
+pub mod segment_hull;
 pub mod support;
 
 pub use continuous::{SphereSweepHit, sphere_sphere_time_of_impact};
