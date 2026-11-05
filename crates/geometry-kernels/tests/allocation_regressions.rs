@@ -347,3 +347,34 @@ fn warmed_polygon2_triangulation_and_decomposition_allocate_nothing() {
     assert!(pieces.len() > 1);
     assert_eq!(ALLOCS.with(Cell::get) + REALLOCS.with(Cell::get), 0);
 }
+
+#[test]
+fn prepared_mesh_queries_allocate_nothing() {
+    use geometry_kernels::triangle_mesh::{PreparedTriangleMesh3, TriangleMeshData3};
+    let mesh = PreparedTriangleMesh3::try_new(TriangleMeshData3 {
+        vertices: vec![[-2., 0., -2.], [2., 0., -2.], [0., 0., 2.]],
+        triangles: vec![[0, 2, 1]],
+    })
+    .unwrap();
+    ALLOCS.with(|count| count.set(0));
+    REALLOCS.with(|count| count.set(0));
+    ENABLED.with(|enabled| enabled.set(true));
+    let mut valid = true;
+    for _ in 0..64 {
+        valid &= std::hint::black_box(mesh.capsule_contact([0., 0.1, 0.], [0., 0.3, 0.], 0.2, 0.))
+            .is_ok();
+        valid &= std::hint::black_box(mesh.capsule_sweep(
+            [0., 2., 0.],
+            [0., 2.3, 0.],
+            0.2,
+            [0., -4., 0.],
+            64,
+        ))
+        .is_ok();
+        valid &= std::hint::black_box(mesh.segment_hit([0., 2., 0.], [0., -2., 0.])).is_ok();
+    }
+    ENABLED.with(|enabled| enabled.set(false));
+    assert!(valid);
+    assert_eq!(ALLOCS.with(Cell::get), 0);
+    assert_eq!(REALLOCS.with(Cell::get), 0);
+}

@@ -38,3 +38,7 @@ harness = false
 
 [lints]
 workspace = true
+
+[[bench]]
+name = "triangle_mesh"
+harness = false
