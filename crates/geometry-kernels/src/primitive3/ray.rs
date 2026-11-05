@@ -25,6 +25,8 @@ pub enum PrimitiveRayFeature3 {
     WedgeFace(u8),
     /// A heightfield triangle, by its `PreparedHeightfield3` triangle id.
     HeightfieldTriangle(u32),
+    /// Stable input triangle index of a prepared static mesh.
+    TriangleMeshTriangle(u32),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

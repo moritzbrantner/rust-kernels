@@ -633,6 +633,26 @@
         "crates/geometry-kernels/tests/audit_regressions.rs checks analytic support extrema and positive-direction rescaling from subnormal through overflow-prone finite vectors for spheres and capsules.",
         "criterion: New ordinary/extreme-direction workloads use Divan in crates/geometry-kernels/benches/audit_numerics.rs."
       ]
+    },
+    {
+      "id": "prepared-triangle-mesh",
+      "crate": "geometry-kernels",
+      "module": "crate::triangle_mesh",
+      "sources": [
+        "crates/geometry-kernels/src/triangle_mesh.rs",
+        "crates/geometry-kernels/src/triangle_mesh/tests.rs"
+      ],
+      "oracleDifferential": "present",
+      "propertyMetamorphic": "present",
+      "coverage": "present",
+      "mutation": "missing",
+      "deterministicPerformance": "present",
+      "criterion": "present",
+      "runtimeProfiler": "missing",
+      "notes": [
+        "BVH contacts, sweeps and rays compared against unpruned triangle traversal; winding/translation, floor/ceiling/edge/initial-overlap/failure cases in triangle_mesh/tests.rs.",
+        "Local-query doubling family asserts bounded exact triangle tests and logarithmic node visits; warm queries allocate nothing. Divan triangle_mesh bench separates preparation and query costs."
+      ]
     }
   ]
 }

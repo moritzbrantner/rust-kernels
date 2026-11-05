@@ -4,8 +4,8 @@
 use std::{error::Error, fmt, mem::size_of};
 
 use crate::math3::{Vec3, add, cross, dot, length, normalized, scale, sub as vsub};
-use crate::primitive3::{closest_point_triangle, closest_segment_points};
 use crate::ray_triangle::segment_triangle_f64;
+use crate::triangle_mesh::closest_segment_triangle;
 
 /// How each cell is split into two triangles.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -788,7 +788,7 @@ fn cell_span(coordinates: &[f64], min: f64, max: f64) -> Option<(usize, usize)> 
 /// Closest points between the segment `p`–`q` and a triangle, as a capsule contact.
 /// Separating-axis overlap of a convex polytope with one triangle (see
 /// [`PreparedHeightfield3::polytope_contact_counted`]).
-fn polytope_triangle_contact(
+pub(crate) fn polytope_triangle_contact(
     polytope: ConvexPolytope3<'_>,
     triangle: [Vec3; 3],
     triangle_normal: Vec3,
@@ -877,7 +877,7 @@ fn segment_triangle_contact(
     triangle: [Vec3; 3],
     normal: Vec3,
 ) -> Option<HeightfieldContact3> {
-    let [a, b, c] = triangle;
+    let a = triangle[0];
     // The segment crossing the triangle: overlap by the deeper endpoint below its plane.
     if let Some((_, point)) = segment_triangle_f64(p, q, triangle) {
         let depth = dot(vsub(p, a), normal)
@@ -890,22 +890,9 @@ fn segment_triangle_contact(
             point,
         });
     }
-    let mut best = (f64::INFINITY, [0.0; 3], [0.0; 3]);
-    let mut consider = |on_segment: Vec3, on_triangle: Vec3| {
-        let d = vsub(on_segment, on_triangle);
-        let d2 = dot(d, d);
-        if d2 < best.0 {
-            best = (d2, on_segment, on_triangle);
-        }
-    };
-    for end in [p, q] {
-        consider(end, closest_point_triangle(end, a, b, c));
-    }
-    for (e0, e1) in [(a, b), (b, c), (c, a)] {
-        let (on_segment, on_edge) = closest_segment_points(p, q, e0, e1)?;
-        consider(on_segment, on_edge);
-    }
-    let (d2, on_segment, on_triangle) = best;
+    let (on_segment, on_triangle) = closest_segment_triangle(p, q, triangle)?;
+    let delta = vsub(on_segment, on_triangle);
+    let d2 = dot(delta, delta);
     if !d2.is_finite() {
         return None;
     }
