@@ -207,11 +207,11 @@ mod tests {
         )
         .unwrap();
         assert!((shifted.distance - original.distance).abs() < 1e-12);
-        for i in 0..3 {
+        for (i, coordinate) in offset.iter().enumerate() {
             assert!(
-                (shifted.point_segment[i] - original.point_segment[i] - offset[i]).abs() < 1e-12
+                (shifted.point_segment[i] - original.point_segment[i] - coordinate).abs() < 1e-12
             );
-            assert!((shifted.point_hull[i] - original.point_hull[i] - offset[i]).abs() < 1e-12);
+            assert!((shifted.point_hull[i] - original.point_hull[i] - coordinate).abs() < 1e-12);
         }
     }
 }
