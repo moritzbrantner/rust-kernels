@@ -196,11 +196,11 @@ fn contacts(
         }
     }
     for (j, e) in edge_directions.into_iter().enumerate() {
-        for (i, axis) in BASIS.into_iter().enumerate() {
-            let axis = cross(axis, e);
-            // A cross axis with at most one nonzero component is either zero
-            // or exactly one of the box face axes already tested above.
-            if axis.into_iter().filter(|&v| v != 0.0).count() <= 1 {
+        let cross_axes = [[0., -e[2], e[1]], [e[2], 0., -e[0]], [-e[1], e[0], 0.]];
+        for (i, axis) in cross_axes.into_iter().enumerate() {
+            // This cross axis already has one zero component. If either other
+            // component is zero it is redundant with a tested box face axis.
+            if e[(i + 1) % 3] == 0. || e[(i + 2) % 3] == 0. {
                 continue;
             }
             let axis_length = length(axis);
@@ -356,8 +356,12 @@ fn contacts(
             .flat_map(|p| p.point_on_triangle)
             .map(f64::abs)
             .fold(0., f64::max);
-        let normalized: [Vec3; 8] =
-            std::array::from_fn(|i| points[i].point_on_triangle.map(|v| v / distance_scale));
+        let inverse_scale = distance_scale.recip();
+        let normalized: [Vec3; 8] = if inverse_scale.is_finite() {
+            std::array::from_fn(|i| scale(points[i].point_on_triangle, inverse_scale))
+        } else {
+            std::array::from_fn(|i| points[i].point_on_triangle.map(|v| v / distance_scale))
+        };
         let mut nearest = [f64::INFINITY; 8];
         let mut used = [false; 8];
         used[selected[0]] = true;
