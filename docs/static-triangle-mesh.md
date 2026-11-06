@@ -20,13 +20,29 @@ surfaces being left or followed tangentially. Polytope overlaps consume the
 existing `heightfield::ConvexPolytope3` contract and shared triangle SAT kernel.
 Rotating sweeps and generic polytope sweeps are not provided.
 
-Queries return `Result<Option<_>, TriangleMeshError3>`: a valid miss is `Ok(None)`;
+`box_contacts_counted(center, axes, half_extents, margin, work, emit)` accepts a
+box's f64 orthonormal local axes in mesh space, positive half extents and a
+nonnegative speculative margin. It emits `TriangleMeshBoxManifold3` per triangle,
+with a normal toward the box and one to four `TriangleMeshBoxPoint3` witness pairs
+in `points[..len]`. Signed separation is measured along that normal. Face patches
+use reference/incident clipping; edge pairs use segment witnesses. Speculative
+corner contacts use Euclidean distance, so projected SAT gaps alone cannot admit
+an out-of-reach corner. Near-equal SAT axes prefer faces deterministically.
+Callbacks follow retained BVH order, rather than sorted triangle IDs. Callers own
+cross-triangle patch reduction, contact persistence and response. No contacts
+means no callback; a later arithmetic error may follow earlier callbacks.
+
+Other queries return `Result<Option<_>, TriangleMeshError3>`: a valid miss is `Ok(None)`;
 invalid input, non-finite arithmetic, and exhausted conservative advancement are
 errors. Finite data alone does not guarantee every difference/product fits f64.
 No numeric failure is converted into a miss. Sweep fractions are f64; consumers
 with narrower physical state own conservative narrowing and response policy.
 
-Preparation owns all retained allocations. `preparation()` reports triangle/node
+Preparation retains normalized triangle edges and inward clipping planes for box
+queries, so repeated queries rotate validated directions instead of reconstructing
+them. Exact cross axes already covered by box face axes are skipped. Clipping
+reuses each vertex's plane distance. Contact-patch reduction updates nearest selected-witness distances
+incrementally in normalized coordinates, avoiding repeated square roots. Preparation owns all retained allocations. `preparation()` reports triangle/node
 counts and vector-capacity bytes, excluding object/allocator overhead. Queries
 allocate nothing and report query count, BVH node visits, exact triangle tests,
 normal reuses and sweep iterations through `TriangleMeshWork3`. BVH construction

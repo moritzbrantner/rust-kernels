@@ -5,6 +5,9 @@
 //! Capsule queries include spheres (equal segment endpoints); sweeps translate a
 //! fixed segment. Rotation, collision response and chunk lifetime belong to callers.
 
+mod box_contacts;
+pub use box_contacts::{TriangleMeshBoxManifold3, TriangleMeshBoxPoint3};
+
 use crate::{
     heightfield::{ConvexPolytope3, polytope_triangle_contact},
     math3::{Vec3, add, cross, dot, length, scale, sub},
@@ -128,6 +131,7 @@ enum NodeKind {
 pub struct PreparedTriangleMesh3 {
     data: TriangleMeshData3,
     normals: Vec<Vec3>,
+    box_geometry: Vec<box_contacts::TriangleBoxGeometry>,
     nodes: Vec<Node>,
     preparation: TriangleMeshPreparation3,
 }
@@ -144,6 +148,7 @@ impl PreparedTriangleMesh3 {
             return Err(InvalidCoordinates);
         }
         let mut normals = Vec::with_capacity(data.triangles.len());
+        let mut box_geometry = Vec::with_capacity(data.triangles.len());
         let mut leaves = Vec::with_capacity(data.triangles.len());
         for (id, indices) in data.triangles.iter().enumerate() {
             let mut triangle = [[0.0; 3]; 3];
@@ -169,6 +174,9 @@ impl PreparedTriangleMesh3 {
             let scaled = n.map(|v| v / n_span);
             let normal = scale(scaled, 1.0 / length(scaled));
             normals.push(normal);
+            box_geometry.push(box_contacts::TriangleBoxGeometry::try_new(
+                triangle, normal,
+            )?);
             leaves.push((
                 u32::try_from(id).map_err(|_| Capacity)?,
                 Bounds::points(triangle),
@@ -208,11 +216,13 @@ impl PreparedTriangleMesh3 {
             retained_bytes: data.vertices.capacity() * size_of::<Vec3>()
                 + data.triangles.capacity() * size_of::<[u32; 3]>()
                 + normals.capacity() * size_of::<Vec3>()
+                + box_geometry.capacity() * size_of::<box_contacts::TriangleBoxGeometry>()
                 + nodes.capacity() * size_of::<Node>(),
         };
         Ok(Self {
             data,
             normals,
+            box_geometry,
             nodes,
             preparation,
         })
