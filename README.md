@@ -117,3 +117,5 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
 ```
+
+Box contact manifolds against retained convex hulls: [API and geometry contract](docs/box-hull-contact.md).
