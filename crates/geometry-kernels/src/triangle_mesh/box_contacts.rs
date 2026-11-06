@@ -125,37 +125,6 @@ fn unit(v: Vec3) -> Option<Vec3> {
     Some(scale(v, length(v).recip()))
 }
 
-/// Compare a projection on an unnormalized axis against a distance. Most
-/// rejected/losing edge axes need no square root or reciprocal. Squaring is
-/// restricted to representable, non-underflowing products; extreme coordinates
-/// retain the normalized comparison as their numerical fallback.
-fn projected_greater(value: f64, distance: f64, norm_squared: f64) -> bool {
-    if norm_squared == 1. {
-        return value > distance;
-    }
-    if value >= 0. && distance < 0. {
-        return true;
-    }
-    if value < 0. && distance >= 0. {
-        return false;
-    }
-    let left = value * value;
-    let right = (distance * distance) * norm_squared;
-    if left.is_finite()
-        && right.is_finite()
-        && (left > 0. || value == 0.)
-        && (right > 0. || distance == 0.)
-    {
-        if value >= 0. {
-            left > right
-        } else {
-            left < right
-        }
-    } else {
-        value / norm_squared.sqrt() > distance
-    }
-}
-
 /// Immutable directions shared by every box query of one triangle.
 #[derive(Debug)]
 pub(super) struct TriangleBoxGeometry {
@@ -190,41 +159,39 @@ fn contacts(
     // A rigid transform of a prepared unit normal is already well scaled.
     let tn = scale(tn, length(tn).recip());
     let mut best = (f64::NEG_INFINITY, tn, Feature::TriangleFace);
-    let mut test =
-        |axis: Vec3, norm_squared: f64, feature: Feature| -> Result<bool, TriangleMeshError3> {
-            let radius = (0..3).map(|i| h[i] * axis[i].abs()).sum::<f64>();
-            let ds = t.map(|p| dot(p, axis));
-            if !radius.is_finite() || !ds.into_iter().all(f64::is_finite) {
-                return Err(TriangleMeshError3::NonFiniteComputation);
-            }
-            let lo = ds.into_iter().fold(f64::INFINITY, f64::min);
-            let hi = ds.into_iter().fold(f64::NEG_INFINITY, f64::max);
-            let positive = -radius - hi;
-            let negative = lo - radius;
-            let (sep, n) = if positive >= negative {
-                (positive, axis)
-            } else {
-                (negative, scale(axis, -1.))
-            };
-            if !sep.is_finite() {
-                return Err(TriangleMeshError3::NonFiniteComputation);
-            }
-            if projected_greater(sep, margin, norm_squared) {
-                return Ok(false);
-            }
-            // Face-first strict tie breaking keeps coplanar patches stable.
-            let tie_tolerance = 64. * f64::EPSILON * radius.max(lo.abs()).max(hi.abs());
-            if projected_greater(sep - tie_tolerance, best.0, norm_squared) {
-                let inverse_norm = norm_squared.sqrt().recip();
-                best = (sep * inverse_norm, scale(n, inverse_norm), feature);
-            }
-            Ok(true)
+    let mut test = |axis: Vec3, feature: Feature| -> Result<bool, TriangleMeshError3> {
+        let radius = (0..3).map(|i| h[i] * axis[i].abs()).sum::<f64>();
+        let ds = t.map(|p| dot(p, axis));
+        if !radius.is_finite() || !ds.into_iter().all(f64::is_finite) {
+            return Err(TriangleMeshError3::NonFiniteComputation);
+        }
+        let lo = ds.into_iter().fold(f64::INFINITY, f64::min);
+        let hi = ds.into_iter().fold(f64::NEG_INFINITY, f64::max);
+        let positive = -radius - hi;
+        let negative = lo - radius;
+        let (sep, n) = if positive >= negative {
+            (positive, axis)
+        } else {
+            (negative, scale(axis, -1.))
         };
-    if !test(tn, 1., Feature::TriangleFace)? {
+        if !sep.is_finite() {
+            return Err(TriangleMeshError3::NonFiniteComputation);
+        }
+        if sep > margin {
+            return Ok(false);
+        }
+        // Face-first strict tie breaking keeps coplanar patches stable.
+        let tie_tolerance = 64. * f64::EPSILON * radius.max(lo.abs()).max(hi.abs());
+        if sep > best.0 + tie_tolerance {
+            best = (sep, n, feature);
+        }
+        Ok(true)
+    };
+    if !test(tn, Feature::TriangleFace)? {
         return Ok(None);
     }
     for (i, axis) in BASIS.into_iter().enumerate() {
-        if !test(axis, 1., Feature::BoxFace(i))? {
+        if !test(axis, Feature::BoxFace(i))? {
             return Ok(None);
         }
     }
@@ -236,9 +203,9 @@ fn contacts(
             if axis.into_iter().filter(|&v| v != 0.0).count() <= 1 {
                 continue;
             }
-            let norm_squared = dot(axis, axis);
-            if norm_squared > (64. * f64::EPSILON).powi(2)
-                && !test(axis, norm_squared, Feature::Edge(i, j))?
+            let axis_length = length(axis);
+            if axis_length > 64. * f64::EPSILON
+                && !test(scale(axis, axis_length.recip()), Feature::Edge(i, j))?
             {
                 return Ok(None);
             }
@@ -381,24 +348,36 @@ fn contacts(
         selected[0] = (0..unique)
             .min_by(|&a, &b| points[a].separation.total_cmp(&points[b].separation))
             .unwrap_or(0);
+        // Normalize once so squared distances stay finite at large/small
+        // geometry scales. Incrementally retain each point's nearest selected
+        // witness instead of recomputing every prefix for both comparator args.
+        let distance_scale = points[..unique]
+            .iter()
+            .flat_map(|p| p.point_on_triangle)
+            .map(f64::abs)
+            .fold(0., f64::max);
+        let normalized: [Vec3; 8] =
+            std::array::from_fn(|i| points[i].point_on_triangle.map(|v| v / distance_scale));
+        let mut nearest = [f64::INFINITY; 8];
+        let mut used = [false; 8];
+        used[selected[0]] = true;
         for k in 1..4 {
-            selected[k] = (0..unique)
-                .filter(|i| !selected[..k].contains(i))
-                .max_by(|&a, &b| {
-                    let score = |i: usize| {
-                        selected[..k]
-                            .iter()
-                            .map(|&j| {
-                                length(sub(
-                                    points[i].point_on_triangle,
-                                    points[j].point_on_triangle,
-                                ))
-                            })
-                            .fold(f64::INFINITY, f64::min)
-                    };
-                    score(a).total_cmp(&score(b)).then(b.cmp(&a))
-                })
-                .unwrap_or(0);
+            let previous = normalized[selected[k - 1]];
+            let mut best_index = usize::MAX;
+            let mut best_score = f64::NEG_INFINITY;
+            for i in 0..unique {
+                if used[i] {
+                    continue;
+                }
+                let delta = sub(normalized[i], previous);
+                nearest[i] = nearest[i].min(dot(delta, delta));
+                if nearest[i] > best_score {
+                    best_index = i;
+                    best_score = nearest[i];
+                }
+            }
+            selected[k] = best_index;
+            used[best_index] = true;
         }
         for (i, j) in selected.into_iter().enumerate() {
             result.points[i] = points[j];
@@ -523,27 +502,4 @@ fn closest(t: [Vec3; 3], h: Vec3) -> Result<(Vec3, Vec3, f64), TriangleMeshError
         }
     }
     Ok(best)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::projected_greater;
-    #[test]
-    fn squared_projection_order_matches_normalized_reference_at_all_scales() {
-        for norm_squared in [1e-27_f64, 1e-8, 0.1, 0.5, 1.] {
-            for scale in [1e-200_f64, 1e-100, 1., 1e100, 1e200] {
-                for sign in [-1., 1.] {
-                    let value = sign * scale;
-                    let normalized = value / norm_squared.sqrt();
-                    for reference in [0., normalized * 0.9, normalized * 1.1, -normalized] {
-                        assert_eq!(
-                            projected_greater(value, reference, norm_squared),
-                            normalized > reference,
-                            "projection={value}, distance={reference}, norm_squared={norm_squared}"
-                        );
-                    }
-                }
-            }
-        }
-    }
 }

@@ -41,9 +41,8 @@ with narrower physical state own conservative narrowing and response policy.
 Preparation retains normalized triangle edges and inward clipping planes for box
 queries, so repeated queries rotate validated directions instead of reconstructing
 them. Exact cross axes already covered by box face axes are skipped. Clipping
-reuses each vertex's plane distance. Edge SAT axes compare signed squared
-projections before normalizing a winning axis; extreme products retain the direct
-normalized comparison as a numerical fallback. Preparation owns all retained allocations. `preparation()` reports triangle/node
+reuses each vertex's plane distance. Contact-patch reduction updates nearest selected-witness distances
+incrementally in normalized coordinates, avoiding repeated square roots. Preparation owns all retained allocations. `preparation()` reports triangle/node
 counts and vector-capacity bytes, excluding object/allocator overhead. Queries
 allocate nothing and report query count, BVH node visits, exact triangle tests,
 normal reuses and sweep iterations through `TriangleMeshWork3`. BVH construction
