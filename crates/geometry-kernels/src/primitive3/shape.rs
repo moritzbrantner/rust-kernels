@@ -22,6 +22,7 @@ pub struct PrimitiveShape3 {
 
 impl PrimitiveShape3 {
     #[must_use]
+    #[inline]
     pub fn sphere(radius: f64) -> Self {
         assert!(
             radius.is_finite() && radius > 0.0,
