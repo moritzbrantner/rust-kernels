@@ -7,7 +7,6 @@
 //! algorithm instead.
 
 mod box_contact;
-pub(crate) use box_contact::clip;
 pub use box_contact::{BoxHullContact, BoxHullError, BoxHullPoint, BoxHullWork, PreparedBoxHull};
 
 use crate::{
