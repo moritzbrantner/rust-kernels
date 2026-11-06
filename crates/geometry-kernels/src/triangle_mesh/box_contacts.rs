@@ -68,10 +68,24 @@ impl PreparedTriangleMesh3 {
                 axes.map(|axis| dot(d, axis))
             });
             let normal = axes.map(|axis| dot(self.normals[id as usize], axis));
+            let geometry = &self.box_geometry[id as usize];
+            let edge_directions = geometry
+                .edge_directions
+                .map(|edge| axes.map(|axis| dot(edge, axis)));
+            let inward_normals = geometry
+                .inward_normals
+                .map(|normal| axes.map(|axis| dot(normal, axis)));
             if !triangle.into_iter().flatten().all(f64::is_finite) {
                 return Err(TriangleMeshError3::NonFiniteComputation);
             }
-            if let Some(mut manifold) = contacts(triangle, normal, half_extents, margin)? {
+            if let Some(mut manifold) = contacts(
+                triangle,
+                normal,
+                edge_directions,
+                inward_normals,
+                half_extents,
+                margin,
+            )? {
                 manifold.triangle = id;
                 let rotate = |p: Vec3| (0..3).fold([0.0; 3], |v, i| add(v, scale(axes[i], p[i])));
                 manifold.normal = rotate(manifold.normal);
@@ -111,69 +125,127 @@ fn unit(v: Vec3) -> Option<Vec3> {
     Some(scale(v, length(v).recip()))
 }
 
+/// Compare a projection on an unnormalized axis against a distance. Most
+/// rejected/losing edge axes need no square root or reciprocal. Squaring is
+/// restricted to representable, non-underflowing products; extreme coordinates
+/// retain the normalized comparison as their numerical fallback.
+fn projected_greater(value: f64, distance: f64, norm_squared: f64) -> bool {
+    if norm_squared == 1. {
+        return value > distance;
+    }
+    if value >= 0. && distance < 0. {
+        return true;
+    }
+    if value < 0. && distance >= 0. {
+        return false;
+    }
+    let left = value * value;
+    let right = (distance * distance) * norm_squared;
+    if left.is_finite()
+        && right.is_finite()
+        && (left > 0. || value == 0.)
+        && (right > 0. || distance == 0.)
+    {
+        if value >= 0. {
+            left > right
+        } else {
+            left < right
+        }
+    } else {
+        value / norm_squared.sqrt() > distance
+    }
+}
+
+/// Immutable directions shared by every box query of one triangle.
+#[derive(Debug)]
+pub(super) struct TriangleBoxGeometry {
+    edge_directions: [Vec3; 3],
+    inward_normals: [Vec3; 3],
+}
+impl TriangleBoxGeometry {
+    pub(super) fn try_new(t: [Vec3; 3], normal: Vec3) -> Result<Self, TriangleMeshError3> {
+        let mut edge_directions = [[0.; 3]; 3];
+        let mut inward_normals = [[0.; 3]; 3];
+        for i in 0..3 {
+            edge_directions[i] =
+                unit(sub(t[(i + 1) % 3], t[i])).ok_or(TriangleMeshError3::NonFiniteComputation)?;
+            inward_normals[i] = unit(cross(normal, edge_directions[i]))
+                .ok_or(TriangleMeshError3::NonFiniteComputation)?;
+        }
+        Ok(Self {
+            edge_directions,
+            inward_normals,
+        })
+    }
+}
+
 fn contacts(
     t: [Vec3; 3],
     tn: Vec3,
+    edge_directions: [Vec3; 3],
+    inward_normals: [Vec3; 3],
     h: Vec3,
     margin: f64,
 ) -> Result<Option<TriangleMeshBoxManifold3>, TriangleMeshError3> {
-    let tn = unit(tn).ok_or(TriangleMeshError3::NonFiniteComputation)?;
-    let edges = [sub(t[1], t[0]), sub(t[2], t[1]), sub(t[0], t[2])];
-    if !edges.into_iter().flatten().all(f64::is_finite) {
-        return Err(TriangleMeshError3::NonFiniteComputation);
-    }
+    // A rigid transform of a prepared unit normal is already well scaled.
+    let tn = scale(tn, length(tn).recip());
     let mut best = (f64::NEG_INFINITY, tn, Feature::TriangleFace);
-    let mut test = |axis: Vec3, feature: Feature| -> Result<bool, TriangleMeshError3> {
-        let radius = (0..3).map(|i| h[i] * axis[i].abs()).sum::<f64>();
-        let ds = t.map(|p| dot(p, axis));
-        if !radius.is_finite() || !ds.into_iter().all(f64::is_finite) {
-            return Err(TriangleMeshError3::NonFiniteComputation);
-        }
-        let lo = ds.into_iter().fold(f64::INFINITY, f64::min);
-        let hi = ds.into_iter().fold(f64::NEG_INFINITY, f64::max);
-        let positive = -radius - hi;
-        let negative = lo - radius;
-        let (sep, n) = if positive >= negative {
-            (positive, axis)
-        } else {
-            (negative, scale(axis, -1.))
+    let mut test =
+        |axis: Vec3, norm_squared: f64, feature: Feature| -> Result<bool, TriangleMeshError3> {
+            let radius = (0..3).map(|i| h[i] * axis[i].abs()).sum::<f64>();
+            let ds = t.map(|p| dot(p, axis));
+            if !radius.is_finite() || !ds.into_iter().all(f64::is_finite) {
+                return Err(TriangleMeshError3::NonFiniteComputation);
+            }
+            let lo = ds.into_iter().fold(f64::INFINITY, f64::min);
+            let hi = ds.into_iter().fold(f64::NEG_INFINITY, f64::max);
+            let positive = -radius - hi;
+            let negative = lo - radius;
+            let (sep, n) = if positive >= negative {
+                (positive, axis)
+            } else {
+                (negative, scale(axis, -1.))
+            };
+            if !sep.is_finite() {
+                return Err(TriangleMeshError3::NonFiniteComputation);
+            }
+            if projected_greater(sep, margin, norm_squared) {
+                return Ok(false);
+            }
+            // Face-first strict tie breaking keeps coplanar patches stable.
+            let tie_tolerance = 64. * f64::EPSILON * radius.max(lo.abs()).max(hi.abs());
+            if projected_greater(sep - tie_tolerance, best.0, norm_squared) {
+                let inverse_norm = norm_squared.sqrt().recip();
+                best = (sep * inverse_norm, scale(n, inverse_norm), feature);
+            }
+            Ok(true)
         };
-        if !sep.is_finite() {
-            return Err(TriangleMeshError3::NonFiniteComputation);
-        }
-        if sep > margin {
-            return Ok(false);
-        }
-        // Face-first strict tie breaking keeps coplanar patches stable.
-        let tie_tolerance = 64. * f64::EPSILON * radius.max(lo.abs()).max(hi.abs());
-        if sep > best.0 + tie_tolerance {
-            best = (sep, n, feature);
-        }
-        Ok(true)
-    };
-    if !test(tn, Feature::TriangleFace)? {
+    if !test(tn, 1., Feature::TriangleFace)? {
         return Ok(None);
     }
     for (i, axis) in BASIS.into_iter().enumerate() {
-        if !test(axis, Feature::BoxFace(i))? {
+        if !test(axis, 1., Feature::BoxFace(i))? {
             return Ok(None);
         }
     }
-    for (j, edge) in edges.into_iter().enumerate() {
-        // Scale first so tiny or huge valid edges retain their direction.
-        let e = unit(edge).ok_or(TriangleMeshError3::NonFiniteComputation)?;
+    for (j, e) in edge_directions.into_iter().enumerate() {
         for (i, axis) in BASIS.into_iter().enumerate() {
             let axis = cross(axis, e);
-            let axis_length = length(axis);
-            if axis_length > 64. * f64::EPSILON
-                && !test(scale(axis, axis_length.recip()), Feature::Edge(i, j))?
+            // A cross axis with at most one nonzero component is either zero
+            // or exactly one of the box face axes already tested above.
+            if axis.into_iter().filter(|&v| v != 0.0).count() <= 1 {
+                continue;
+            }
+            let norm_squared = dot(axis, axis);
+            if norm_squared > (64. * f64::EPSILON).powi(2)
+                && !test(axis, norm_squared, Feature::Edge(i, j))?
             {
                 return Ok(None);
             }
         }
     }
     let (separation, normal, feature) = best;
-    let mut points = [TriangleMeshBoxPoint3::default(); 12];
+    let mut points = [TriangleMeshBoxPoint3::default(); 8];
     let mut count = 0;
     let tolerance = 128.
         * f64::EPSILON
@@ -198,12 +270,7 @@ fn contacts(
                 polygon.push(p)?;
             }
             for i in 0..3 {
-                let inward = unit(cross(
-                    tn,
-                    unit(edges[i]).ok_or(TriangleMeshError3::NonFiniteComputation)?,
-                ))
-                .ok_or(TriangleMeshError3::NonFiniteComputation)?;
-                polygon.clip(inward, t[i], tolerance)?;
+                polygon.clip(inward_normals[i], t[i], tolerance)?;
             }
             for &p in &polygon.points[..polygon.len] {
                 let sep = dot(sub(p, t[0]), normal);
@@ -287,12 +354,15 @@ fn contacts(
     }
     // Remove clipping duplicates, then retain a spread of at most four witnesses.
     let mut unique = 0;
+    let tolerance_squared = tolerance * tolerance;
     for i in 0..count {
         if !(0..unique).any(|j| {
-            length(sub(
-                points[i].point_on_triangle,
-                points[j].point_on_triangle,
-            )) <= tolerance
+            let delta = sub(points[i].point_on_triangle, points[j].point_on_triangle);
+            if tolerance_squared > 0. && tolerance_squared.is_finite() {
+                dot(delta, delta) <= tolerance_squared
+            } else {
+                length(delta) <= tolerance
+            }
         }) {
             points[unique] = points[i];
             unique += 1;
@@ -348,13 +418,13 @@ fn contacts(
 }
 
 struct Polygon {
-    points: [Vec3; 12],
+    points: [Vec3; 8],
     len: usize,
 }
 impl Polygon {
     fn empty() -> Self {
         Self {
-            points: [[0.; 3]; 12],
+            points: [[0.; 3]; 8],
             len: 0,
         }
     }
@@ -362,6 +432,9 @@ impl Polygon {
         if !p.into_iter().all(f64::is_finite) {
             return Err(TriangleMeshError3::NonFiniteComputation);
         }
+        self.push_finite(p)
+    }
+    fn push_finite(&mut self, p: Vec3) -> Result<(), TriangleMeshError3> {
         if self.len == self.points.len() {
             return Err(TriangleMeshError3::Capacity);
         }
@@ -370,24 +443,46 @@ impl Polygon {
         Ok(())
     }
     fn clip(&mut self, n: Vec3, origin: Vec3, tolerance: f64) -> Result<(), TriangleMeshError3> {
+        if self.len == 0 {
+            return Ok(());
+        }
         let mut out = Self::empty();
+        let mut a = self.points[0];
+        let mut da = dot(sub(a, origin), n);
+        if !da.is_finite() {
+            return Err(TriangleMeshError3::NonFiniteComputation);
+        }
         for i in 0..self.len {
-            let a = self.points[i];
-            let b = self.points[(i + 1) % self.len];
-            let da = dot(sub(a, origin), n);
+            let b = self.points[if i + 1 == self.len { 0 } else { i + 1 }];
             let db = dot(sub(b, origin), n);
-            if !da.is_finite() || !db.is_finite() {
+            if !db.is_finite() {
                 return Err(TriangleMeshError3::NonFiniteComputation);
             }
             let inside_a = da >= -tolerance;
             let inside_b = db >= -tolerance;
             if inside_a {
-                out.push(a)?;
+                out.push_finite(a)?;
             }
             if inside_a != inside_b {
-                let fraction = (da / (da - db)).clamp(0., 1.);
-                out.push(add(scale(a, 1. - fraction), scale(b, fraction)))?;
+                // Opposite signs can overflow da-db even when each endpoint
+                // distance is finite. Scale before dividing on that rare path.
+                let denominator = da - db;
+                let fraction = if denominator.is_finite() {
+                    da / denominator
+                } else {
+                    let magnitude = da.abs().max(db.abs());
+                    (da / magnitude) / (da / magnitude - db / magnitude)
+                }
+                .clamp(0., 1.);
+                // An endpoint intersection is already emitted as an inside
+                // vertex. Avoid duplicates before the next clip (a clipped
+                // quad/triangle has at most seven distinct vertices).
+                if fraction > 0. && fraction < 1. {
+                    out.push(add(scale(a, 1. - fraction), scale(b, fraction)))?;
+                }
             }
+            a = b;
+            da = db;
         }
         *self = out;
         Ok(())
@@ -428,4 +523,27 @@ fn closest(t: [Vec3; 3], h: Vec3) -> Result<(Vec3, Vec3, f64), TriangleMeshError
         }
     }
     Ok(best)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::projected_greater;
+    #[test]
+    fn squared_projection_order_matches_normalized_reference_at_all_scales() {
+        for norm_squared in [1e-27_f64, 1e-8, 0.1, 0.5, 1.] {
+            for scale in [1e-200_f64, 1e-100, 1., 1e100, 1e200] {
+                for sign in [-1., 1.] {
+                    let value = sign * scale;
+                    let normalized = value / norm_squared.sqrt();
+                    for reference in [0., normalized * 0.9, normalized * 1.1, -normalized] {
+                        assert_eq!(
+                            projected_greater(value, reference, norm_squared),
+                            normalized > reference,
+                            "projection={value}, distance={reference}, norm_squared={norm_squared}"
+                        );
+                    }
+                }
+            }
+        }
+    }
 }
