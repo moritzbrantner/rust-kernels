@@ -1,10 +1,13 @@
-//! Closest points between a finite segment and a convex 3D hull when the
+//! Retained convex hull geometry: box contact manifolds and closest segment points when the
 //! segment's centreline is strictly outside the solid.
 //!
 //! This is a useful narrow phase for capsules against *static* convex terrain:
 //! the segment-to-hull distance can be reduced by the capsule radius. If the
 //! centreline touches or crosses the solid, the caller must use a penetration
 //! algorithm instead.
+
+mod box_contact;
+pub use box_contact::{BoxHullContact, BoxHullError, BoxHullPoint, BoxHullWork};
 
 use crate::{
     hull::{Hull3, HullDimension},
@@ -83,6 +86,7 @@ struct Face {
 #[derive(Clone, Copy, Debug)]
 struct Edge {
     ends: [u32; 2],
+    opposite: [u32; 2],
     bounds: Bounds,
 }
 
@@ -128,26 +132,31 @@ impl PreparedSegmentHull {
                 offset: dot(normal, a),
                 bounds: Bounds::from_points([a, b, c]),
             });
-            for [a, b] in [
-                [triangle[0], triangle[1]],
-                [triangle[1], triangle[2]],
-                [triangle[2], triangle[0]],
+            for [a, b, opposite] in [
+                [triangle[0], triangle[1], triangle[2]],
+                [triangle[1], triangle[2], triangle[0]],
+                [triangle[2], triangle[0], triangle[1]],
             ] {
-                edge_keys.push([a.min(b), a.max(b)]);
+                edge_keys.push(([a.min(b), a.max(b)], opposite));
             }
         }
         edge_keys.sort_unstable();
-        edge_keys.dedup();
-        let edges = edge_keys
-            .into_iter()
-            .map(|ends| {
-                let [a, b] = ends.map(|i| hull.vertices[i as usize]);
-                Edge {
-                    ends,
-                    bounds: Bounds::from_points([a, b]),
-                }
-            })
-            .collect();
+        if edge_keys.len() % 2 != 0 {
+            return None;
+        }
+        let mut edges = Vec::with_capacity(edge_keys.len() / 2);
+        for pair in edge_keys.as_chunks::<2>().0 {
+            if pair[0].0 != pair[1].0 {
+                return None;
+            }
+            let ends = pair[0].0;
+            let [a, b] = ends.map(|i| hull.vertices[i as usize]);
+            edges.push(Edge {
+                ends,
+                opposite: [pair[0].1, pair[1].1],
+                bounds: Bounds::from_points([a, b]),
+            });
+        }
         Some(Self { hull, faces, edges })
     }
 
