@@ -53,3 +53,21 @@ fn segment_hit(bencher: Bencher, count: usize) {
         )
     });
 }
+
+#[divan::bench(args=[64,256,1024])]
+fn box_manifold(bencher: Bencher, count: usize) {
+    let mesh = PreparedTriangleMesh3::try_new(data(count)).unwrap();
+    bencher.bench_local(|| {
+        mesh.box_contacts_counted(
+            black_box([0., 0.49, 0.]),
+            [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]],
+            [0.5; 3],
+            0.05,
+            &mut geometry_kernels::triangle_mesh::TriangleMeshWork3::default(),
+            |m| {
+                black_box(m);
+            },
+        )
+        .unwrap();
+    });
+}

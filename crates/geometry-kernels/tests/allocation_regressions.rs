@@ -372,6 +372,18 @@ fn prepared_mesh_queries_allocate_nothing() {
         ))
         .is_ok();
         valid &= std::hint::black_box(mesh.segment_hit([0., 2., 0.], [0., -2., 0.])).is_ok();
+        valid &= mesh
+            .box_contacts_counted(
+                [0., 0.49, 0.],
+                [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]],
+                [0.5; 3],
+                0.05,
+                &mut geometry_kernels::triangle_mesh::TriangleMeshWork3::default(),
+                |m| {
+                    std::hint::black_box(m);
+                },
+            )
+            .is_ok();
     }
     ENABLED.with(|enabled| enabled.set(false));
     assert!(valid);
