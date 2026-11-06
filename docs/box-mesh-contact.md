@@ -7,7 +7,8 @@ Invalid input or nonfinite computation returns `TriangleMeshError3`.
 
 The callback receives a stable input triangle ID, a normal from triangle to box, and up
 to four finite-face or edge witnesses. Each witness has `point_box`, `point_mesh` and a
-signed separation. SAT tests the triangle normal, box normals and edge-cross axes.
+signed separation. Duplicate boundary witnesses are removed before selecting four points,
+so shared-edge intersections cannot displace a real supporting corner. SAT tests the triangle normal, box normals and edge-cross axes.
 Incident faces are clipped to the finite opposing feature. A separated face witness
 attaining its supporting-plane gap can certify a result before the remaining axes.
 Open boundaries and holes remain open; a triangle's bounding box is never its collider.

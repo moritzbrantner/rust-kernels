@@ -263,10 +263,24 @@ fn triangle_contact(
 }
 
 fn finish(
-    points: Vec<TriangleMeshBoxPoint3>,
+    mut points: Vec<TriangleMeshBoxPoint3>,
     normal: Vec3,
     centre: Vec3,
 ) -> Result<Option<TriangleMeshBoxContact3>, TriangleMeshError3> {
+    // Boundary intersections may repeat a polygon vertex. Remove them before bounded
+    // selection, otherwise duplicates can displace a genuine supporting corner.
+    let mut unique = 0;
+    for read in 0..points.len() {
+        let point = points[read];
+        if !points[..unique]
+            .iter()
+            .any(|p| p.point_box == point.point_box && p.point_mesh == point.point_mesh)
+        {
+            points[unique] = point;
+            unique += 1;
+        }
+    }
+    points.truncate(unique);
     let len = points.len().min(4);
     let mut selected = [TriangleMeshBoxPoint3::default(); 4];
     for (i, p) in selected[..len].iter_mut().enumerate() {
@@ -542,6 +556,53 @@ mod tests {
                 assert!(work.triangles_tested <= 4);
                 assert!(work.nodes_visited <= 8 * (patches as u32).ilog2() as u64 + 8);
             }
+        }
+    }
+    #[test]
+    fn shared_diagonal_keeps_all_four_box_corners_without_duplicate_witnesses() {
+        let mesh = PreparedTriangleMesh3::try_new(TriangleMeshData3 {
+            vertices: vec![
+                [-2.0, 0.0, -2.0],
+                [2.0, 0.0, -2.0],
+                [2.0, 0.0, 2.0],
+                [-2.0, 0.0, 2.0],
+            ],
+            triangles: vec![[0, 1, 2], [0, 2, 3]],
+        })
+        .unwrap();
+        let mut contacts = Vec::new();
+        mesh.box_contacts_counted(
+            [0.0, 0.49, 0.0],
+            [0.5; 3],
+            AXES,
+            0.02,
+            &mut TriangleMeshWork3::default(),
+            |c| contacts.push(c),
+        )
+        .unwrap();
+        assert_eq!(contacts.len(), 2);
+        for c in &contacts {
+            assert_eq!(c.len, 3);
+            for i in 0..c.len {
+                assert!(
+                    !c.points[..i]
+                        .iter()
+                        .any(|p| p.point_box == c.points[i].point_box)
+                );
+            }
+        }
+        for p in [
+            [-0.5, 0.0, -0.5],
+            [-0.5, 0.0, 0.5],
+            [0.5, 0.0, -0.5],
+            [0.5, 0.0, 0.5],
+        ] {
+            assert!(
+                contacts
+                    .iter()
+                    .any(|c| c.points[..c.len].iter().any(|point| point.point_mesh == p)),
+                "missing {p:?}"
+            );
         }
     }
 }
