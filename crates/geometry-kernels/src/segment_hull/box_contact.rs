@@ -52,7 +52,7 @@ struct BoxFrame {
     half: Vec3,
     axes: [Vec3; 3],
     planes: Vec<PreparedAxis>,
-    face_axes: usize,
+    remaining: std::sync::OnceLock<Result<Vec<PreparedAxis>, BoxHullError>>,
 }
 impl BoxFrame {
     fn new(
@@ -75,8 +75,8 @@ impl BoxFrame {
             return Err(BoxHullError::InvalidInput);
         }
         let radius = |n| (0..3).map(|i| half[i] * dot(axes[i], n).abs()).sum::<f64>();
-        // Faces and box normals are mandatory; reserve their storage before adding edge axes.
-        let mut planes = Vec::with_capacity(hull.faces.len() + 6);
+        // Hull faces can certify separation/contact before any vertex projections.
+        let mut planes = Vec::with_capacity(hull.faces.len());
         let mut push = |normal: Vec3, origin: Vec3, offset: f64, feature: Feature| {
             if !normal
                 .into_iter()
@@ -102,6 +102,53 @@ impl BoxFrame {
                 Feature::Hull(face_id),
             )?;
         }
+        work.axis_preparations += planes.len() as u64;
+        Ok(Self {
+            half,
+            axes,
+            planes,
+            remaining: std::sync::OnceLock::new(),
+        })
+    }
+
+    fn remaining<'a>(
+        &'a self,
+        hull: &PreparedSegmentHull,
+        work: &mut BoxHullWork,
+    ) -> Result<&'a [PreparedAxis], BoxHullError> {
+        self.remaining
+            .get_or_init(|| self.prepare_remaining(hull, work))
+            .as_ref()
+            .map(Vec::as_slice)
+            .map_err(|&error| error)
+    }
+
+    fn prepare_remaining(
+        &self,
+        hull: &PreparedSegmentHull,
+        work: &mut BoxHullWork,
+    ) -> Result<Vec<PreparedAxis>, BoxHullError> {
+        let half = self.half;
+        let axes = self.axes;
+        let radius = |n| (0..3).map(|i| half[i] * dot(axes[i], n).abs()).sum::<f64>();
+        let mut planes = Vec::with_capacity(6);
+        let mut push = |normal: Vec3, origin: Vec3, offset: f64, feature: Feature| {
+            if !normal
+                .into_iter()
+                .chain(origin)
+                .chain([offset])
+                .all(f64::is_finite)
+            {
+                return Err(BoxHullError::NonFiniteComputation);
+            }
+            planes.push(PreparedAxis {
+                normal,
+                origin,
+                offset,
+                feature,
+            });
+            Ok(())
+        };
         for (k, n) in axes.into_iter().enumerate() {
             let mut lo = f64::INFINITY;
             let mut hi = f64::NEG_INFINITY;
@@ -162,12 +209,7 @@ impl BoxFrame {
         }
 
         work.axis_preparations += planes.len() as u64;
-        Ok(Self {
-            half,
-            axes,
-            planes,
-            face_axes: hull.faces.len(),
-        })
+        Ok(planes)
     }
 }
 
@@ -199,7 +241,13 @@ impl PreparedBoxHull {
     }
     /// Owned plane payload only; the shared hull is accounted for by its owner.
     pub fn retained_bytes(&self) -> usize {
-        self.frame.planes.capacity() * size_of::<PreparedAxis>()
+        let remaining = self
+            .frame
+            .remaining
+            .get()
+            .and_then(|result| result.as_ref().ok())
+            .map_or(0, Vec::capacity);
+        (self.frame.planes.capacity() + remaining) * size_of::<PreparedAxis>()
     }
 }
 
@@ -237,7 +285,7 @@ impl PreparedSegmentHull {
             normal: [1.0, 0.0, 0.0],
             feature: Feature::Hull(0),
         };
-        for plane in &frame.planes[..frame.face_axes] {
+        for plane in &frame.planes {
             if choice.offer(
                 work,
                 margin,
@@ -260,7 +308,7 @@ impl PreparedSegmentHull {
                 return finish(choice.normal, choice.gap, points).map(Some);
             }
         }
-        for plane in &frame.planes[frame.face_axes..] {
+        for plane in frame.remaining(self, work)? {
             if choice.offer(
                 work,
                 margin,
@@ -631,7 +679,11 @@ mod tests {
         let half = [0.3, 0.5, 0.7];
         let mut preparation = BoxHullWork::default();
         let frame = PreparedBoxHull::new(hull.clone(), half, axes, &mut preparation).unwrap();
-        assert!(preparation.axis_preparations > 0 && preparation.vertex_tests > 0);
+        assert!(preparation.axis_preparations > 0);
+        assert_eq!(preparation.vertex_tests, 0);
+        // A penetrating query prepares the deferred axes; subsequent queries reuse them.
+        frame.contact([0.0; 3], 0.0, &mut preparation).unwrap();
+        assert!(preparation.vertex_tests > 0);
         for centre in [
             [0.0, 1.51, 0.0],
             [1.2, 1.2, 0.0],
@@ -651,6 +703,36 @@ mod tests {
             }
         }
         assert!(frame.retained_bytes() > 0);
+    }
+    #[test]
+    fn face_certificates_defer_full_sat_until_needed_and_retain_it() {
+        let hull = std::sync::Arc::new(cube());
+        let mut work = BoxHullWork::default();
+        let frame = PreparedBoxHull::new(hull.clone(), [0.5; 3], AXES, &mut work).unwrap();
+        assert_eq!(work.vertex_tests, 0);
+        let before = frame.retained_bytes();
+        for centre in [[3.0, 0.0, 0.0], [0.0, 1.51, 0.0]] {
+            let mut query = BoxHullWork::default();
+            frame.contact(centre, 0.02, &mut query).unwrap();
+            assert_eq!(query.axis_preparations, 0);
+            assert_eq!(query.vertex_tests, 0);
+            assert_eq!(frame.retained_bytes(), before);
+        }
+        let mut first = BoxHullWork::default();
+        let contact = frame.contact([0.0; 3], 0.0, &mut first).unwrap();
+        assert!(first.axis_preparations > 0 && first.vertex_tests > 0);
+        assert!(frame.retained_bytes() > before);
+        let mut second = BoxHullWork::default();
+        assert_eq!(frame.contact([0.0; 3], 0.0, &mut second).unwrap(), contact);
+        assert_eq!(second.axis_preparations, 0);
+        assert_eq!(second.vertex_tests, 0);
+        let mut eager_work = BoxHullWork::default();
+        let eager = PreparedBoxHull::new(hull.clone(), [0.5; 3], AXES, &mut eager_work).unwrap();
+        eager.frame.remaining(&hull, &mut eager_work).unwrap();
+        assert_eq!(
+            eager.contact([0.0; 3], 0.0, &mut eager_work).unwrap(),
+            contact
+        );
     }
     #[test]
     fn separated_and_invalid_queries_do_not_make_contacts() {
