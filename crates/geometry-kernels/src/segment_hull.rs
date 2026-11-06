@@ -29,6 +29,19 @@ pub struct SegmentHullWork {
     pub edges_pruned: u64,
 }
 
+/// Geometry retained by an immutable [`PreparedSegmentHull`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SegmentHullPreparation {
+    pub vertices_prepared: u64,
+    pub triangles_prepared: u64,
+    /// Unique undirected triangulation edges, including coplanar diagonals.
+    pub edges_prepared: u64,
+    /// Current vector payload capacities for the owned hull vertices and
+    /// triangles, prepared faces and unique edges. Excludes temporary build
+    /// storage, inline struct storage, allocator overhead and consumer state.
+    pub retained_bytes: usize,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct Bounds {
     min: Vec3,
@@ -144,6 +157,21 @@ impl PreparedSegmentHull {
         &self.hull
     }
 
+    /// Reports retained geometry in constant time, without allocating or
+    /// changing query work. Capacities reflect this instance, including clones.
+    #[must_use]
+    pub fn preparation(&self) -> SegmentHullPreparation {
+        SegmentHullPreparation {
+            vertices_prepared: self.hull.vertices.len() as u64,
+            triangles_prepared: self.hull.triangles.len() as u64,
+            edges_prepared: self.edges.len() as u64,
+            retained_bytes: self.hull.vertices.capacity() * size_of::<Vec3>()
+                + self.hull.triangles.capacity() * size_of::<[u32; 3]>()
+                + self.faces.capacity() * size_of::<Face>()
+                + self.edges.capacity() * size_of::<Edge>(),
+        }
+    }
+
     /// Returns exact witnesses if the segment's centreline is outside the
     /// closed convex solid. Returns `None` for touching/intersecting centrelines
     /// or invalid endpoints, requiring the caller's penetration-capable path.
@@ -253,6 +281,47 @@ mod tests {
         let mut hull = Hull3::default();
         quickhull3(&points, &mut QuickHullWork::default(), &mut hull);
         hull
+    }
+
+    #[test]
+    fn preparation_reports_owned_capacities_without_changing_queries() {
+        let mut source = cube();
+        source.vertices.reserve(64);
+        source.triangles.reserve(64);
+        let source_bytes = source.vertices.capacity() * size_of::<[f64; 3]>()
+            + source.triangles.capacity() * size_of::<[u32; 3]>();
+        let hull = PreparedSegmentHull::new(source).unwrap();
+        let expected_bytes = source_bytes
+            + hull.faces.capacity() * size_of::<super::Face>()
+            + hull.edges.capacity() * size_of::<super::Edge>();
+        let p = [2.0, 2.0, 0.0];
+        let q = [2.0, 2.0, 0.8];
+        let mut before_work = SegmentHullWork::default();
+        let before = hull.closest_with_work(p, q, &mut before_work);
+        let stats = hull.preparation();
+        assert_eq!(stats.vertices_prepared, 8);
+        assert_eq!(stats.triangles_prepared, 12);
+        assert_eq!(stats.edges_prepared, 18);
+        assert_eq!(stats.retained_bytes, expected_bytes);
+        let mut after_work = SegmentHullWork::default();
+        assert_eq!(hull.closest_with_work(p, q, &mut after_work), before);
+        assert_eq!(after_work, before_work);
+        assert_eq!(hull.preparation(), stats);
+
+        let cloned = hull.clone();
+        let clone_stats = cloned.preparation();
+        assert_eq!(clone_stats.vertices_prepared, stats.vertices_prepared);
+        assert_eq!(clone_stats.triangles_prepared, stats.triangles_prepared);
+        assert_eq!(clone_stats.edges_prepared, stats.edges_prepared);
+        assert_eq!(
+            clone_stats.retained_bytes,
+            cloned.hull.vertices.capacity() * size_of::<[f64; 3]>()
+                + cloned.hull.triangles.capacity() * size_of::<[u32; 3]>()
+                + cloned.faces.capacity() * size_of::<super::Face>()
+                + cloned.edges.capacity() * size_of::<super::Edge>()
+        );
+        assert!(clone_stats.retained_bytes < stats.retained_bytes);
+        assert_eq!(cloned.closest(p, q), before);
     }
 
     #[test]
