@@ -119,3 +119,5 @@ cargo test --workspace --all-features
 ```
 
 Box contact manifolds against retained convex hulls: [API and geometry contract](docs/box-hull-contact.md).
+
+Box contact manifolds over retained triangle meshes: [API and geometry contract](docs/box-mesh-contact.md).

@@ -642,7 +642,8 @@
       "module": "crate::triangle_mesh",
       "sources": [
         "crates/geometry-kernels/src/triangle_mesh.rs",
-        "crates/geometry-kernels/src/triangle_mesh/tests.rs"
+        "crates/geometry-kernels/src/triangle_mesh/tests.rs",
+        "crates/geometry-kernels/src/triangle_mesh/box_contact.rs"
       ],
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
@@ -653,7 +654,8 @@
       "runtimeProfiler": "missing",
       "notes": [
         "BVH contacts, sweeps and rays compared against unpruned triangle traversal; winding/translation, floor/ceiling/edge/initial-overlap/failure cases in triangle_mesh/tests.rs.",
-        "Local-query doubling family asserts bounded exact triangle tests and logarithmic node visits; warm queries allocate nothing. Divan triangle_mesh bench separates preparation and query costs."
+        "Local-query doubling family asserts bounded exact triangle tests and logarithmic node visits; warm queries allocate nothing. Divan triangle_mesh bench separates preparation and query costs.",
+        "Box/triangle SAT and clipped finite-face witnesses: analytic floor/sidedness/winding and prediction bounds plus 512 rotated-box comparisons against the separate polytope/triangle overlap kernel. Physics Engine owns speculative interval admission and response."
       ]
     }
   ]

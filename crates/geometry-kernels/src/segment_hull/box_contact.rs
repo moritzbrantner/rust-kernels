@@ -564,7 +564,11 @@ fn finish(
     })
 }
 
-fn clip(polygon: &mut Vec<Vec3>, scratch: &mut Vec<Vec3>, distance: impl Fn(Vec3) -> f64) {
+pub(crate) fn clip(
+    polygon: &mut Vec<Vec3>,
+    scratch: &mut Vec<Vec3>,
+    distance: impl Fn(Vec3) -> f64,
+) {
     if polygon.is_empty() {
         return;
     }

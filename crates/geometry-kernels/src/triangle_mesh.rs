@@ -5,6 +5,9 @@
 //! Capsule queries include spheres (equal segment endpoints); sweeps translate a
 //! fixed segment. Rotation, collision response and chunk lifetime belong to callers.
 
+mod box_contact;
+pub use box_contact::{TriangleMeshBoxContact3, TriangleMeshBoxPoint3};
+
 use crate::{
     heightfield::{ConvexPolytope3, polytope_triangle_contact},
     math3::{Vec3, add, cross, dot, length, scale, sub},
