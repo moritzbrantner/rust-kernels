@@ -32,6 +32,15 @@ Callbacks follow retained BVH order, rather than sorted triangle IDs. Callers ow
 cross-triangle patch reduction, contact persistence and response. No contacts
 means no callback; a later arithmetic error may follow earlier callbacks.
 
+`reduce_box_contact_points` selects indices of up to four existing witnesses from
+at most eight finite `TriangleMeshBoxPoint3` inputs, without allocation. Empty
+input is valid. It retains the deepest witness, then maximizes distance to the
+nearest selected witness with input-order ties. This is the same spread reduction
+used inside a triangle manifold. A consumer may combine two patches while
+retaining each selected witness's original triangle/support identity. The caller
+must group only contacts sharing an oriented normal and plane; the reducer does
+not join surfaces, add contacts across holes, or choose persistence/response policy.
+
 Other queries return `Result<Option<_>, TriangleMeshError3>`: a valid miss is `Ok(None)`;
 invalid input, non-finite arithmetic, and exhausted conservative advancement are
 errors. Finite data alone does not guarantee every difference/product fits f64.
