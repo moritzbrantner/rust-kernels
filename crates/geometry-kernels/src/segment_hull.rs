@@ -7,7 +7,7 @@
 //! algorithm instead.
 
 mod box_contact;
-pub use box_contact::{BoxHullContact, BoxHullError, BoxHullPoint, BoxHullWork};
+pub use box_contact::{BoxHullContact, BoxHullError, BoxHullPoint, BoxHullWork, PreparedBoxHull};
 
 use crate::{
     hull::{Hull3, HullDimension},
@@ -80,6 +80,8 @@ impl Bounds {
 struct Face {
     normal: Vec3,
     offset: f64,
+    unit_normal: Vec3,
+    unit_offset: f64,
     bounds: Bounds,
 }
 
@@ -87,6 +89,8 @@ struct Face {
 struct Edge {
     ends: [u32; 2],
     opposite: [u32; 2],
+    cone_normals: [Vec3; 2],
+    cone_tolerance: [f64; 2],
     bounds: Bounds,
 }
 
@@ -97,6 +101,7 @@ pub struct PreparedSegmentHull {
     hull: Hull3,
     faces: Vec<Face>,
     edges: Vec<Edge>,
+    centre: Vec3,
 }
 
 impl PreparedSegmentHull {
@@ -127,9 +132,12 @@ impl PreparedSegmentHull {
             if !squared.is_finite() || squared == 0.0 {
                 return None;
             }
+            let length = squared.sqrt();
             faces.push(Face {
                 normal,
                 offset: dot(normal, a),
+                unit_normal: normal.map(|v| v / length),
+                unit_offset: dot(normal, a) / length,
                 bounds: Bounds::from_points([a, b, c]),
             });
             for [a, b, opposite] in [
@@ -151,13 +159,31 @@ impl PreparedSegmentHull {
             }
             let ends = pair[0].0;
             let [a, b] = ends.map(|i| hull.vertices[i as usize]);
+            let opposite = [pair[0].1, pair[1].1];
+            let direction = sub(b, a);
+            let deltas = opposite.map(|i| sub(hull.vertices[i as usize], a));
+            let largest = |p: Vec3| p.into_iter().map(f64::abs).fold(0.0_f64, f64::max);
             edges.push(Edge {
                 ends,
-                opposite: [pair[0].1, pair[1].1],
+                opposite,
+                cone_normals: deltas.map(|p| cross(p, direction)),
+                cone_tolerance: deltas
+                    .map(|p| 64.0 * f64::EPSILON * largest(direction) * largest(p)),
                 bounds: Bounds::from_points([a, b]),
             });
         }
-        Some(Self { hull, faces, edges })
+        let centre = std::array::from_fn(|i| {
+            hull.vertices
+                .iter()
+                .map(|p| p[i] / hull.vertices.len() as f64)
+                .sum()
+        });
+        Some(Self {
+            hull,
+            faces,
+            edges,
+            centre,
+        })
     }
 
     /// The canonical hull used for support mapping, persistence and reporting.

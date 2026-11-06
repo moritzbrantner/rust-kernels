@@ -30,3 +30,18 @@ Tests compare 512 deterministic rotated box/cube cases with the separate primiti
 box SAT query, check signed face depths and finite-shape witnesses, and preserve
 the existing segment-distance tests. The concrete consumer is Physics Engine's
 Greyhaven crate/panel Rapier oracle, not a new game-side solver.
+
+For repeated translation queries, `PreparedBoxHull::new(Arc<PreparedSegmentHull>, half,
+axes, work)` retains the hull and the box-frame SAT planes. `contact(centre, margin,
+work)` visits those planes without repeating hull projections or edge-cone construction.
+A new frame is required when orientation, extents or geometry change. Owning an `Arc`
+prevents applying a frame to a different hull; translation remains per-call input.
+`retained_bytes` counts the frame's owned plane payload, excluding shared hull geometry.
+Preparation work and warm query work have separate counters. Tests compare warm-frame
+queries bit-for-bit with fresh preparation at different translations and margins.
+
+Face normalization and edge-cone normals are retained with the hull. Near a cone boundary,
+the query retains the direct triple-product classification. Separated finite-face witnesses
+that attain the supporting-plane gap may finish without the remaining SAT axes; edges,
+corners and penetration retain the full search. Contact polygons still use temporary
+allocation; this does not establish an allocation-free query or rotational sweep.

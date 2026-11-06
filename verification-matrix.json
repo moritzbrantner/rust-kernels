@@ -548,7 +548,8 @@
       "crate": "geometry-kernels",
       "module": "crate::segment_hull",
       "sources": [
-        "crates/geometry-kernels/src/segment_hull.rs"
+        "crates/geometry-kernels/src/segment_hull.rs",
+        "crates/geometry-kernels/src/segment_hull/box_contact.rs"
       ],
       "oracleDifferential": "partial",
       "propertyMetamorphic": "present",
@@ -558,6 +559,7 @@
       "criterion": "n/a",
       "runtimeProfiler": "missing",
       "notes": [
+        "Prepared box frames own their immutable hull and match fresh preparation bit-for-bit across translation/margin changes without repeated vertex projections. Box/hull contacts: analytic signed face depths and finite-face witnesses, 512 deterministic rotated box/cube comparisons against the separate primitive SAT path, and the actual Greyhaven crate/panel Rapier oracle cover face/edge SAT and clipping. The contact kernel is not a sweep; Physics Engine still owns speculative response and CCD admission.",
         "Analytic face, edge, corner and diagonal-corner-distance cases use a cube built with QuickHull. A deterministic 400-segment box-distance comparison exercises the physics-engine consumer.",
         "A crossing/touching segment returns None so consumers retain a penetration-capable fallback. Translation invariance, deterministic work counters and AABB feature pruning have Cargo-native regression tests.",
         "The Greyhaven static-rock Rapier oracle checks capsule cast timing and work on the real 32-point authored asset; wall-clock measurements are advisory outside controlled runners.",
