@@ -372,10 +372,6 @@ fn prepared_mesh_queries_allocate_nothing() {
         ))
         .is_ok();
         valid &= std::hint::black_box(mesh.segment_hit([0., 2., 0.], [0., -2., 0.])).is_ok();
-        valid &= geometry_kernels::triangle_mesh::reduce_box_contact_points(
-            &[geometry_kernels::triangle_mesh::TriangleMeshBoxPoint3::default(); 8],
-        )
-        .is_ok();
         valid &= mesh
             .box_contacts_counted(
                 [0., 0.49, 0.],

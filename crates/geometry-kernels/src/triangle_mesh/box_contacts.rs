@@ -19,92 +19,6 @@ pub struct TriangleMeshBoxManifold3 {
     pub len: usize,
 }
 
-/// Indices into the unchanged input witnesses selected for a four-point patch.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct TriangleMeshBoxPatchSelection3 {
-    pub indices: [usize; 4],
-    pub len: usize,
-}
-
-/// Reduces at most eight existing witnesses (two four-point patches) without
-/// allocation. Empty input is valid. The deepest witness is retained first,
-/// followed by maximum distance to the nearest selected witness; ties retain
-/// input order. Returned indices never invent or move a contact.
-///
-/// The caller owns grouping by the same oriented normal and contact plane, and
-/// retains per-witness triangle/support identity alongside these indices. This
-/// operation does not join surfaces, fill holes, or decide response policy.
-/// Larger streams can repeatedly combine the retained four with the next four.
-pub fn reduce_box_contact_points(
-    points: &[TriangleMeshBoxPoint3],
-) -> Result<TriangleMeshBoxPatchSelection3, TriangleMeshError3> {
-    if points.len() > 8
-        || points.iter().any(|p| {
-            !p.separation.is_finite()
-                || !p
-                    .point_on_box
-                    .into_iter()
-                    .chain(p.point_on_triangle)
-                    .all(f64::is_finite)
-        })
-    {
-        return Err(TriangleMeshError3::InvalidQuery);
-    }
-    if points.is_empty() {
-        return Ok(TriangleMeshBoxPatchSelection3::default());
-    }
-    let mut selected = [usize::MAX; 4];
-    selected[0] = (0..points.len())
-        .min_by(|&a, &b| points[a].separation.total_cmp(&points[b].separation))
-        .unwrap_or(0);
-    let distance_scale = points
-        .iter()
-        .flat_map(|p| p.point_on_triangle)
-        .map(f64::abs)
-        .fold(0., f64::max);
-    let inverse_scale = if distance_scale == 0. {
-        1.
-    } else {
-        distance_scale.recip()
-    };
-    let mut normalized = [[0.; 3]; 8];
-    for (out, p) in normalized.iter_mut().zip(points) {
-        *out = if inverse_scale.is_finite() {
-            scale(p.point_on_triangle, inverse_scale)
-        } else {
-            p.point_on_triangle.map(|v| v / distance_scale)
-        };
-    }
-    let mut nearest = [f64::INFINITY; 8];
-    let mut used = [false; 8];
-    used[selected[0]] = true;
-    let len = points.len().min(4);
-    for k in 1..len {
-        let previous = normalized[selected[k - 1]];
-        let mut best_index = usize::MAX;
-        let mut best_score = f64::NEG_INFINITY;
-        for i in 0..points.len() {
-            if used[i] {
-                continue;
-            }
-            let delta = sub(normalized[i], previous);
-            nearest[i] = nearest[i].min(dot(delta, delta));
-            if nearest[i] > best_score {
-                best_index = i;
-                best_score = nearest[i];
-            }
-        }
-        selected[k] = best_index;
-        used[best_index] = true;
-    }
-    // Invalid tail indices are deliberately not exposed as usable witnesses.
-    selected[len..].fill(0);
-    Ok(TriangleMeshBoxPatchSelection3 {
-        indices: selected,
-        len,
-    })
-}
-
 impl PreparedTriangleMesh3 {
     /// Emits at most four contacts per candidate triangle without heap allocation.
     ///
@@ -430,7 +344,45 @@ fn contacts(
     if unique <= 4 {
         result.points[..unique].copy_from_slice(&points[..unique]);
     } else {
-        let selected = reduce_box_contact_points(&points[..unique])?.indices;
+        let mut selected = [usize::MAX; 4];
+        selected[0] = (0..unique)
+            .min_by(|&a, &b| points[a].separation.total_cmp(&points[b].separation))
+            .unwrap_or(0);
+        // Normalize once so squared distances stay finite at large/small
+        // geometry scales. Incrementally retain each point's nearest selected
+        // witness instead of recomputing every prefix for both comparator args.
+        let distance_scale = points[..unique]
+            .iter()
+            .flat_map(|p| p.point_on_triangle)
+            .map(f64::abs)
+            .fold(0., f64::max);
+        let inverse_scale = distance_scale.recip();
+        let normalized: [Vec3; 8] = if inverse_scale.is_finite() {
+            std::array::from_fn(|i| scale(points[i].point_on_triangle, inverse_scale))
+        } else {
+            std::array::from_fn(|i| points[i].point_on_triangle.map(|v| v / distance_scale))
+        };
+        let mut nearest = [f64::INFINITY; 8];
+        let mut used = [false; 8];
+        used[selected[0]] = true;
+        for k in 1..4 {
+            let previous = normalized[selected[k - 1]];
+            let mut best_index = usize::MAX;
+            let mut best_score = f64::NEG_INFINITY;
+            for i in 0..unique {
+                if used[i] {
+                    continue;
+                }
+                let delta = sub(normalized[i], previous);
+                nearest[i] = nearest[i].min(dot(delta, delta));
+                if nearest[i] > best_score {
+                    best_index = i;
+                    best_score = nearest[i];
+                }
+            }
+            selected[k] = best_index;
+            used[best_index] = true;
+        }
         for (i, j) in selected.into_iter().enumerate() {
             result.points[i] = points[j];
         }

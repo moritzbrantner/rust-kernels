@@ -6,10 +6,7 @@
 //! fixed segment. Rotation, collision response and chunk lifetime belong to callers.
 
 mod box_contacts;
-pub use box_contacts::{
-    TriangleMeshBoxManifold3, TriangleMeshBoxPatchSelection3, TriangleMeshBoxPoint3,
-    reduce_box_contact_points,
-};
+pub use box_contacts::{TriangleMeshBoxManifold3, TriangleMeshBoxPoint3};
 
 use crate::{
     heightfield::{ConvexPolytope3, polytope_triangle_contact},
