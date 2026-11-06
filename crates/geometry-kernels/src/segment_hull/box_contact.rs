@@ -75,7 +75,8 @@ impl BoxFrame {
             return Err(BoxHullError::InvalidInput);
         }
         let radius = |n| (0..3).map(|i| half[i] * dot(axes[i], n).abs()).sum::<f64>();
-        let mut planes = Vec::new();
+        // Faces and box normals are mandatory; reserve their storage before adding edge axes.
+        let mut planes = Vec::with_capacity(hull.faces.len() + 6);
         let mut push = |normal: Vec3, origin: Vec3, offset: f64, feature: Feature| {
             if !normal
                 .into_iter()
@@ -304,6 +305,7 @@ impl PreparedSegmentHull {
                     .map(|&p| dot(normal, p))
                     .fold(f64::NEG_INFINITY, f64::max);
                 let tolerance = 1e-9 * (1.0 + high.abs());
+                let mut scratch = Vec::new();
                 let mut polygon: Vec<_> = self
                     .hull
                     .vertices
@@ -329,7 +331,9 @@ impl PreparedSegmentHull {
                 for i in (0..3).filter(|&i| i != k) {
                     for sign in [-1.0, 1.0] {
                         work.clipping_planes += 1;
-                        polygon = clip(polygon, |p| sign * dot(sub(p, centre), axes[i]) - half[i]);
+                        clip(&mut polygon, &mut scratch, |p| {
+                            sign * dot(sub(p, centre), axes[i]) - half[i]
+                        });
                     }
                 }
                 for p in polygon {
@@ -428,12 +432,15 @@ impl PreparedSegmentHull {
             sub(sub(c, u), v),
             add(sub(c, v), u),
         ];
+        let mut scratch = Vec::new();
         for plane in &self.faces {
             work.clipping_planes += 1;
             let projection = dot(plane.unit_normal, normal);
             let clip_normal = sub(plane.unit_normal, scale(normal, projection));
             let clip_offset = plane.unit_offset - offset * projection;
-            polygon = clip(polygon, |p| dot(clip_normal, p) - clip_offset);
+            clip(&mut polygon, &mut scratch, |p| {
+                dot(clip_normal, p) - clip_offset
+            });
             if polygon.is_empty() {
                 break;
             }
@@ -467,7 +474,9 @@ impl AxisChoice {
         feature: Feature,
     ) -> Result<bool, BoxHullError> {
         work.axes_tested += 1;
-        if !gap.is_finite() || !normal.into_iter().all(f64::is_finite) {
+        // Prepared axes were validated when the frame was built. Only the
+        // translation-dependent gap can introduce a new non-finite value.
+        if !gap.is_finite() {
             return Err(BoxHullError::NonFiniteComputation);
         }
         if gap > self.gap {
@@ -507,29 +516,30 @@ fn finish(
     })
 }
 
-fn clip(mut polygon: Vec<Vec3>, distance: impl Fn(Vec3) -> f64) -> Vec<Vec3> {
+fn clip(polygon: &mut Vec<Vec3>, scratch: &mut Vec<Vec3>, distance: impl Fn(Vec3) -> f64) {
     if polygon.is_empty() {
-        return polygon;
+        return;
     }
     if polygon.iter().all(|&p| distance(p) <= 1e-10) {
-        return polygon;
+        return;
     }
-    let mut out = Vec::with_capacity(polygon.len() + 1);
+    scratch.clear();
+    scratch.reserve(polygon.len() + 1);
     let mut prev = polygon[polygon.len() - 1];
     let mut dp = distance(prev);
     for next in polygon.drain(..) {
         let dn = distance(next);
         // Small slack avoids losing a polygon to roundoff on its own face plane.
         if (dp <= 1e-10) != (dn <= 1e-10) {
-            out.push(add(prev, scale(sub(next, prev), dp / (dp - dn))));
+            scratch.push(add(prev, scale(sub(next, prev), dp / (dp - dn))));
         }
         if dn <= 1e-10 {
-            out.push(next);
+            scratch.push(next);
         }
         prev = next;
         dp = dn;
     }
-    out
+    std::mem::swap(polygon, scratch);
 }
 
 #[cfg(test)]
