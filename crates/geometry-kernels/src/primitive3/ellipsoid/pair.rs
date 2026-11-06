@@ -155,7 +155,7 @@ impl EllipsoidSharedFrame3 {
         let slack = self.rounding_bound(delta, displacement, radius);
         let Some(fraction) =
             crate::continuous::try_sphere_sphere_fraction_f64(start, travel, radius + slack)
-                .map_err(|()| EllipsoidError3::Unrepresentable)?
+                .map_err(|_| EllipsoidError3::Unrepresentable)?
         else {
             return Ok(EllipsoidPairToi3::Miss);
         };
