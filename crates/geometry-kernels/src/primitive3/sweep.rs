@@ -93,7 +93,7 @@ pub fn try_swept_time(
             displacement,
             radius,
         )
-        .map_err(|()| PrimitiveSweepError3::NonFiniteComputation);
+        .map_err(|_| PrimitiveSweepError3::NonFiniteComputation);
     }
     let target = margin;
     let tolerance = 1.0e-9 * (1.0 + a.shape.radius() + b.shape.radius());
