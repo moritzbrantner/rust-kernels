@@ -18,7 +18,9 @@ pub mod segment_hull;
 pub mod support;
 pub mod triangle_mesh;
 
-pub use continuous::{SphereSweepHit, sphere_sphere_time_of_impact};
+pub use continuous::{
+    SphereSweepError, SphereSweepHit, sphere_sphere_time_of_impact, try_sphere_sphere_fraction_f64,
+};
 pub use ray::{Ray3, RayIntervalHit, ray_aabb, ray_sphere};
 pub use ray_triangle::{
     RayTriangleHit, SegmentTriangleHit, TriangleCulling, TriangleFacing, ray_triangle,

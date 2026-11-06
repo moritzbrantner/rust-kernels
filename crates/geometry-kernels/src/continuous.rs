@@ -63,23 +63,51 @@ pub fn sphere_sphere_time_of_impact(
     })
 }
 
-/// Checked first-contact fraction for fixed-orientation spheres translated over one step.
+/// A failed sphere sweep provides no conclusion about collision absence.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SphereSweepError {
+    /// A vector component or radius is non-finite, or the radius is negative.
+    InvalidInput,
+    /// Finite inputs produced a non-finite intersection calculation.
+    NonFiniteComputation,
+}
+
+impl std::fmt::Display for SphereSweepError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "sphere translation sweep: {self:?}")
+    }
+}
+
+impl std::error::Error for SphereSweepError {}
+
+/// Checked first-contact fraction for spheres translated over one step.
 ///
-/// Both center displacement and radius are scaled together before the line/sphere
-/// intersection, avoiding f64 squared-distance overflow and preserving tiny sweeps.
-/// This is the f64 primitive counterpart of the public sphere/ray CCD query.
-/// No collision response or discrete-contact policy lives here.
-pub(crate) fn try_sphere_sphere_fraction_f64(
+/// `initial_delta` is one center minus the other center at the start, and
+/// `displacement` is the corresponding relative center displacement over the
+/// complete step, in the same coordinate system and subtraction order.
+/// `combined_radius` is the sum of the radii (and any caller-selected margin).
+/// All components must be finite and the radius must be non-negative.
+///
+/// Returns a fraction in `[0, 1]`; initial touching or overlap returns zero,
+/// including without motion. `Ok(None)` means no contact during the step.
+/// Errors distinguish invalid input from a non-finite calculation and must not
+/// be interpreted as misses. Extreme finite inputs may lose precision.
+///
+/// Relative position, displacement and radius are scaled together before the
+/// line/sphere intersection to avoid squared-distance overflow. Tangencies use
+/// a scale-aware rounding tolerance. Response and discrete-contact policy
+/// remain with the caller.
+pub fn try_sphere_sphere_fraction_f64(
     initial_delta: Vec3,
     displacement: Vec3,
     combined_radius: f64,
-) -> Result<Option<f64>, ()> {
+) -> Result<Option<f64>, SphereSweepError> {
     if !crate::math3::is_finite(initial_delta)
         || !crate::math3::is_finite(displacement)
         || !combined_radius.is_finite()
         || combined_radius < 0.0
     {
-        return Err(());
+        return Err(SphereSweepError::InvalidInput);
     }
 
     let magnitude = initial_delta
@@ -119,7 +147,7 @@ pub(crate) fn try_sphere_sphere_fraction_f64(
     let half_chord = ((radius_squared - perpendicular_squared).max(0.0) / travel_squared).sqrt();
     let enter = center_time - half_chord;
     if !enter.is_finite() || !half_chord.is_finite() {
-        return Err(());
+        return Err(SphereSweepError::NonFiniteComputation);
     }
 
     Ok((enter <= 1.0 && center_time + half_chord >= 0.0).then_some(enter.max(0.0)))
