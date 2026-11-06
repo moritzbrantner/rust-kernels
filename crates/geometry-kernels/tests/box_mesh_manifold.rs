@@ -244,3 +244,54 @@ fn face_patch_scales_with_small_and_large_geometry() {
         }
     }
 }
+
+#[test]
+fn shared_diagonal_preserves_unique_witnesses_and_all_box_support_corners() {
+    let vertices = [[-2., 0., -2.], [2., 0., -2.], [2., 0., 2.], [-2., 0., 2.]];
+    for reversed in [false, true] {
+        let mut triangles = [[0u32, 1, 2], [0, 2, 3]];
+        if reversed {
+            for triangle in &mut triangles {
+                triangle.swap(1, 2);
+            }
+        }
+        let m = PreparedTriangleMesh3::try_new(TriangleMeshData3 {
+            vertices: vertices.to_vec(),
+            triangles: triangles.to_vec(),
+        })
+        .unwrap();
+        for side in [-1., 1.] {
+            let center = [0., side * 0.49, 0.];
+            let out = query(&m, center, AXES, [0.5; 3], 0.02);
+            assert_eq!(out.len(), 2);
+            for manifold in &out {
+                witnesses(
+                    manifold,
+                    center,
+                    AXES,
+                    [0.5; 3],
+                    triangles[manifold.triangle as usize].map(|i| vertices[i as usize]),
+                );
+                for (i, point) in manifold.points[..manifold.len].iter().enumerate() {
+                    assert!(manifold.points[..i].iter().all(|prior| {
+                        length(sub(prior.point_on_triangle, point.point_on_triangle)) > 1e-12
+                    }));
+                }
+            }
+            // Duplicate clipping intersections must not consume the bounded witness slots
+            // and displace a genuine box corner at the shared triangle edge.
+            for corner in [
+                [-0.5, 0., -0.5],
+                [-0.5, 0., 0.5],
+                [0.5, 0., -0.5],
+                [0.5, 0., 0.5],
+            ] {
+                assert!(out.iter().any(|manifold| {
+                    manifold.points[..manifold.len]
+                        .iter()
+                        .any(|point| length(sub(point.point_on_triangle, corner)) < 1e-12)
+                }));
+            }
+        }
+    }
+}
