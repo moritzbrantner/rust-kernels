@@ -7,7 +7,8 @@
       "crate": "geometry-kernels",
       "module": "crate::heightfield",
       "sources": [
-        "crates/geometry-kernels/src/heightfield.rs"
+        "crates/geometry-kernels/src/heightfield.rs",
+        "crates/geometry-kernels/src/heightfield_differential_tests.rs"
       ],
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
@@ -21,7 +22,8 @@
         "8192 retained 65x65 queries allocate/reallocate zero times, test one cell/triangle and reuse one prepared normal, with at most16 coordinate comparisons. Preparation and vector-payload retained bytes are reported independently; no timing speedup is claimed.",
         "Developer-facing complete prepared sample calls run in the existing Divan primitive3 benchmark. This is vertical surface projection, not a ray, capsule sweep, rigid-body contact or character response.",
         "criterion: Complete prepared sample calls use the existing Divan primitive3 suite; no new Criterion suite is added.",
-        "Convex polytope (box, wedge) overlap with the surface by the separating-axis test (face normals and edge cross products per triangle under the footprint, deepest triangle kept): closed-form depths on flat terrain, and 400 seeded oriented boxes on hills against a sampled reference (straddling boxes overlap, boxes clear of the sampled surface do not)."
+        "Convex polytope (box, wedge) overlap with the surface by the separating-axis test (face normals and edge cross products per triangle under the footprint, deepest triangle kept): closed-form depths on flat terrain, and 400 seeded oriented boxes on hills against a sampled reference (straddling boxes overlap, boxes clear of the sampled surface do not).",
+        "Capsule contact skips the exact distance test for triangles whose plane the segment clears by more than radius + margin + 1e-9 * (1 + scale) on one side; a seeded differential fuzz (heightfield_differential_tests.rs: 60000 queries over random nonuniform terrains with holes, both diagonals and offsets to 3e4, tangent/grazing face, edge and vertex placements at the pruning boundary) requires bit-identical contacts against the unpruned kernel. The Divan heightfield bench times capsule contact and sweep for character capsules on rolling terrain."
       ]
     }
   ]
