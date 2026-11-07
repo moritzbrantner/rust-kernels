@@ -16,6 +16,7 @@ pub mod ray;
 pub mod ray_triangle;
 pub mod segment_hull;
 pub mod support;
+mod sweep_search;
 pub mod triangle_mesh;
 
 pub use continuous::{

@@ -5,6 +5,7 @@ use std::{error::Error, fmt, mem::size_of};
 
 use crate::math3::{Vec3, add, cross, dot, length, normalized, scale, sub as vsub};
 use crate::ray_triangle::segment_triangle_f64;
+use crate::sweep_search::{CapsuleMotion, SweepSteps};
 use crate::triangle_mesh::closest_segment_triangle;
 
 /// How each cell is split into two triangles.
@@ -535,92 +536,48 @@ impl PreparedHeightfield3 {
         // on that triangle's touch, so the search always steps the triangle with the lowest
         // bound and stops once it passes the best hit (or the end of the motion).
         let sweep = CapsuleSweep {
-            p,
-            q,
-            radius,
-            displacement,
-            tolerance,
+            motion: CapsuleMotion {
+                p,
+                q,
+                radius,
+                displacement,
+                tolerance,
+                scale: scale_bound,
+            },
             length: dot(displacement, displacement).sqrt(),
-            scale: scale_bound,
         };
-        let mut triangles = [(0_u32, [[0.0; 3]; 3], [0.0; 3]); 64];
-        let mut heap = [SweepStep::default(); 64];
-        let mut count = 0;
-        let (mut spill, mut heap_spill) = (Vec::new(), Vec::new());
+        let mut triangles = [(0_u32, [[0.0; 3]; 3], [0.0; 3]); SweepSteps::INLINE];
+        let mut spill = Vec::new();
+        let mut steps = SweepSteps::new();
         self.visit_triangles_counted(min, max, work, |id, t, n| {
-            let plane = sweep.plane_bound(t, n);
-            let step = SweepStep {
-                bound: plane,
-                plane,
-                time: 0.0,
-                id,
-                iterations: 0,
-                index: count,
-            };
+            let count = steps.len();
             if count < triangles.len() {
                 triangles[count] = (id, t, n);
-                heap[count] = step;
             } else {
                 if count == triangles.len() {
                     spill.extend_from_slice(&triangles);
-                    heap_spill.extend_from_slice(&heap);
                 }
                 spill.push((id, t, n));
-                heap_spill.push(step);
             }
-            count += 1;
+            steps.push(id, sweep.motion.plane_bound(t, n));
         });
-        let (triangles, heap) = if count <= 64 {
-            (&triangles[..count], &mut heap[..count])
+        let triangles = if steps.len() <= SweepSteps::INLINE {
+            &triangles[..steps.len()]
         } else {
-            (&spill[..], &mut heap_spill[..])
+            &spill[..]
         };
-        let mut len = heap.len();
-        for i in (0..len / 2).rev() {
-            sift_down(&mut heap[..len], i);
-        }
         let mut best: Option<HeightfieldSweepHit3> = None;
-        // Lowest bound of a triangle that ran out of iterations (NaN as -inf).
-        let mut failure: Option<f64> = None;
-        let limit = |best: Option<HeightfieldSweepHit3>| best.map_or(1.0, |b| b.fraction);
-        while len > 0 {
-            let step = heap[0];
-            if step.bound > limit(best) {
-                break;
-            }
-            // Every later hit is past this failure: the sweep fails.
-            if failure.is_some_and(|f| step.bound > f && not_after(f, limit(best))) {
-                return Err(HeightfieldError3::NonFiniteComputation);
-            }
-            let next = if step.iterations == max_iterations {
-                let at = if step.bound.is_nan() {
-                    f64::NEG_INFINITY
-                } else {
-                    step.bound
-                };
-                failure = Some(failure.map_or(at, |f| f.min(at)));
-                None
-            } else {
+        steps.search(
+            max_iterations,
+            &mut best,
+            |best| best.map_or(1.0, |b| b.fraction),
+            |step, best| {
                 work.triangles_tested += 1;
                 let (id, triangle, normal) = triangles[step.index];
-                sweep.step(id, triangle, normal, step.time, &mut best)
-            };
-            if let Some(time) = next {
-                heap[0] = SweepStep {
-                    bound: step.plane.max(time),
-                    time,
-                    iterations: step.iterations + 1,
-                    ..step
-                };
-            } else {
-                len -= 1;
-                heap[0] = heap[len];
-            }
-            sift_down(&mut heap[..len], 0);
-        }
-        if failure.is_some_and(|f| not_after(f, limit(best))) {
-            return Err(HeightfieldError3::NonFiniteComputation);
-        }
+                Ok(sweep.step(id, triangle, normal, step.time, best))
+            },
+            HeightfieldError3::NonFiniteComputation,
+        )?;
         Ok(best)
     }
 
@@ -798,113 +755,13 @@ impl PreparedHeightfield3 {
     }
 }
 
-/// Range of cells whose closed extent overlaps `min..=max` along one axis.
 /// The query of one capsule sweep, shared by every triangle under its footprint.
 struct CapsuleSweep {
-    p: Vec3,
-    q: Vec3,
-    radius: f64,
-    displacement: Vec3,
-    tolerance: f64,
+    motion: CapsuleMotion,
     length: f64,
-    /// Largest coordinate magnitude of the query.
-    scale: f64,
-}
-
-/// One triangle's place in the sweep search: its next Newton step from `time`.
-#[derive(Clone, Copy, Default)]
-struct SweepStep {
-    /// Lower bound on the triangle's touch: `time` raised to `plane`.
-    bound: f64,
-    plane: f64,
-    time: f64,
-    id: u32,
-    iterations: u32,
-    index: usize,
-}
-
-impl SweepStep {
-    /// Lower bound first (NaN, which no hit passes, before everything), then triangle id.
-    fn precedes(&self, other: &Self) -> bool {
-        let key = |bound: f64| {
-            if bound.is_nan() {
-                f64::NEG_INFINITY
-            } else {
-                bound
-            }
-        };
-        key(self.bound)
-            .total_cmp(&key(other.bound))
-            .then(self.id.cmp(&other.id))
-            .is_lt()
-    }
-}
-
-/// Whether a failure at bound `failure` counts against `limit`: a NaN limit, which no
-/// iteration passes, counts.
-fn not_after(failure: f64, limit: f64) -> bool {
-    failure.partial_cmp(&limit) != Some(std::cmp::Ordering::Greater)
-}
-
-/// Restores the min-heap order of `heap` below `i`.
-fn sift_down(heap: &mut [SweepStep], mut i: usize) {
-    loop {
-        let (left, right) = (2 * i + 1, 2 * i + 2);
-        let mut least = i;
-        if left < heap.len() && heap[left].precedes(&heap[least]) {
-            least = left;
-        }
-        if right < heap.len() && heap[right].precedes(&heap[least]) {
-            least = right;
-        }
-        if least == i {
-            return;
-        }
-        heap.swap(i, least);
-        i = least;
-    }
 }
 
 impl CapsuleSweep {
-    /// A lower bound on the time the capsule comes within `tolerance` of the triangle, from the
-    /// gap between their extents along its plane normal: 0 when they may already touch, and
-    /// infinite when the motion never closes the gap. Conservative by `1e-9 * (1 + scale)`, as
-    /// the plane pruning of [`PreparedHeightfield3::capsule_contact`].
-    fn plane_bound(&self, triangle: [Vec3; 3], normal: Vec3) -> f64 {
-        let corners = triangle.map(|v| dot(v, normal));
-        let (low, high) = (
-            corners[0].min(corners[1]).min(corners[2]),
-            corners[0].max(corners[1]).max(corners[2]),
-        );
-        let (ep, eq) = (dot(self.p, normal), dot(self.q, normal));
-        let scale = triangle
-            .into_iter()
-            .flatten()
-            .map(f64::abs)
-            .fold(self.scale, f64::max);
-        let reach = self.radius + self.tolerance + 1e-9 * (1.0 + scale);
-        let rate = dot(self.displacement, normal);
-        // Gaps above and below the plane; NaN compares false and leaves the bound at 0.
-        let (above, below) = (ep.min(eq) - high - reach, low - ep.max(eq) - reach);
-        let mut bound = 0.0_f64;
-        if above > 0.0 {
-            bound = if rate < 0.0 {
-                above / -rate
-            } else {
-                f64::INFINITY
-            };
-        }
-        if below > 0.0 {
-            bound = bound.max(if rate > 0.0 {
-                below / rate
-            } else {
-                f64::INFINITY
-            });
-        }
-        // Rounding of the quotient.
-        bound * (1.0 - 4.0 * f64::EPSILON)
-    }
-
     /// One Newton step of a triangle from `time`: records a settled hit in `best`, or returns
     /// the next time while the triangle can still be touched within the motion.
     fn step(
@@ -915,17 +772,18 @@ impl CapsuleSweep {
         time: f64,
         best: &mut Option<HeightfieldSweepHit3>,
     ) -> Option<f64> {
-        let displacement = self.displacement;
+        let CapsuleMotion {
+            p,
+            q,
+            radius,
+            displacement,
+            tolerance,
+            ..
+        } = self.motion;
         let offset = scale(displacement, time);
-        let c = segment_triangle_contact(
-            add(self.p, offset),
-            add(self.q, offset),
-            self.radius,
-            triangle,
-            normal,
-        )?;
+        let c = segment_triangle_contact(add(p, offset), add(q, offset), radius, triangle, normal)?;
         let rate = dot(displacement, c.normal);
-        if c.separation <= self.tolerance {
+        if c.separation <= tolerance {
             if time == 0.0 && rate >= 0.0 {
                 // Starts touching but moves away (or along it): no hit.
                 return None;
@@ -943,18 +801,19 @@ impl CapsuleSweep {
             return None;
         }
         // A lower bound on the time to touch, from the separation and full speed.
-        if time + (c.separation - self.tolerance) / self.length > 1.0 {
+        if time + (c.separation - tolerance) / self.length > 1.0 {
             return None;
         }
         if rate >= 0.0 {
             // Moving away: by convexity this triangle only gets farther.
             return None;
         }
-        let time = time + (c.separation - self.tolerance * 0.5) / -rate;
+        let time = time + (c.separation - tolerance * 0.5) / -rate;
         if time > 1.0 { None } else { Some(time) }
     }
 }
 
+/// Range of cells whose closed extent overlaps `min..=max` along one axis.
 fn cell_span(coordinates: &[f64], min: f64, max: f64) -> Option<(usize, usize)> {
     let last = coordinates.len() - 1;
     if max < coordinates[0] || min > coordinates[last] || min.is_nan() || max.is_nan() || min > max
