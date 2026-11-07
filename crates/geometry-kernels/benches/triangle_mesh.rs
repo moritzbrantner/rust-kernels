@@ -90,3 +90,75 @@ fn rotated_box_manifold(bencher: Bencher, count: usize) {
         .unwrap();
     });
 }
+
+/// The closed cave of the `triangle_mesh` sweep tests: a wobbling tube of 41 rings of 24
+/// vertices along X with a flattened floor and capped ends (1968 triangles).
+fn cave() -> TriangleMeshData3 {
+    let (rings, around, size, wobble) = (41_usize, 24_usize, 3.0, 0.1);
+    let mut vertices = Vec::new();
+    let half = (rings - 1) as f64 * 0.5;
+    for i in 0..rings {
+        let x = i as f64 - half;
+        for k in 0..around {
+            let angle = std::f64::consts::TAU * k as f64 / around as f64;
+            let r = size
+                * (1.0
+                    + wobble
+                        * ((0.7 * x + 3.0 * angle).sin() + 0.5 * (1.3 * x - 2.0 * angle).cos()));
+            let y = (r * angle.sin()).max(-0.6 * size + 0.05 * (0.9 * x).sin());
+            vertices.push([x, y, r * angle.cos()]);
+        }
+    }
+    let ring = |i: usize, k: usize| (i * around + k % around) as u32;
+    let mut triangles = Vec::new();
+    for i in 0..rings - 1 {
+        for k in 0..around {
+            triangles.push([ring(i, k), ring(i + 1, k), ring(i + 1, k + 1)]);
+            triangles.push([ring(i, k), ring(i + 1, k + 1), ring(i, k + 1)]);
+        }
+    }
+    for (i, x) in [(0, -half - 0.5), (rings - 1, half + 0.5)] {
+        let centre = vertices.len() as u32;
+        vertices.push([x, 0.0, 0.0]);
+        for k in 0..around {
+            triangles.push([centre, ring(i, k + 1), ring(i, k)]);
+        }
+    }
+    TriangleMeshData3 {
+        vertices,
+        triangles,
+    }
+}
+
+/// 256 character capsules (radius 0.35, half height 0.55) on the cave floor, each swept once.
+#[divan::bench(args = ["walk", "fall", "skim", "fast diagonal"])]
+fn cave_capsule_sweep(bencher: Bencher, motion: &str) {
+    let mesh = PreparedTriangleMesh3::try_new(cave()).unwrap();
+    let (radius, half) = (0.35, 0.55);
+    let (gap, d) = match motion {
+        "walk" => (0.02, [0.12, -0.03, 0.07]),
+        "fall" => (0.5, [0.05, -1.2, 0.0]),
+        "skim" => (0.0, [0.3, 0.0, 0.2]),
+        _ => (0.1, [1.5, -0.8, 1.1]),
+    };
+    let capsules: Vec<_> = (0..256)
+        .map(|i| {
+            let (x, z) = (
+                f64::from(i % 32) * 1.1 - 17.0,
+                f64::from(i / 32) * 0.4 - 1.4,
+            );
+            let floor = mesh
+                .segment_hit([x, 0.0, z], [x, -4.0, z])
+                .unwrap()
+                .unwrap()
+                .point[1];
+            let bottom = floor + radius + gap;
+            ([x, bottom, z], [x, bottom + 2.0 * half, z])
+        })
+        .collect();
+    bencher.bench_local(|| {
+        for &(p, q) in &capsules {
+            black_box(mesh.capsule_sweep(black_box(p), q, radius, d, 64).unwrap());
+        }
+    });
+}

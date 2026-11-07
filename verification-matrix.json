@@ -643,7 +643,9 @@
       "sources": [
         "crates/geometry-kernels/src/triangle_mesh.rs",
         "crates/geometry-kernels/src/triangle_mesh/box_contacts.rs",
-        "crates/geometry-kernels/src/triangle_mesh/tests.rs"
+        "crates/geometry-kernels/src/triangle_mesh/tests.rs",
+        "crates/geometry-kernels/src/triangle_mesh/sweep_differential_tests.rs",
+        "crates/geometry-kernels/src/sweep_search.rs"
       ],
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
@@ -655,7 +657,8 @@
       "notes": [
         "BVH contacts, sweeps and rays compared against unpruned triangle traversal; winding/translation, floor/ceiling/edge/initial-overlap/failure cases in triangle_mesh/tests.rs.",
         "Box manifolds validate face, edge and corner witness membership, speculative Euclidean distance, rotations, two-sided winding, finite errors, deterministic replay and BVH-vs-unpruned queries in tests/box_mesh_manifold.rs.",
-        "Local-query doubling family asserts bounded exact triangle tests and logarithmic node visits; warm queries allocate nothing. Divan triangle_mesh bench separates preparation and query costs."
+        "Local-query doubling family asserts bounded exact triangle tests and logarithmic node visits; warm queries allocate nothing. Divan triangle_mesh bench separates preparation and query costs.",
+        "Capsule sweep searches triangles best-first by a lower bound on their touch (Newton time raised to a plane bound, shared with the heightfield sweep in sweep_search.rs) and stops at the best hit; a seeded differential fuzz (sweep_differential_tests.rs: 40000 sweeps over random closed caves, jittered grids with shared edges and vertices, and soups of thin and nearly degenerate triangles at offsets to 3e4; grazing and near-tangent displacements; 0..64 iterations) against the BVH-order kernel requires bit-identical Ok results, Err only where the old kernel failed with the same error, and every Err that became Ok to match the old kernel with 2^20 iterations. A work ratchet holds the cave sweep iterations below 80/50/90/55% of the old kernel (walk/fall/skim/fast diagonal); the Divan triangle_mesh bench times cave_capsule_sweep."
       ]
     }
   ]

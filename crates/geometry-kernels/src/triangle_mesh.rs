@@ -13,6 +13,7 @@ use crate::{
     math3::{Vec3, add, cross, dot, length, scale, sub},
     primitive3::{closest_point_triangle, closest_segment_points},
     ray_triangle::segment_triangle_f64,
+    sweep_search::{CapsuleMotion, SweepSteps},
 };
 use std::{error::Error, fmt, mem::size_of};
 
@@ -351,6 +352,22 @@ impl PreparedTriangleMesh3 {
             point: on_triangle,
         })
     }
+    /// First contact of the capsule `p`–`q`/`radius` translated by `displacement` within
+    /// `0..=1`, by conservative advancement over the triangles in the swept bounds, adding the
+    /// queries, BVH nodes, triangles stepped (`triangles_tested`, `normal_reuses`) and Newton
+    /// steps (`sweep_iterations`) to `work`. Equal-time hits resolve to the most head-on
+    /// contact, then the lower triangle id; a starting touch the motion leaves or follows is
+    /// ignored.
+    ///
+    /// Triangles are searched best-first by a lower bound on their touch (Newton time raised to
+    /// a conservative plane bound), and the search stops once that bound passes the best hit.
+    /// Each triangle may take `max_iterations` steps. A triangle that runs out of steps
+    /// (`IterationLimit`) or whose step fails (`NonFiniteComputation`, or `IterationLimit` when
+    /// a step makes no progress) fails the sweep only when its bound is at or before the
+    /// earliest settled hit (or the end of the motion when nothing is hit); a later failure
+    /// cannot change the hit and is ignored, so the result does not depend on the order the
+    /// triangles are searched in. Among counted failures the one at the lowest bound (then
+    /// lowest id) is returned.
     pub fn capsule_sweep_counted(
         &self,
         p: Vec3,
@@ -383,14 +400,35 @@ impl PreparedTriangleMesh3 {
         if !speed.is_finite() {
             return Err(TriangleMeshError3::NonFiniteComputation);
         }
+        // Best-first over the triangles in the swept bounds (see `sweep_search`): each is
+        // solved on its own by Newton steps from below; the earliest touch wins (ties: most
+        // head-on, then triangle id).
+        let motion = CapsuleMotion {
+            p,
+            q,
+            radius,
+            displacement,
+            tolerance,
+            scale: magnitude,
+        };
+        let mut steps = SweepSteps::new();
+        self.visit(bounds, work, |id, _| {
+            steps.push(
+                id,
+                motion.plane_bound(self.triangle(id), self.normals[id as usize]),
+            );
+            Ok(())
+        })?;
         let mut best: Option<TriangleMeshSweepHit3> = None;
-        self.visit(bounds, work, |id, work| {
-            work.triangles_tested += 1;
-            work.normal_reuses += 1;
-            let mut time = 0.0;
-            for _ in 0..max_iterations {
-                if best.is_some_and(|b| time > b.fraction) {
-                    return Ok(());
+        steps.search(
+            max_iterations,
+            &mut best,
+            |best| best.map_or(1.0, |b| b.fraction),
+            |step, best| {
+                let (id, time) = (step.id, step.time);
+                if time == 0.0 {
+                    work.triangles_tested += 1;
+                    work.normal_reuses += 1;
                 }
                 work.sweep_iterations += 1;
                 let offset = scale(displacement, time);
@@ -401,12 +439,8 @@ impl PreparedTriangleMesh3 {
                 }
                 if c.separation <= tolerance {
                     if time == 0.0 && rate >= 0.0 {
-                        return Ok(());
+                        return Ok(None);
                     }
-                    let hit = TriangleMeshSweepHit3 {
-                        fraction: time,
-                        contact: c,
-                    };
                     if best.is_none_or(|b| {
                         time < b.fraction
                             || (time == b.fraction
@@ -415,29 +449,33 @@ impl PreparedTriangleMesh3 {
                                     .then(id.cmp(&b.contact.triangle))
                                     .is_lt())
                     }) {
-                        best = Some(hit);
+                        *best = Some(TriangleMeshSweepHit3 {
+                            fraction: time,
+                            contact: c,
+                        });
                     }
-                    return Ok(());
+                    return Ok(None);
                 }
                 if speed == 0.0 || rate >= 0.0 || time + (c.separation - tolerance) / speed > 1.0 {
-                    return Ok(());
+                    return Ok(None);
                 }
                 let next = time + (c.separation - tolerance * 0.5) / -rate;
                 if !next.is_finite() {
                     return Err(TriangleMeshError3::NonFiniteComputation);
                 }
                 if next > 1.0 {
-                    return Ok(());
+                    return Ok(None);
                 }
                 if next <= time {
                     return Err(TriangleMeshError3::IterationLimit);
                 }
-                time = next;
-            }
-            Err(TriangleMeshError3::IterationLimit)
-        })?;
+                Ok(Some(next))
+            },
+            TriangleMeshError3::IterationLimit,
+        )?;
         Ok(best)
     }
+    /// [`Self::capsule_sweep_counted`] without work counters.
     pub fn capsule_sweep(
         &self,
         p: Vec3,
@@ -597,5 +635,7 @@ pub(crate) fn closest_segment_triangle(
     best.0.is_finite().then_some((best.1, best.2))
 }
 
+#[cfg(test)]
+mod sweep_differential_tests;
 #[cfg(test)]
 mod tests;

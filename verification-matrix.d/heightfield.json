@@ -8,7 +8,8 @@
       "module": "crate::heightfield",
       "sources": [
         "crates/geometry-kernels/src/heightfield.rs",
-        "crates/geometry-kernels/src/heightfield_differential_tests.rs"
+        "crates/geometry-kernels/src/heightfield_differential_tests.rs",
+        "crates/geometry-kernels/src/sweep_search.rs"
       ],
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",

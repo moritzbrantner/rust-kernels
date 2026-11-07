@@ -38,6 +38,29 @@ errors. Finite data alone does not guarantee every difference/product fits f64.
 No numeric failure is converted into a miss. Sweep fractions are f64; consumers
 with narrower physical state own conservative narrowing and response policy.
 
+`capsule_sweep` solves each triangle in the swept bounds by Newton steps from below
+and searches them best-first, sharing the search of the heightfield sweep
+(`sweep_search.rs`): every pending triangle carries a lower bound on its touch (its
+current Newton time, raised to a conservative bound from the gap between the capsule
+and the triangle's plane), the triangle with the lowest bound (then lowest ID) takes
+the next step, and the search stops once that bound passes the best settled hit or the
+end of the motion. BVH candidate gathering is unchanged. `max_iterations` caps the
+steps per triangle. The sweep returns `Err` only when a triangle fails (runs out of
+steps, makes no progress or computes a non-finite value) at a bound at or before the
+earliest settled hit (or the end of the motion when nothing is hit); later failures
+cannot change the result and are ignored, so the result does not depend on visit
+order. Compared with the earlier BVH-order kernel, every `Ok` result is bit-identical
+and every `Err` was the same `Err` there; some earlier `Err` results, where a triangle
+visited before the winner ran out of steps after it, or a triangle the plane bound
+shows unreachable ran out of steps, now return the hit (or no hit) the earlier kernel
+settles to with unbounded steps. A seeded differential fuzz
+(`triangle_mesh/sweep_differential_tests.rs`) enforces exactly this against a copy of
+the earlier kernel. `triangles_tested` counts triangles that take at least one step;
+`sweep_iterations` counts steps. For 256 character capsules on the floor of a closed
+1968-triangle cave, steps drop from 2376/4160/2098/8247 to 1755/1707/1691/3976
+(walk/fall/skim/fast diagonal) and the `cave_capsule_sweep` Divan medians drop by about
+10/47/10/28%.
+
 Preparation retains normalized triangle edges and inward clipping planes for box
 queries, so repeated queries rotate validated directions instead of reconstructing
 them. Exact cross axes already covered by box face axes are skipped. Clipping
