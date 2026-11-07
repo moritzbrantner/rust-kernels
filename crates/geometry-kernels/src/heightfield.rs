@@ -100,6 +100,9 @@ pub struct HeightfieldWork3 {
     pub cells_visited: u64,
     pub triangles_tested: u64,
     pub normal_reuses: u64,
+    /// Triangles a capsule contact excluded by their plane alone, without the exact distance
+    /// test.
+    pub triangles_pruned: u64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -404,8 +407,14 @@ impl PreparedHeightfield3 {
         let reach = radius + margin.max(0.0);
         let min = [p[0].min(q[0]) - reach, p[2].min(q[2]) - reach];
         let max = [p[0].max(q[0]) + reach, p[2].max(q[2]) + reach];
+        let query_scale = p.into_iter().chain(q).map(f64::abs).fold(reach, f64::max);
         let mut best: Option<HeightfieldContact3> = None;
+        let mut pruned = 0;
         self.visit_triangles_counted(min, max, work, |id, triangle, normal| {
+            if beyond_plane(p, q, reach, query_scale, triangle, normal) {
+                pruned += 1;
+                return;
+            }
             let Some(contact) = segment_triangle_contact(p, q, radius, triangle, normal) else {
                 return;
             };
@@ -418,6 +427,7 @@ impl PreparedHeightfield3 {
                 });
             }
         });
+        work.triangles_pruned += pruned;
         best
     }
 
@@ -870,6 +880,40 @@ pub(crate) fn polytope_triangle_contact(
     })
 }
 
+/// Whether the segment `p`–`q` lies strictly on one side of the triangle's plane, farther than
+/// `reach` from it with a rounding margin, so no point of the triangle is within `reach` of it
+/// and [`segment_triangle_contact`] would report a separation above `reach - radius`.
+///
+/// Every triangle point `t` and segment point `s` are convex combinations of the corners and
+/// endpoints, so `dot(s - t, n) >= min(dot(p, n), dot(q, n)) - max over corners of dot(v, n)`
+/// for any `n`, and `|s - t| >= dot(s - t, n) / |n|`; the stored normal only needs to be near
+/// unit length, not exact. The margin `1e-9 * (1 + scale)` covers the rounding of these dot
+/// products and of the exact test's witnesses and square root (each a few ulps of the
+/// coordinate scale) with a factor of over a thousand to spare.
+fn beyond_plane(
+    p: Vec3,
+    q: Vec3,
+    reach: f64,
+    query_scale: f64,
+    triangle: [Vec3; 3],
+    n: Vec3,
+) -> bool {
+    let corners = triangle.map(|v| dot(v, n));
+    let (low, high) = (
+        corners[0].min(corners[1]).min(corners[2]),
+        corners[0].max(corners[1]).max(corners[2]),
+    );
+    let (ep, eq) = (dot(p, n), dot(q, n));
+    let scale = triangle
+        .into_iter()
+        .flatten()
+        .map(f64::abs)
+        .fold(query_scale, f64::max);
+    let bound = reach + 1e-9 * (1.0 + scale);
+    // NaN compares false, leaving the exact test to decide.
+    ep.min(eq) - high > bound || low - ep.max(eq) > bound
+}
+
 fn segment_triangle_contact(
     p: Vec3,
     q: Vec3,
@@ -933,3 +977,7 @@ fn locate(coordinates: &[f64], value: f64, work: &mut HeightfieldWork3) -> Optio
     }
     Some(low)
 }
+
+#[cfg(test)]
+#[path = "heightfield_differential_tests.rs"]
+mod differential_tests;
