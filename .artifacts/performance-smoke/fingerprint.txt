@@ -1,0 +1,15 @@
+repository=https://github.com/moritzbrantner/rust-kernels.git
+candidate=91055975ba1a1c9f793f611a0541da83ccbfff32
+baseline=none
+rustflags=
+baseline_cargo_target_dir=/home/brantner/.cache/agent-work/rust-kernels-218/target/performance-smoke/baseline
+candidate_cargo_target_dir=/home/brantner/.cache/agent-work/rust-kernels-218/target/performance-smoke/candidate
+cargo_lock_sha256=6dced58143f2df8d7eed0208d68dc2b91a74efa6297a346e9c2bcd43d9d93fdf
+rustc 1.99.1 (58cf8f9c3 2026-10-13)
+binary: rustc
+commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+commit-date: 2026-10-13
+host: x86_64-unknown-linux-gnu
+release: 1.99.1
+LLVM version: 23.1.1
+cargo 1.99.1 (5f94df478 2026-08-27)

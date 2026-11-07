@@ -12,6 +12,7 @@ mod polytope;
 mod query;
 mod ray;
 mod shape;
+mod submerged;
 mod sweep;
 mod volume;
 mod wedge;
@@ -29,6 +30,9 @@ pub use ray::{
     PrimitiveRayError3, PrimitiveRayFeature3, PrimitiveRayHit3, PrimitiveRayWork3, try_ray_cast,
 };
 pub use shape::{PrimitiveBody3, PrimitiveKind3, PrimitivePair3, PrimitiveShape3};
+pub use submerged::{
+    SubmergedError3, SubmergedProperties3, try_hull_submerged_properties, try_submerged_properties,
+};
 pub use sweep::{PrimitiveSweepError3, swept_time, try_swept_time};
 pub use volume::{PrimitiveVolumeError3, PrimitiveVolumeProperties3, try_volume_properties};
 use wedge::wedge_planes;

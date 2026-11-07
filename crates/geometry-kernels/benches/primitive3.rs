@@ -724,3 +724,26 @@ mod ellipsoid_pair {
         });
     }
 }
+
+#[divan::bench]
+fn submerged_properties(bencher: Bencher) {
+    use geometry_kernels::primitive3::try_submerged_properties;
+    let shapes = [
+        PrimitiveShape3::sphere(1.0),
+        PrimitiveShape3::cuboid([1.0, 2.0, 3.0]),
+        PrimitiveShape3::capsule(2.0, 0.5),
+        PrimitiveShape3::wedge([1.0, 2.0, 3.0]),
+    ];
+    let axes = [[0.6, 0.8, 0.0], [-0.8, 0.6, 0.0], [0.0, 0.0, 1.0]];
+    bencher.bench_local(|| {
+        for shape in shapes {
+            let _ = black_box(try_submerged_properties(
+                black_box(shape),
+                black_box([0.0; 3]),
+                black_box(axes),
+                black_box([0.0, 0.3, 0.0]),
+                black_box([0.2, 1.0, -0.3]),
+            ));
+        }
+    });
+}
