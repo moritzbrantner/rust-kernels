@@ -95,6 +95,62 @@ fn primitive_volume_queries_allocate_nothing() {
 }
 
 #[test]
+fn submerged_volume_queries_allocate_nothing() {
+    use geometry_kernels::hull::{Hull3, QuickHullWork, quickhull3};
+    use geometry_kernels::primitive3::{
+        PrimitiveShape3, try_hull_submerged_properties, try_submerged_properties,
+    };
+    let shapes = [
+        PrimitiveShape3::sphere(1.0),
+        PrimitiveShape3::cuboid([1.0, 2.0, 3.0]),
+        PrimitiveShape3::capsule(2.0, 0.5),
+        PrimitiveShape3::wedge([1.0, 2.0, 3.0]),
+    ];
+    let mut hull = Hull3::default();
+    let corners: Vec<[f64; 3]> = (0..8)
+        .map(|i| {
+            [
+                f64::from(i & 1) - 0.5,
+                f64::from((i >> 1) & 1) - 0.5,
+                f64::from((i >> 2) & 1) - 0.5,
+            ]
+        })
+        .collect();
+    quickhull3(&corners, &mut QuickHullWork::default(), &mut hull);
+    let axes = [[0.6, 0.8, 0.0], [-0.8, 0.6, 0.0], [0.0, 0.0, 1.0]];
+    let normal = [0.2, 1.0, -0.3];
+    ALLOCS.with(|count| count.set(0));
+    REALLOCS.with(|count| count.set(0));
+    ENABLED.with(|enabled| enabled.set(true));
+    let mut valid = true;
+    for step in 0..1024 {
+        let level = [0.0, f64::from(step % 9) * 0.25 - 1.0, 0.0];
+        for shape in shapes {
+            valid &= std::hint::black_box(try_submerged_properties(
+                std::hint::black_box(shape),
+                [0.0; 3],
+                axes,
+                level,
+                normal,
+            ))
+            .is_ok();
+        }
+        valid &= std::hint::black_box(try_hull_submerged_properties(
+            std::hint::black_box(&hull),
+            [0.0; 3],
+            axes,
+            level,
+            normal,
+        ))
+        .is_ok();
+    }
+    ENABLED.with(|enabled| enabled.set(false));
+    assert!(valid);
+    assert_eq!(ALLOCS.with(Cell::get), 0);
+    assert_eq!(REALLOCS.with(Cell::get), 0);
+}
+
+#[test]
 fn capsule_skeleton_contact_queries_allocate_nothing() {
     use geometry_kernels::primitive3::{PrimitiveBody3, PrimitiveShape3, PrimitiveWork3, query};
     let capsule =
