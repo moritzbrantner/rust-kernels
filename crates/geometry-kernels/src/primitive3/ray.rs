@@ -78,16 +78,13 @@ pub fn try_ray_cast(
     if !is_finite(half) {
         return Err(NonFiniteComputation);
     }
-    let magnitude = offset
-        .into_iter()
-        .chain(displacement)
-        .chain(half)
-        .map(f64::abs)
-        .fold(0.0, f64::max);
-    let o = offset.map(|v| v / magnitude);
-    let d = displacement.map(|v| v / magnitude);
-    let half = half.map(|v| v / magnitude);
-    if half.into_iter().any(|v| v == 0.0) || dot(d, d) == 0.0 {
+    let magnitude = max_abs(offset)
+        .max(max_abs(displacement))
+        .max(max_abs(half));
+    let o = divide(offset, magnitude);
+    let d = divide(displacement, magnitude);
+    let half = divide(half, magnitude);
+    if half[0] == 0.0 || half[1] == 0.0 || half[2] == 0.0 || dot(d, d) == 0.0 {
         return Err(NonFiniteComputation);
     }
     let candidate = match body.shape.kind() {
@@ -118,6 +115,14 @@ pub fn try_ray_cast(
         return Err(NonFiniteComputation);
     }
     Ok(Some(hit))
+}
+
+fn max_abs([x, y, z]: Vec3) -> f64 {
+    x.abs().max(y.abs()).max(z.abs())
+}
+
+fn divide([x, y, z]: Vec3, divisor: f64) -> Vec3 {
+    [x / divisor, y / divisor, z / divisor]
 }
 
 fn valid_axes(body: PrimitiveBody3) -> bool {
@@ -276,17 +281,23 @@ fn polyhedral(
     half: Vec3,
     work: &mut PrimitiveRayWork3,
 ) -> Result<Option<PrimitiveRayHit3>, PrimitiveRayError3> {
-    let box_planes = [
-        ([-1.0, 0.0, 0.0], half[0]),
-        ([1.0, 0.0, 0.0], half[0]),
-        ([0.0, -1.0, 0.0], half[1]),
-        ([0.0, 1.0, 0.0], half[1]),
-        ([0.0, 0.0, -1.0], half[2]),
-        ([0.0, 0.0, 1.0], half[2]),
-    ];
-    let wedge = wedge_planes(half);
     let is_box = body.shape.kind() == PrimitiveKind3::Box;
-    let planes: &[(Vec3, f64)] = if is_box { &box_planes } else { &wedge };
+    let (box_planes, wedge);
+    let planes: &[(Vec3, f64)] = if is_box {
+        box_planes = [
+            ([-1.0, 0.0, 0.0], half[0]),
+            ([1.0, 0.0, 0.0], half[0]),
+            ([0.0, -1.0, 0.0], half[1]),
+            ([0.0, 1.0, 0.0], half[1]),
+            ([0.0, 0.0, -1.0], half[2]),
+            ([0.0, 0.0, 1.0], half[2]),
+        ];
+        &box_planes
+    } else {
+        // The slope normal costs a square root that boxes never need.
+        wedge = wedge_planes(half);
+        &wedge
+    };
     let mut enter = 0.0_f64;
     let mut exit = 1.0_f64;
     let mut entry_face = 0;
