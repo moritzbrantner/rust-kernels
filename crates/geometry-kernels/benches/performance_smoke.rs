@@ -34,13 +34,16 @@ fn cave_case(tilted: bool) -> (PreparedTriangleMesh3, Vec<Vec3>, Axes) {
     (mesh, boxes, axes)
 }
 
-#[library_benchmark]
-#[bench::resting_64(cave_case(false))]
-#[bench::tilted_64(cave_case(true))]
-fn box_mesh_contacts((mesh, boxes, axes): (PreparedTriangleMesh3, Vec<Vec3>, Axes)) -> usize {
+// Measured loops live outside the benchmark functions: Iai-Callgrind toggles
+// collection on entering any function whose name contains the benchmark's
+// wrapper path, and a kernel instantiated with a closure defined inside the
+// benchmark carries that path, toggling collection back off inside the kernel
+// (unless it happens to be inlined), so most of its work went uncounted.
+#[inline(never)]
+fn cave_contacts(mesh: &PreparedTriangleMesh3, boxes: &[Vec3], axes: Axes) -> usize {
     let mut manifolds = 0;
     let mut work = TriangleMeshWork3::default();
-    for &centre in &boxes {
+    for &centre in boxes {
         mesh.box_contacts_counted(
             black_box(centre),
             axes,
@@ -51,7 +54,14 @@ fn box_mesh_contacts((mesh, boxes, axes): (PreparedTriangleMesh3, Vec<Vec3>, Axe
         )
         .unwrap();
     }
-    black_box(manifolds)
+    manifolds
+}
+
+#[library_benchmark]
+#[bench::cave_resting_64(cave_case(false))]
+#[bench::cave_tilted_64(cave_case(true))]
+fn box_mesh_contacts((mesh, boxes, axes): (PreparedTriangleMesh3, Vec<Vec3>, Axes)) -> usize {
+    black_box(cave_contacts(&mesh, &boxes, axes))
 }
 
 type RockCase = (Arc<PreparedSegmentHull>, Vec<(Vec3, Axes)>);
