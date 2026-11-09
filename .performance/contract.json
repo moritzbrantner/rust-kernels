@@ -521,7 +521,7 @@
           "budget": {
             "relativeRegressionPercent": 5
           },
-          "notes": "Guards rust-kernels#225 (bit-identical branch-free SAT axis selection, structure-of-arrays edge axes, inline polygon clipping and an iterative BVH walk: 11-20% faster on this workload when measured). An intentional slowdown must say why in the pull request."
+          "notes": "Guards rust-kernels#225 (bit-identical branch-free SAT axis selection, structure-of-arrays edge axes, inline polygon clipping and an iterative BVH walk: 11-20% faster in an interleaved wall-clock A/B on this workload, although it executes about 8% more instructions than the pre-#225 kernel and simulates only about 8% fewer branch mispredicts; end to end in physics-engine the gain was within noise). An intentional slowdown must say why in the pull request. Callgrind's toggle collection undercounts recursive calls (the pre-#225 recursive walk reported 0.26M instead of 2.72M instructions), so reintroducing recursion here shows up as a false improvement, not a regression."
         }
       ]
     },

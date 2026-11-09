@@ -1,10 +1,10 @@
 repository=https://github.com/moritzbrantner/rust-kernels.git
-candidate=91055975ba1a1c9f793f611a0541da83ccbfff32
-baseline=none
+candidate=1b105b4395c391c642cd20dbc7360e0343d327fa
+baseline=a331393cc345bc42fd27f367582910a4f024b39e
 rustflags=
-baseline_cargo_target_dir=/home/brantner/.cache/agent-work/rust-kernels-218/target/performance-smoke/baseline
-candidate_cargo_target_dir=/home/brantner/.cache/agent-work/rust-kernels-218/target/performance-smoke/candidate
-cargo_lock_sha256=6dced58143f2df8d7eed0208d68dc2b91a74efa6297a346e9c2bcd43d9d93fdf
+baseline_cargo_target_dir=/home/brantner/.cache/claude-work/rk/target/performance-smoke/baseline
+candidate_cargo_target_dir=/home/brantner/.cache/claude-work/rk/target/performance-smoke/candidate
+cargo_lock_sha256=314e7175ce840089e73f1309bef4ddc3fe5a60a3787ee2ded870547cc35730bb
 rustc 1.99.1 (58cf8f9c3 2026-10-13)
 binary: rustc
 commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
@@ -13,3 +13,6 @@ host: x86_64-unknown-linux-gnu
 release: 1.99.1
 LLVM version: 23.1.1
 cargo 1.99.1 (5f94df478 2026-08-27)
+valgrind-3.26.0
+iai-callgrind-runner=0.16.1
+Linux 6.18.33.2-microsoft-standard-WSL2 x86_64
