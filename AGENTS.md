@@ -21,5 +21,6 @@ This file contains repository-specific guidance for coding agents working in `ru
 - Before integration, run `python3 scripts/validate_verification_matrix.py` plus `cargo fmt --all --check`, workspace Clippy with warnings denied, and the full workspace test suite when the environment supports them.
 - Preserve deterministic output and differential/oracle evidence when changing algorithm behavior.
 - Keep kernel correctness and performance evidence Cargo-native whenever practical: use Rust `#[test]`/integration tests for correctness, work and allocation ratchets, Divan for developer-facing microbenchmarks, and Iai-Callgrind for deterministic blocking performance sentinels.
+- Run the Iai-Callgrind sentinels locally with `bash scripts/benchmark-smoke.sh` (set `PERF_BASE_SHA` to compare against a base). They need Valgrind from the system package manager and the pinned `iai-callgrind-runner` from `mise.toml` (`mise install`); measure instruction counts instead of estimating them.
 - Invoke benchmark suites directly with `cargo bench`; do not make Python parsing of benchmark output the test oracle when a deterministic Rust assertion can express the contract.
 - Reserve Python validation for the repository's verification-matrix tooling or cases where the evidence genuinely cannot be expressed through Cargo/Rust.
