@@ -333,10 +333,11 @@ impl PreparedSegmentHull {
             };
             let points = self.face_points(centre, half, axes, face_id, margin, work);
             if points
+                .as_slice()
                 .iter()
                 .any(|p| (p.separation - choice.gap).abs() <= 1e-10 * (1.0 + choice.gap.abs()))
             {
-                return finish(choice.normal, choice.gap, points).map(Some);
+                return finish(choice.normal, choice.gap, points.as_slice()).map(Some);
             }
         }
         for plane in frame.remaining(self, work)? {
@@ -370,7 +371,7 @@ impl PreparedSegmentHull {
                 )
             })
         };
-        let mut points = Vec::new();
+        let mut points = Points::new();
         match feature {
             Feature::Hull(face_id) => {
                 points = self.face_points(centre, half, axes, face_id, margin, work);
@@ -384,23 +385,22 @@ impl PreparedSegmentHull {
                     .map(|&p| dot(normal, p))
                     .fold(f64::NEG_INFINITY, f64::max);
                 let tolerance = 1e-9 * (1.0 + high.abs());
-                let mut scratch = Vec::new();
-                let mut polygon: Vec<_> = self
-                    .hull
-                    .vertices
-                    .iter()
-                    .copied()
-                    .filter(|&p| high - dot(normal, p) <= tolerance)
-                    .collect();
+                let mut scratch = Polygon::new();
+                let mut polygon = Polygon::new();
+                for &p in &self.hull.vertices {
+                    if high - dot(normal, p) <= tolerance {
+                        polygon.push(p);
+                    }
+                }
                 // Canonical angular order around the supporting polygon; degenerate edge or
                 // vertex supports are also valid polygons for clipping.
                 let centroid = scale(
-                    polygon.iter().copied().fold([0.0; 3], add),
-                    1.0 / polygon.len() as f64,
+                    polygon.as_slice().iter().copied().fold([0.0; 3], add),
+                    1.0 / polygon.as_slice().len() as f64,
                 );
                 let u = axes[(k + 1) % 3];
                 let v = axes[(k + 2) % 3];
-                polygon.sort_by(|a, b| {
+                polygon.as_mut_slice().sort_by(|a, b| {
                     let a = sub(*a, centroid);
                     let b = sub(*b, centroid);
                     dot(a, v)
@@ -415,7 +415,7 @@ impl PreparedSegmentHull {
                         });
                     }
                 }
-                for p in polygon {
+                for &p in polygon.as_slice() {
                     let separation = offset - dot(normal, p);
                     if separation <= margin {
                         points.push(BoxHullPoint {
@@ -476,7 +476,7 @@ impl PreparedSegmentHull {
                 separation: best,
             });
         }
-        finish(normal, best, points).map(Some)
+        finish(normal, best, points.as_slice()).map(Some)
     }
 
     fn face_points(
@@ -487,10 +487,10 @@ impl PreparedSegmentHull {
         face_id: usize,
         margin: f64,
         work: &mut BoxHullWork,
-    ) -> Vec<BoxHullPoint> {
+    ) -> Points {
         let face = &self.faces[face_id];
         let normal = face.unit_normal;
-        let mut points = Vec::new();
+        let mut points = Points::new();
         let offset = face.unit_offset;
         let k = (0..3)
             .max_by(|&i, &j| {
@@ -505,13 +505,16 @@ impl PreparedSegmentHull {
         );
         let u = scale(axes[(k + 1) % 3], half[(k + 1) % 3]);
         let v = scale(axes[(k + 2) % 3], half[(k + 2) % 3]);
-        let mut polygon = vec![
+        let mut polygon = Polygon::new();
+        for p in [
             add(add(c, u), v),
             add(sub(c, u), v),
             sub(sub(c, u), v),
             add(sub(c, v), u),
-        ];
-        let mut scratch = Vec::new();
+        ] {
+            polygon.push(p);
+        }
+        let mut scratch = Polygon::new();
         for plane in &self.faces {
             work.clipping_planes += 1;
             let projection = dot(plane.unit_normal, normal);
@@ -524,7 +527,7 @@ impl PreparedSegmentHull {
                 break;
             }
         }
-        for p in polygon {
+        for &p in polygon.as_slice() {
             let separation = dot(normal, p) - offset;
             if separation <= margin {
                 points.push(BoxHullPoint {
@@ -571,7 +574,7 @@ impl AxisChoice {
 fn finish(
     normal: Vec3,
     best: f64,
-    points: Vec<BoxHullPoint>,
+    points: &[BoxHullPoint],
 ) -> Result<BoxHullContact, BoxHullError> {
     if points.iter().any(|p| {
         !p.point_box
@@ -595,18 +598,18 @@ fn finish(
     })
 }
 
-fn clip(polygon: &mut Vec<Vec3>, scratch: &mut Vec<Vec3>, distance: impl Fn(Vec3) -> f64) {
-    if polygon.is_empty() {
+fn clip(polygon: &mut Polygon, scratch: &mut Polygon, distance: impl Fn(Vec3) -> f64) {
+    let points = polygon.as_slice();
+    if points.is_empty() {
         return;
     }
-    if polygon.iter().all(|&p| distance(p) <= 1e-10) {
+    if points.iter().all(|&p| distance(p) <= 1e-10) {
         return;
     }
     scratch.clear();
-    scratch.reserve(polygon.len() + 1);
-    let mut prev = polygon[polygon.len() - 1];
+    let mut prev = points[points.len() - 1];
     let mut dp = distance(prev);
-    for next in polygon.drain(..) {
+    for &next in points {
         let dn = distance(next);
         // Small slack avoids losing a polygon to roundoff on its own face plane.
         if (dp <= 1e-10) != (dn <= 1e-10) {
@@ -619,6 +622,59 @@ fn clip(polygon: &mut Vec<Vec3>, scratch: &mut Vec<Vec3>, distance: impl Fn(Vec3
         dp = dn;
     }
     std::mem::swap(polygon, scratch);
+}
+
+/// Clipped polygons and their contact points: eight inline (a box face clipped by
+/// a few hull planes), spilling to the heap only for unusually long polygons.
+type Polygon = InlineVec<Vec3, 8>;
+type Points = InlineVec<BoxHullPoint, 8>;
+
+struct InlineVec<T, const N: usize> {
+    inline: [T; N],
+    len: usize,
+    /// Holds every item once more than `N` were pushed since the last clear.
+    spilled: Vec<T>,
+}
+impl<T: Copy + Default, const N: usize> InlineVec<T, N> {
+    fn new() -> Self {
+        Self {
+            inline: [T::default(); N],
+            len: 0,
+            spilled: Vec::new(),
+        }
+    }
+    fn as_slice(&self) -> &[T] {
+        if self.spilled.is_empty() {
+            &self.inline[..self.len]
+        } else {
+            &self.spilled
+        }
+    }
+    fn as_mut_slice(&mut self) -> &mut [T] {
+        if self.spilled.is_empty() {
+            &mut self.inline[..self.len]
+        } else {
+            &mut self.spilled
+        }
+    }
+    fn is_empty(&self) -> bool {
+        self.as_slice().is_empty()
+    }
+    fn push(&mut self, item: T) {
+        if self.spilled.is_empty() {
+            if self.len < N {
+                self.inline[self.len] = item;
+                self.len += 1;
+                return;
+            }
+            self.spilled.extend_from_slice(&self.inline);
+        }
+        self.spilled.push(item);
+    }
+    fn clear(&mut self) {
+        self.len = 0;
+        self.spilled.clear();
+    }
 }
 
 #[cfg(test)]
@@ -764,6 +820,35 @@ mod tests {
             eager.contact([0.0; 3], 0.0, &mut eager_work).unwrap(),
             contact
         );
+    }
+    #[test]
+    fn inline_buffers_spill_past_their_capacity_and_reuse_after_clear() {
+        let mut buffer = InlineVec::<u32, 8>::new();
+        for round in 0..2 {
+            for i in 0..20 {
+                buffer.push(i + round);
+            }
+            assert_eq!(
+                buffer.as_slice(),
+                &(round..20 + round).collect::<Vec<_>>()[..]
+            );
+            buffer.as_mut_slice().reverse();
+            assert_eq!(buffer.as_slice()[0], 19 + round);
+            buffer.clear();
+            assert!(buffer.is_empty());
+        }
+        buffer.push(7);
+        assert_eq!(buffer.as_slice(), &[7]);
+        // A clip that spills: a long polygon trimmed by one plane keeps its order.
+        let mut polygon = Polygon::new();
+        let mut scratch = Polygon::new();
+        for i in 0..12 {
+            let angle = f64::from(i) * std::f64::consts::TAU / 12.0;
+            polygon.push([angle.cos(), angle.sin(), 0.0]);
+        }
+        clip(&mut polygon, &mut scratch, |p| p[0] - 0.5);
+        assert!(polygon.as_slice().iter().all(|p| p[0] <= 0.5 + 1e-10));
+        assert_eq!(polygon.as_slice().len(), 11);
     }
     #[test]
     fn separated_and_invalid_queries_do_not_make_contacts() {
