@@ -624,9 +624,9 @@ fn clip(polygon: &mut Polygon, scratch: &mut Polygon, distance: impl Fn(Vec3) ->
     std::mem::swap(polygon, scratch);
 }
 
-/// Clipped polygons and their contact points: eight inline (a box face clipped by
-/// a few hull planes), spilling to the heap only for unusually long polygons.
-type Polygon = InlineVec<Vec3, 8>;
+/// Clipped polygons (sixteen inline: a box face clipped by several hull planes)
+/// and their contact points (eight inline) spill to the heap only when longer.
+type Polygon = InlineVec<Vec3, 16>;
 type Points = InlineVec<BoxHullPoint, 8>;
 
 struct InlineVec<T, const N: usize> {
