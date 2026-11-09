@@ -126,7 +126,35 @@ impl BoxFrame {
         let half = self.half;
         let axes = self.axes;
         let radius = |n| (0..3).map(|i| half[i] * dot(axes[i], n).abs()).sum::<f64>();
-        let mut planes = Vec::with_capacity(6);
+        // Most edge/axis pairs straddle the edge's normal cone on the prepared
+        // cone normals alone. A branch-free pass marks every other pair (and
+        // every pair inside the cone tolerance) per 64-edge chunk; the exact
+        // per-pair logic below then runs for marked pairs only, in edge-major,
+        // axis-minor order, so the planes and their order are unchanged. The
+        // marked count bounds the planes, so they are allocated once.
+        let chunks = hull.edges.len().div_ceil(64);
+        let mut inline = [[0_u64; 3]; 8];
+        let mut spilled = Vec::new();
+        let marks: &mut [[u64; 3]] = if chunks <= inline.len() {
+            &mut inline[..chunks]
+        } else {
+            spilled.resize(chunks, [0; 3]);
+            &mut spilled
+        };
+        for (marked, chunk) in marks.iter_mut().zip(hull.edges.chunks(64)) {
+            for (k, axis) in axes.into_iter().enumerate() {
+                for (i, edge) in chunk.iter().enumerate() {
+                    let dp = dot(axis, edge.cone_normals[0]);
+                    let dq = dot(axis, edge.cone_normals[1]);
+                    let near =
+                        (dp.abs() <= edge.cone_tolerance[0]) | (dq.abs() <= edge.cone_tolerance[1]);
+                    let straddles = (dp < 0.0) & (dq > 0.0) | (dp > 0.0) & (dq < 0.0);
+                    marked[k] |= u64::from(near | !straddles) << i;
+                }
+            }
+        }
+        let marked_pairs: u32 = marks.iter().flatten().map(|m| m.count_ones()).sum();
+        let mut planes = Vec::with_capacity(6 + marked_pairs as usize);
         let mut push = |normal: Vec3, origin: Vec3, offset: f64, feature: Feature| {
             if !is_finite(normal) || !is_finite(origin) || !offset.is_finite() {
                 return Err(BoxHullError::NonFiniteComputation);
@@ -155,23 +183,7 @@ impl BoxFrame {
         // cone. Its two adjacent triangles certify support locally, avoiding a
         // full hull-vertex projection for every edge/box-axis pair.
         let vertex = |i: u32| hull.hull.vertices[i as usize];
-        // Most edge/axis pairs straddle the edge's normal cone on the prepared
-        // cone normals alone. A branch-free pass marks every other pair (and
-        // every pair inside the cone tolerance) per 64-edge chunk; the exact
-        // per-pair logic below then runs for marked pairs only, in edge-major,
-        // axis-minor order, so the planes and their order are unchanged.
-        for (c, chunk) in hull.edges.chunks(64).enumerate() {
-            let mut marked = [0_u64; 3];
-            for (k, axis) in axes.into_iter().enumerate() {
-                for (i, edge) in chunk.iter().enumerate() {
-                    let dp = dot(axis, edge.cone_normals[0]);
-                    let dq = dot(axis, edge.cone_normals[1]);
-                    let near =
-                        (dp.abs() <= edge.cone_tolerance[0]) | (dq.abs() <= edge.cone_tolerance[1]);
-                    let straddles = (dp < 0.0) & (dq > 0.0) | (dp > 0.0) & (dq < 0.0);
-                    marked[k] |= u64::from(near | !straddles) << i;
-                }
-            }
+        for (c, (chunk, &marked)) in hull.edges.chunks(64).zip(&*marks).enumerate() {
             let mut edges = marked[0] | marked[1] | marked[2];
             while edges != 0 {
                 let i = edges.trailing_zeros() as usize;
@@ -225,6 +237,8 @@ impl BoxFrame {
             }
         }
 
+        // Rejected marked pairs leave spare capacity; retain only the planes.
+        planes.shrink_to_fit();
         work.axis_preparations += planes.len() as u64;
         Ok(planes)
     }
