@@ -29,52 +29,58 @@ mkdir -p "$artifact_dir" "$baseline_target_dir" "$candidate_target_dir"
   uname -srm
 } > "$artifact_dir/fingerprint.txt"
 
-run_benchmark() {
-  local cargo_target_dir="$1"
-  local log="$2"
-  shift 2
-  CARGO_TARGET_DIR="$cargo_target_dir" \
-    cargo bench -p search-kernels --bench performance_smoke -- "$@" \
-    2>&1 | tee "$artifact_dir/$log"
-}
-
+# Each package's Iai-Callgrind sentinels: compared against the pull request base
+# when the base has the bench (5% soft Ir limit, fail fast), seeded otherwise.
+benches=(
+  "search-kernels:crates/search-kernels/benches/performance_smoke.rs"
+  "geometry-kernels:crates/geometry-kernels/benches/performance_smoke.rs"
+)
 base_sha="${PERF_BASE_SHA:-}"
-bench_path="crates/search-kernels/benches/performance_smoke.rs"
 baseline_name="pr_base"
+baseline_dir=""
 
-if [[ -n "$base_sha" ]] && git cat-file -e "$base_sha:$bench_path" 2>/dev/null; then
-  worktree_parent="$(mktemp -d)"
-  baseline_dir="$worktree_parent/base"
-
-  cleanup() {
+cleanup() {
+  if [[ -n "$baseline_dir" ]]; then
     git worktree remove --force "$baseline_dir" >/dev/null 2>&1 || true
-    rm -rf "$worktree_parent"
-  }
-  trap cleanup EXIT
-
-  git worktree add --detach "$baseline_dir" "$base_sha" >/dev/null
-  (
-    cd "$baseline_dir"
-    CARGO_TARGET_DIR="$baseline_target_dir" \
-      cargo bench -p search-kernels --bench performance_smoke -- --save-baseline="$baseline_name"
-  ) 2>&1 | tee "$artifact_dir/baseline.log"
-
-  if [[ ! -d "$baseline_target_dir/iai" ]]; then
-    printf 'Expected Iai-Callgrind baseline output under %s/iai\n' "$baseline_target_dir" >&2
-    exit 1
+    rm -rf "$(dirname "$baseline_dir")"
   fi
+}
+trap cleanup EXIT
 
-  # Keep compilation artifacts isolated between the detached base worktree and
-  # the candidate checkout. Sharing one Cargo target directory can let Cargo
-  # reuse the base benchmark executable because both builds have the same
-  # package name and target. Only copy Iai's saved baseline data so the
-  # candidate is rebuilt from HEAD while still comparing against the base.
-  rm -rf "$candidate_target_dir/iai"
-  cp -a "$baseline_target_dir/iai" "$candidate_target_dir/iai"
-  run_benchmark "$candidate_target_dir" candidate.log --baseline="$baseline_name"
-else
-  printf '%s\n' \
-    'No compatible base benchmark exists; this run seeds the performance-smoke contract.' \
-    | tee "$artifact_dir/baseline.log"
-  run_benchmark "$candidate_target_dir" candidate.log --save-baseline=seed
-fi
+for entry in "${benches[@]}"; do
+  package="${entry%%:*}"
+  bench_path="${entry#*:}"
+  if [[ -n "$base_sha" ]] && git cat-file -e "$base_sha:$bench_path" 2>/dev/null; then
+    if [[ -z "$baseline_dir" ]]; then
+      baseline_dir="$(mktemp -d)/base"
+      git worktree add --detach "$baseline_dir" "$base_sha" >/dev/null
+    fi
+    (
+      cd "$baseline_dir"
+      CARGO_TARGET_DIR="$baseline_target_dir" \
+        cargo bench -p "$package" --bench performance_smoke -- --save-baseline="$baseline_name"
+    ) 2>&1 | tee "$artifact_dir/$package-baseline.log"
+
+    if [[ ! -d "$baseline_target_dir/iai" ]]; then
+      printf 'Expected Iai-Callgrind baseline output under %s/iai\n' "$baseline_target_dir" >&2
+      exit 1
+    fi
+
+    # Keep compilation artifacts isolated between the detached base worktree and
+    # the candidate checkout. Sharing one Cargo target directory can let Cargo
+    # reuse the base benchmark executable because both builds have the same
+    # package name and target. Only copy Iai's saved baseline data so the
+    # candidate is rebuilt from HEAD while still comparing against the base.
+    rm -rf "$candidate_target_dir/iai"
+    cp -a "$baseline_target_dir/iai" "$candidate_target_dir/iai"
+    CARGO_TARGET_DIR="$candidate_target_dir" \
+      cargo bench -p "$package" --bench performance_smoke -- --baseline="$baseline_name" \
+      2>&1 | tee "$artifact_dir/$package-candidate.log"
+  else
+    printf '%s: no compatible base benchmark exists; this run seeds its performance-smoke contract.\n' \
+      "$package" | tee "$artifact_dir/$package-baseline.log"
+    CARGO_TARGET_DIR="$candidate_target_dir" \
+      cargo bench -p "$package" --bench performance_smoke -- --save-baseline=seed \
+      2>&1 | tee "$artifact_dir/$package-candidate.log"
+  fi
+done

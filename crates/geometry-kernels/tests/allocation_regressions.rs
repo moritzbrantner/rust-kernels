@@ -446,3 +446,98 @@ fn prepared_mesh_queries_allocate_nothing() {
     assert_eq!(ALLOCS.with(Cell::get), 0);
     assert_eq!(REALLOCS.with(Cell::get), 0);
 }
+
+#[path = "support/contact_fixtures.rs"]
+mod contact_fixtures;
+
+/// Runs `f` with allocation counting on; returns (alloc calls, realloc calls).
+fn counted(f: impl FnOnce()) -> (usize, usize) {
+    ALLOCS.with(|count| count.set(0));
+    REALLOCS.with(|count| count.set(0));
+    ENABLED.with(|enabled| enabled.set(true));
+    f();
+    ENABLED.with(|enabled| enabled.set(false));
+    (ALLOCS.with(Cell::get), REALLOCS.with(Cell::get))
+}
+
+/// rust-kernels#228: clip polygons, scratch and contact points live inline, so
+/// contacts against an already prepared box/hull frame (the steady state of a
+/// box resting on a hull) never touch the heap.
+#[test]
+fn box_hull_contacts_on_a_prepared_frame_allocate_nothing() {
+    use geometry_kernels::segment_hull::{BoxHullWork, PreparedBoxHull};
+    let hull = contact_fixtures::rock();
+    let queries = contact_fixtures::rock_queries();
+    for &(_, axes) in queries.iter().step_by(8) {
+        let mut work = BoxHullWork::default();
+        let frame = PreparedBoxHull::new(hull.clone(), [0.35; 3], axes, &mut work).unwrap();
+        // The first penetrating contact prepares and retains the deferred axes.
+        frame.contact([0.0, 1.1, 0.0], 0.02, &mut work).unwrap();
+        let mut contacts = 0;
+        let (allocations, reallocations) = counted(|| {
+            for &(centre, _) in &queries {
+                contacts += usize::from(frame.contact(centre, 0.02, &mut work).unwrap().is_some());
+            }
+        });
+        assert!(contacts > 0);
+        assert_eq!((allocations, reallocations), (0, 0), "per 64 contacts");
+    }
+}
+
+/// rust-kernels#227/#228: a new box orientation allocates the frame's face
+/// planes and, when a contact needs them, its deferred edge/box planes once,
+/// sized from the branch-free cone marks; the contact itself allocates nothing.
+#[test]
+fn fresh_box_hull_frames_allocate_only_their_plane_lists() {
+    use geometry_kernels::segment_hull::{BoxHullWork, PreparedBoxHull};
+    let hull = contact_fixtures::rock();
+    let queries = contact_fixtures::rock_queries();
+    let (mut allocations, mut reallocations) = (0, 0);
+    for &(centre, axes) in &queries {
+        let (a, r) = counted(|| {
+            let mut work = BoxHullWork::default();
+            let frame = PreparedBoxHull::new(hull.clone(), [0.35; 3], axes, &mut work).unwrap();
+            frame.contact(centre, 0.02, &mut work).unwrap();
+        });
+        assert!(
+            a <= 2,
+            "a fresh frame and contact made {a} allocation calls"
+        );
+        allocations += a;
+        reallocations += r;
+    }
+    // 64 face-plane lists plus 42 deferred lists for the queries that need them.
+    assert_eq!(
+        (allocations, reallocations),
+        (106, 0),
+        "over 64 fresh frames"
+    );
+}
+
+/// rust-kernels#225: box/triangle-mesh contacts emit every manifold through the
+/// callback from fixed-size buffers and never allocate.
+#[test]
+fn box_triangle_mesh_contacts_allocate_nothing() {
+    use geometry_kernels::triangle_mesh::{PreparedTriangleMesh3, TriangleMeshWork3};
+    let mesh = PreparedTriangleMesh3::try_new(contact_fixtures::cave()).unwrap();
+    let boxes = contact_fixtures::cave_boxes(&mesh);
+    for axes in [contact_fixtures::IDENTITY, contact_fixtures::tilted()] {
+        let mut manifolds = 0;
+        let mut work = TriangleMeshWork3::default();
+        let counts = counted(|| {
+            for &centre in &boxes {
+                mesh.box_contacts_counted(
+                    centre,
+                    axes,
+                    contact_fixtures::CAVE_BOX_HALF,
+                    0.02,
+                    &mut work,
+                    |_| manifolds += 1,
+                )
+                .unwrap();
+            }
+        });
+        assert!(manifolds > 0);
+        assert_eq!(counts, (0, 0), "per 64 boxes");
+    }
+}
