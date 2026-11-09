@@ -11,6 +11,7 @@ spatial-kernels = { path = "../spatial-kernels" }
 [dev-dependencies]
 criterion = "=0.8.2"
 divan = "=0.1.21"
+iai-callgrind = "=0.16.1"
 
 [[bench]]
 name = "obb3_sat"
@@ -49,4 +50,8 @@ harness = false
 
 [[bench]]
 name = "segment_hull_box"
+harness = false
+
+[[bench]]
+name = "performance_smoke"
 harness = false

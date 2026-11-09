@@ -497,6 +497,160 @@
           }
         }
       ]
+    },
+    {
+      "id": "box-mesh-cave-contacts",
+      "kind": "micro",
+      "description": "Box/triangle-mesh contacts for 64 boxes (half extents 0.4 x 0.3 x 0.5) resting on a closed 1968-triangle cave floor, axis aligned and tilted, 0.02 margin.",
+      "dimensions": {
+        "boxes": 64,
+        "triangles": 1968,
+        "poses": "resting,tilted"
+      },
+      "correctnessEvidence": [
+        "crates/geometry-kernels/benches/performance_smoke.rs::box_mesh_contacts",
+        "crates/geometry-kernels/tests/box_mesh_manifold.rs"
+      ],
+      "metrics": [
+        {
+          "name": "callgrind-ir",
+          "unit": "instructions",
+          "direction": "lower",
+          "signal": "instruction-count",
+          "blocking": true,
+          "budget": {
+            "relativeRegressionPercent": 5
+          },
+          "notes": "Guards rust-kernels#225 (bit-identical branch-free SAT axis selection, structure-of-arrays edge axes, inline polygon clipping and an iterative BVH walk: 11-20% faster on this workload when measured). An intentional slowdown must say why in the pull request."
+        }
+      ]
+    },
+    {
+      "id": "box-mesh-cave-contact-allocations",
+      "kind": "micro",
+      "description": "The same 64 resting and tilted cave boxes; manifolds are emitted through the callback from fixed-size buffers.",
+      "dimensions": {
+        "boxes": 64,
+        "triangles": 1968
+      },
+      "correctnessEvidence": [
+        "crates/geometry-kernels/tests/allocation_regressions.rs::box_triangle_mesh_contacts_allocate_nothing"
+      ],
+      "metrics": [
+        {
+          "name": "allocator-alloc-calls",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 0
+          },
+          "notes": "Pins the documented no-heap contract of box_contacts_counted; realloc calls are asserted to be zero too."
+        }
+      ]
+    },
+    {
+      "id": "box-hull-fresh-frames",
+      "kind": "micro",
+      "description": "PreparedBoxHull::new plus one contact for 64 tumbling box orientations (half extent 0.35) resting against a 32-vertex authored rock hull.",
+      "dimensions": {
+        "queries": 64,
+        "hullVertices": 32
+      },
+      "correctnessEvidence": [
+        "crates/geometry-kernels/benches/performance_smoke.rs::box_hull_fresh_frames",
+        "crates/geometry-kernels/src/segment_hull/box_contact.rs tests"
+      ],
+      "metrics": [
+        {
+          "name": "callgrind-ir",
+          "unit": "instructions",
+          "direction": "lower",
+          "signal": "instruction-count",
+          "blocking": true,
+          "budget": {
+            "relativeRegressionPercent": 5
+          },
+          "notes": "Guards rust-kernels#226 (branch-free edge-cone marks so only non-straddling edge/axis pairs run the exact per-pair logic: about 40% faster fresh frames when measured) and #227 (deferred planes allocated once). Results are bit-identical to the pre-#226 kernel."
+        }
+      ]
+    },
+    {
+      "id": "box-hull-fresh-frame-allocations",
+      "kind": "micro",
+      "description": "The same 64 fresh frames and contacts: each frame allocates its face-plane list, and its deferred edge/box-plane list only when a contact needs it.",
+      "dimensions": {
+        "queries": 64,
+        "hullVertices": 32
+      },
+      "correctnessEvidence": [
+        "crates/geometry-kernels/tests/allocation_regressions.rs::fresh_box_hull_frames_allocate_only_their_plane_lists"
+      ],
+      "metrics": [
+        {
+          "name": "allocator-alloc-calls",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 106
+          },
+          "notes": "Exactly 64 face-plane lists plus 42 deferred lists, at most two per frame, and zero realloc calls (#227 sizes the deferred list from the cone marks; #228 removed the per-contact polygon and point allocations)."
+        }
+      ]
+    },
+    {
+      "id": "box-hull-reused-frame",
+      "kind": "micro",
+      "description": "64 contacts of one prepared box orientation (deferred planes already retained) resting around a 32-vertex authored rock hull: the steady state of a box at rest on a hull.",
+      "dimensions": {
+        "contacts": 64,
+        "hullVertices": 32
+      },
+      "correctnessEvidence": [
+        "crates/geometry-kernels/benches/performance_smoke.rs::box_hull_reused_frame"
+      ],
+      "metrics": [
+        {
+          "name": "callgrind-ir",
+          "unit": "instructions",
+          "direction": "lower",
+          "signal": "instruction-count",
+          "blocking": true,
+          "budget": {
+            "relativeRegressionPercent": 5
+          },
+          "notes": "Guards rust-kernels#228 (clip polygons, scratch and points inline: about 17% faster steady-state contacts when measured)."
+        }
+      ]
+    },
+    {
+      "id": "box-hull-reused-frame-allocations",
+      "kind": "micro",
+      "description": "Eight prepared box orientations, each queried at the 64 resting places around the rock.",
+      "dimensions": {
+        "frames": 8,
+        "contactsPerFrame": 64,
+        "hullVertices": 32
+      },
+      "correctnessEvidence": [
+        "crates/geometry-kernels/tests/allocation_regressions.rs::box_hull_contacts_on_a_prepared_frame_allocate_nothing"
+      ],
+      "metrics": [
+        {
+          "name": "allocator-alloc-calls",
+          "unit": "operations",
+          "direction": "lower",
+          "signal": "operation-count",
+          "blocking": true,
+          "budget": {
+            "max": 0
+          },
+          "notes": "rust-kernels#228: sixteen inline polygon vertices and eight inline points; longer polygons still spill to the heap, so this pins that the fixture's resting contacts do not. Realloc calls are asserted to be zero too. Before #228 the first of these frames made 109 alloc and 50 realloc calls over its 64 contacts."
+        }
+      ]
     }
   ],
   "operations": [
