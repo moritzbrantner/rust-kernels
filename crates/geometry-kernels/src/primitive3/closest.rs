@@ -1,7 +1,7 @@
 //! Closest-point queries on triangles, segments and axis-aligned boxes.
 
 use super::query::PrimitiveWork3;
-use crate::math3::{Vec3, add, cross, dot, length_squared, scale, sub};
+use crate::math3::{Vec3, add, cross, dot, is_finite, length_squared, scale, sub};
 
 // `#[inline]` keeps these inlinable into `pairs` despite the codegen-unit split; measured.
 
@@ -85,25 +85,16 @@ pub(super) fn closest_point_segment(
 /// first segment's start is preferred when it belongs to that set.
 #[must_use]
 pub fn closest_segment_points(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> Option<(Vec3, Vec3)> {
-    if !p1
-        .into_iter()
-        .chain(q1)
-        .chain(p2)
-        .chain(q2)
-        .all(f64::is_finite)
-    {
+    if ![p1, q1, p2, q2].iter().all(|p| is_finite(*p)) {
         return None;
     }
     let points = closest_segment_segment(p1, q1, p2, q2, &mut PrimitiveWork3::default());
-    points
-        .0
-        .into_iter()
-        .chain(points.1)
-        .all(f64::is_finite)
-        .then_some(points)
+    (is_finite(points.0) && is_finite(points.1)).then_some(points)
 }
 
-#[inline]
+// Always inlined: as an out-of-line call its `[f64; 3]` arguments and results go
+// through memory, which measured ~14% of WASM mesh-character time (physics-engine#549).
+#[inline(always)]
 pub(super) fn closest_segment_segment(
     p1: Vec3,
     q1: Vec3,
@@ -115,13 +106,14 @@ pub(super) fn closest_segment_segment(
     let unscaled_d1 = sub(q1, p1);
     let unscaled_d2 = sub(q2, p2);
     let unscaled_r = sub(p1, p2);
-    let components = unscaled_d1.into_iter().chain(unscaled_d2).chain(unscaled_r);
     let mut span = 0.0_f64;
-    for component in components {
-        if !component.is_finite() {
-            return ([f64::NAN; 3], [f64::NAN; 3]);
+    for vector in [unscaled_d1, unscaled_d2, unscaled_r] {
+        for component in vector {
+            if !component.is_finite() {
+                return ([f64::NAN; 3], [f64::NAN; 3]);
+            }
+            span = span.max(component.abs());
         }
-        span = span.max(component.abs());
     }
     if span == 0.0 {
         return (p1, p2);
