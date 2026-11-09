@@ -46,3 +46,7 @@ harness = false
 [[bench]]
 name = "heightfield"
 harness = false
+
+[[bench]]
+name = "segment_hull_box"
+harness = false

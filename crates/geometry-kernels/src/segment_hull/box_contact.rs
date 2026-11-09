@@ -1,6 +1,6 @@
 //! Fixed-orientation box/polytope SAT and clipped contact witnesses.
 use super::PreparedSegmentHull;
-use crate::math3::{Vec3, add, cross, dot, length_squared, neg, normalized, scale, sub};
+use crate::math3::{Vec3, add, cross, dot, is_finite, length_squared, neg, normalized, scale, sub};
 use crate::primitive3::closest_segment_points;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -78,12 +78,7 @@ impl BoxFrame {
         // Hull faces can certify separation/contact before any vertex projections.
         let mut planes = Vec::with_capacity(hull.faces.len());
         let mut push = |normal: Vec3, origin: Vec3, offset: f64, feature: Feature| {
-            if !normal
-                .into_iter()
-                .chain(origin)
-                .chain([offset])
-                .all(f64::is_finite)
-            {
+            if !is_finite(normal) || !is_finite(origin) || !offset.is_finite() {
                 return Err(BoxHullError::NonFiniteComputation);
             }
             planes.push(PreparedAxis {
@@ -133,12 +128,7 @@ impl BoxFrame {
         let radius = |n| (0..3).map(|i| half[i] * dot(axes[i], n).abs()).sum::<f64>();
         let mut planes = Vec::with_capacity(6);
         let mut push = |normal: Vec3, origin: Vec3, offset: f64, feature: Feature| {
-            if !normal
-                .into_iter()
-                .chain(origin)
-                .chain([offset])
-                .all(f64::is_finite)
-            {
+            if !is_finite(normal) || !is_finite(origin) || !offset.is_finite() {
                 return Err(BoxHullError::NonFiniteComputation);
             }
             planes.push(PreparedAxis {
@@ -164,16 +154,41 @@ impl BoxFrame {
         // An edge cross axis matters only inside the hull edge's outward normal
         // cone. Its two adjacent triangles certify support locally, avoiding a
         // full hull-vertex projection for every edge/box-axis pair.
-        for (e, edge) in hull.edges.iter().enumerate() {
-            let [a, b] = edge.ends.map(|i| hull.hull.vertices[i as usize]);
-            let [p, q] = edge
-                .opposite
-                .map(|i| sub(hull.hull.vertices[i as usize], a));
+        let vertex = |i: u32| hull.hull.vertices[i as usize];
+        // Most edge/axis pairs straddle the edge's normal cone on the prepared
+        // cone normals alone. A branch-free pass marks every other pair (and
+        // every pair inside the cone tolerance) per 64-edge chunk; the exact
+        // per-pair logic below then runs for marked pairs only, in edge-major,
+        // axis-minor order, so the planes and their order are unchanged.
+        for (c, chunk) in hull.edges.chunks(64).enumerate() {
+            let mut marked = [0_u64; 3];
             for (k, axis) in axes.into_iter().enumerate() {
-                let mut dp = dot(axis, edge.cone_normals[0]);
-                let mut dq = dot(axis, edge.cone_normals[1]);
-                let crossed =
-                    if dp.abs() <= edge.cone_tolerance[0] || dq.abs() <= edge.cone_tolerance[1] {
+                for (i, edge) in chunk.iter().enumerate() {
+                    let dp = dot(axis, edge.cone_normals[0]);
+                    let dq = dot(axis, edge.cone_normals[1]);
+                    let near =
+                        (dp.abs() <= edge.cone_tolerance[0]) | (dq.abs() <= edge.cone_tolerance[1]);
+                    let straddles = (dp < 0.0) & (dq > 0.0) | (dp > 0.0) & (dq < 0.0);
+                    marked[k] |= u64::from(near | !straddles) << i;
+                }
+            }
+            let mut edges = marked[0] | marked[1] | marked[2];
+            while edges != 0 {
+                let i = edges.trailing_zeros() as usize;
+                edges &= edges - 1;
+                let (e, edge) = (64 * c + i, &chunk[i]);
+                let ends = || edge.ends.map(vertex);
+                for (k, axis) in axes.into_iter().enumerate() {
+                    if marked[k] >> i & 1 == 0 {
+                        continue;
+                    }
+                    let mut dp = dot(axis, edge.cone_normals[0]);
+                    let mut dq = dot(axis, edge.cone_normals[1]);
+                    let crossed = if dp.abs() <= edge.cone_tolerance[0]
+                        || dq.abs() <= edge.cone_tolerance[1]
+                    {
+                        let [a, b] = ends();
+                        let [p, q] = edge.opposite.map(|i| sub(vertex(i), a));
                         let crossed = cross(sub(b, a), axis);
                         dp = dot(crossed, p);
                         dq = dot(crossed, q);
@@ -181,30 +196,32 @@ impl BoxFrame {
                     } else {
                         None
                     };
-                if (dp < 0.0 && dq > 0.0) || (dp > 0.0 && dq < 0.0) {
-                    continue;
-                }
-                let crossed = crossed.unwrap_or_else(|| cross(sub(b, a), axis));
-                if length_squared(crossed) <= 1e-24 {
-                    continue;
-                }
-                let n = if dp == 0.0 && dq == 0.0 {
-                    if dot(crossed, sub(hull.centre, a)) <= 0.0 {
-                        crossed
-                    } else {
-                        neg(crossed)
+                    if (dp < 0.0 && dq > 0.0) || (dp > 0.0 && dq < 0.0) {
+                        continue;
                     }
-                } else if dp <= 0.0 && dq <= 0.0 {
-                    crossed
-                } else if dp >= 0.0 && dq >= 0.0 {
-                    neg(crossed)
-                } else {
-                    continue;
-                };
-                let Some(n) = normalized(n) else {
-                    continue;
-                };
-                push(n, a, radius(n), Feature::Edge(e, k))?;
+                    let [a, b] = ends();
+                    let crossed = crossed.unwrap_or_else(|| cross(sub(b, a), axis));
+                    if length_squared(crossed) <= 1e-24 {
+                        continue;
+                    }
+                    let n = if dp == 0.0 && dq == 0.0 {
+                        if dot(crossed, sub(hull.centre, a)) <= 0.0 {
+                            crossed
+                        } else {
+                            neg(crossed)
+                        }
+                    } else if dp <= 0.0 && dq <= 0.0 {
+                        crossed
+                    } else if dp >= 0.0 && dq >= 0.0 {
+                        neg(crossed)
+                    } else {
+                        continue;
+                    };
+                    let Some(n) = normalized(n) else {
+                        continue;
+                    };
+                    push(n, a, radius(n), Feature::Edge(e, k))?;
+                }
             }
         }
 
