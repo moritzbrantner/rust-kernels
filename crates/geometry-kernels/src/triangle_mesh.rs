@@ -10,7 +10,7 @@ pub use box_contacts::{TriangleMeshBoxManifold3, TriangleMeshBoxPoint3};
 
 use crate::{
     heightfield::{ConvexPolytope3, polytope_triangle_contact},
-    math3::{Vec3, add, cross, dot, length, scale, sub},
+    math3::{Vec3, add, cross, dot, is_finite, length, scale, sub},
     primitive3::{closest_point_triangle, closest_segment_points},
     ray_triangle::segment_triangle_f64,
     sweep_search::{CapsuleMotion, SweepSteps},
@@ -247,27 +247,27 @@ impl PreparedTriangleMesh3 {
         work: &mut TriangleMeshWork3,
         mut f: impl FnMut(u32, &mut TriangleMeshWork3) -> Result<(), TriangleMeshError3>,
     ) -> Result<(), TriangleMeshError3> {
-        fn walk(
-            mesh: &PreparedTriangleMesh3,
-            at: usize,
-            bounds: Bounds,
-            work: &mut TriangleMeshWork3,
-            f: &mut impl FnMut(u32, &mut TriangleMeshWork3) -> Result<(), TriangleMeshError3>,
-        ) -> Result<(), TriangleMeshError3> {
+        // Depth-first, left child first. Median splits keep the depth at most
+        // 33 for u32 triangle ids, so a fixed stack never overflows.
+        let mut stack = [0_usize; 64];
+        let mut len = 1;
+        while len > 0 {
+            len -= 1;
+            let node = &self.nodes[stack[len]];
             work.nodes_visited += 1;
-            let node = &mesh.nodes[at];
             if !node.bounds.overlaps(bounds) {
-                return Ok(());
+                continue;
             }
             match node.kind {
-                NodeKind::Leaf(id) => f(id, work),
+                NodeKind::Leaf(id) => f(id, work)?,
                 NodeKind::Branch(a, b) => {
-                    walk(mesh, a, bounds, work, f)?;
-                    walk(mesh, b, bounds, work, f)
+                    stack[len] = b;
+                    stack[len + 1] = a;
+                    len += 2;
                 }
             }
         }
-        walk(self, 0, bounds, work, &mut f)
+        Ok(())
     }
     pub fn capsule_contact_counted(
         &self,

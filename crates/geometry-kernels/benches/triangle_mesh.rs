@@ -162,3 +162,41 @@ fn cave_capsule_sweep(bencher: Bencher, motion: &str) {
         }
     });
 }
+
+/// 64 boxes (half extents 0.4 x 0.3 x 0.5) resting on the cave floor, axis aligned or tilted,
+/// each queried once for contacts with a 0.02 margin.
+#[divan::bench(args = ["resting", "tilted"])]
+fn cave_box_contacts(bencher: Bencher, pose: &str) {
+    let mesh = PreparedTriangleMesh3::try_new(cave()).unwrap();
+    let half = [0.4, 0.3, 0.5];
+    let axes = if pose == "resting" {
+        [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]
+    } else {
+        let (s, c) = 0.21_f64.sin_cos();
+        let (s2, c2) = 0.37_f64.sin_cos();
+        [[c, s, 0.], [-s * c2, c * c2, s2], [s * s2, -c * s2, c2]]
+    };
+    let boxes: Vec<_> = (0..64)
+        .map(|i| {
+            let (x, z) = (
+                f64::from(i % 16) * 2.1 - 16.0,
+                f64::from(i / 16) * 0.5 - 0.8,
+            );
+            let floor = mesh
+                .segment_hit([x, 0.0, z], [x, -4.0, z])
+                .unwrap()
+                .unwrap()
+                .point[1];
+            [x, floor + 0.29, z]
+        })
+        .collect();
+    let mut work = geometry_kernels::triangle_mesh::TriangleMeshWork3::default();
+    bencher.bench_local(|| {
+        for &center in &boxes {
+            mesh.box_contacts_counted(black_box(center), axes, half, 0.02, &mut work, |m| {
+                black_box(m);
+            })
+            .unwrap();
+        }
+    });
+}

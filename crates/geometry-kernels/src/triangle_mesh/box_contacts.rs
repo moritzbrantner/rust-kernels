@@ -72,17 +72,19 @@ impl PreparedTriangleMesh3 {
             let edge_directions = geometry
                 .edge_directions
                 .map(|edge| axes.map(|axis| dot(edge, axis)));
-            let inward_normals = geometry
-                .inward_normals
-                .map(|normal| axes.map(|axis| dot(normal, axis)));
-            if !triangle.into_iter().flatten().all(f64::is_finite) {
+            if !triangle.iter().all(|p| is_finite(*p)) {
                 return Err(TriangleMeshError3::NonFiniteComputation);
             }
             if let Some(mut manifold) = contacts(
                 triangle,
                 normal,
                 edge_directions,
-                inward_normals,
+                // Only a triangle-face manifold clips against the edge planes.
+                || {
+                    geometry
+                        .inward_normals
+                        .map(|normal| axes.map(|axis| dot(normal, axis)))
+                },
                 half_extents,
                 margin,
             )? {
@@ -92,12 +94,7 @@ impl PreparedTriangleMesh3 {
                 for point in &mut manifold.points[..manifold.len] {
                     point.point_on_box = add(center, rotate(point.point_on_box));
                     point.point_on_triangle = add(center, rotate(point.point_on_triangle));
-                    if !point
-                        .point_on_box
-                        .into_iter()
-                        .chain(point.point_on_triangle)
-                        .all(f64::is_finite)
-                    {
+                    if !is_finite(point.point_on_box) || !is_finite(point.point_on_triangle) {
                         return Err(TriangleMeshError3::NonFiniteComputation);
                     }
                 }
@@ -152,74 +149,135 @@ fn contacts(
     t: [Vec3; 3],
     tn: Vec3,
     edge_directions: [Vec3; 3],
-    inward_normals: [Vec3; 3],
+    inward_normals: impl FnOnce() -> [Vec3; 3],
     h: Vec3,
     margin: f64,
 ) -> Result<Option<TriangleMeshBoxManifold3>, TriangleMeshError3> {
     // A rigid transform of a prepared unit normal is already well scaled.
     let tn = scale(tn, length(tn).recip());
-    let mut best = (f64::NEG_INFINITY, tn, Feature::TriangleFace);
-    let mut test = |axis: Vec3, feature: Feature| -> Result<bool, TriangleMeshError3> {
-        let radius = (0..3).map(|i| h[i] * axis[i].abs()).sum::<f64>();
+    // The best axis as (gap, axis code, flipped): 0 is the triangle face,
+    // 1..=3 the box faces and 4 + 3j + i the cross of box axis i with edge j.
+    // Scalars keep the update branch-free; the axis is rebuilt after the scan.
+    let mut best = (f64::NEG_INFINITY, 0, false);
+    let max = |a: f64, b: f64| if b > a { b } else { a };
+    // Inputs are finite here, so plain comparisons are f64::min/max.
+    let mut separated =
+        |radius: f64, ds: [f64; 3], code: usize| -> Result<bool, TriangleMeshError3> {
+            let lo = if ds[1] < ds[0] { ds[1] } else { ds[0] };
+            let lo = if ds[2] < lo { ds[2] } else { lo };
+            let hi = max(max(ds[0], ds[1]), ds[2]);
+            let positive = -radius - hi;
+            let negative = lo - radius;
+            let flipped = positive < negative;
+            let sep = if flipped { negative } else { positive };
+            if !sep.is_finite() {
+                return Err(TriangleMeshError3::NonFiniteComputation);
+            }
+            if sep > margin {
+                return Ok(false);
+            }
+            // Face-first strict tie breaking keeps coplanar patches stable.
+            let tie_tolerance = 64. * f64::EPSILON * max(max(radius, lo.abs()), hi.abs());
+            let better = sep > best.0 + tie_tolerance;
+            best = (
+                if better { sep } else { best.0 },
+                if better { code } else { best.1 },
+                if better { flipped } else { best.2 },
+            );
+            Ok(true)
+        };
+    let project = |axis: Vec3| -> Result<(f64, [f64; 3]), TriangleMeshError3> {
+        let radius = h[0] * axis[0].abs() + h[1] * axis[1].abs() + h[2] * axis[2].abs();
         let ds = t.map(|p| dot(p, axis));
         if !radius.is_finite() || !ds.into_iter().all(f64::is_finite) {
             return Err(TriangleMeshError3::NonFiniteComputation);
         }
-        let lo = ds.into_iter().fold(f64::INFINITY, f64::min);
-        let hi = ds.into_iter().fold(f64::NEG_INFINITY, f64::max);
-        let positive = -radius - hi;
-        let negative = lo - radius;
-        let (sep, n) = if positive >= negative {
-            (positive, axis)
-        } else {
-            (negative, scale(axis, -1.))
-        };
-        if !sep.is_finite() {
-            return Err(TriangleMeshError3::NonFiniteComputation);
-        }
-        if sep > margin {
-            return Ok(false);
-        }
-        // Face-first strict tie breaking keeps coplanar patches stable.
-        let tie_tolerance = 64. * f64::EPSILON * radius.max(lo.abs()).max(hi.abs());
-        if sep > best.0 + tie_tolerance {
-            best = (sep, n, feature);
-        }
-        Ok(true)
+        Ok((radius, ds))
     };
-    if !test(tn, Feature::TriangleFace)? {
+    let (radius, ds) = project(tn)?;
+    if !separated(radius, ds, 0)? {
         return Ok(None);
     }
-    for (i, axis) in BASIS.into_iter().enumerate() {
-        if !test(axis, Feature::BoxFace(i))? {
+    // A box face axis projects the box to its half extent and the (finite)
+    // local triangle to one coordinate; the general projection gives the
+    // same values up to the sign of an exact zero, which no result observes.
+    for i in 0..3 {
+        if !separated(h[i], t.map(|p| p[i]), 1 + i)? {
             return Ok(None);
         }
     }
+    // Project all nine edge cross axes branch-free, one array per component
+    // so the arithmetic vectorizes, then scan them in the scalar order: the
+    // same IEEE operations per axis give identical results and errors.
+    let mut axis = [[0.; 9]; 3];
     for (j, e) in edge_directions.into_iter().enumerate() {
-        let cross_axes = [[0., -e[2], e[1]], [e[2], 0., -e[0]], [-e[1], e[0], 0.]];
-        for (i, axis) in cross_axes.into_iter().enumerate() {
+        for (i, c) in [[0., -e[2], e[1]], [e[2], 0., -e[0]], [-e[1], e[0], 0.]]
+            .into_iter()
+            .enumerate()
+        {
+            for k in 0..3 {
+                axis[k][3 * j + i] = c[k];
+            }
+        }
+    }
+    let lengths: [f64; 9] = std::array::from_fn(|a| {
+        (axis[0][a] * axis[0][a] + axis[1][a] * axis[1][a] + axis[2][a] * axis[2][a]).sqrt()
+    });
+    for component in &mut axis {
+        for (v, length) in component.iter_mut().zip(lengths) {
+            *v *= length.recip();
+        }
+    }
+    let radii: [f64; 9] = std::array::from_fn(|a| {
+        h[0] * axis[0][a].abs() + h[1] * axis[1][a].abs() + h[2] * axis[2][a].abs()
+    });
+    let ds: [[f64; 9]; 3] = t.map(|p| {
+        std::array::from_fn(|a| p[0] * axis[0][a] + p[1] * axis[1][a] + p[2] * axis[2][a])
+    });
+    for (j, e) in edge_directions.into_iter().enumerate() {
+        for i in 0..3 {
             // This cross axis already has one zero component. If either other
             // component is zero it is redundant with a tested box face axis.
             if e[(i + 1) % 3] == 0. || e[(i + 2) % 3] == 0. {
                 continue;
             }
-            let axis_length = length(axis);
-            if axis_length > 64. * f64::EPSILON
-                && !test(scale(axis, axis_length.recip()), Feature::Edge(i, j))?
-            {
-                return Ok(None);
+            let a = 3 * j + i;
+            if lengths[a] > 64. * f64::EPSILON {
+                let (radius, ds) = (radii[a], ds.map(|d| d[a]));
+                if !radius.is_finite() || !ds.into_iter().all(f64::is_finite) {
+                    return Err(TriangleMeshError3::NonFiniteComputation);
+                }
+                if !separated(radius, ds, 4 + a)? {
+                    return Ok(None);
+                }
             }
         }
     }
-    let (separation, normal, feature) = best;
+    let (separation, code, flipped) = best;
+    let (axis, feature) = match code {
+        0 => (tn, Feature::TriangleFace),
+        1..=3 => (BASIS[code - 1], Feature::BoxFace(code - 1)),
+        _ => {
+            let a = code - 4;
+            (
+                [axis[0][a], axis[1][a], axis[2][a]],
+                Feature::Edge(a % 3, a / 3),
+            )
+        }
+    };
+    let normal = if flipped { scale(axis, -1.) } else { axis };
     let mut points = [TriangleMeshBoxPoint3::default(); 8];
     let mut count = 0;
-    let tolerance = 128.
-        * f64::EPSILON
-        * h.into_iter()
-            .chain(t.into_iter().flatten())
-            .map(f64::abs)
-            .fold(0., f64::max);
+    // Every input is finite here, so a plain comparison fold is f64::max.
+    let mut magnitude = 0.;
+    for v in [h, t[0], t[1], t[2]] {
+        for v in v {
+            if v.abs() > magnitude {
+                magnitude = v.abs();
+            }
+        }
+    }
+    let tolerance = 128. * f64::EPSILON * magnitude;
     match feature {
         Feature::TriangleFace => {
             let face = (0..3)
@@ -236,10 +294,11 @@ fn contacts(
                 p[v] = sv * h[v];
                 polygon.push(p)?;
             }
+            let inward_normals = inward_normals();
             for i in 0..3 {
                 polygon.clip(inward_normals[i], t[i], tolerance)?;
             }
-            for &p in &polygon.points[..polygon.len] {
+            for &p in polygon.points() {
                 let sep = dot(sub(p, t[0]), normal);
                 if sep <= margin {
                     points[count] = TriangleMeshBoxPoint3 {
@@ -266,7 +325,7 @@ fn contacts(
                 }
             }
             let box_plane = -h[face]; // projection of the box face onto mesh->box normal
-            for &p in &polygon.points[..polygon.len] {
+            for &p in polygon.points() {
                 let sep = box_plane - dot(p, normal);
                 if sep <= margin {
                     points[count] = TriangleMeshBoxPoint3 {
@@ -388,40 +447,39 @@ fn contacts(
         }
     }
     if result.points[..result.len].iter().any(|p| {
-        !p.separation.is_finite()
-            || !p
-                .point_on_box
-                .into_iter()
-                .chain(p.point_on_triangle)
-                .all(f64::is_finite)
+        !p.separation.is_finite() || !is_finite(p.point_on_box) || !is_finite(p.point_on_triangle)
     }) {
         return Err(TriangleMeshError3::NonFiniteComputation);
     }
     Ok(Some(result))
 }
 
+/// A convex polygon of at most eight vertices, clipped between two buffers
+/// so no clip zeroes or copies a fresh one.
 struct Polygon {
-    points: [Vec3; 8],
+    buffers: [[Vec3; 8]; 2],
+    front: usize,
     len: usize,
 }
 impl Polygon {
     fn empty() -> Self {
         Self {
-            points: [[0.; 3]; 8],
+            buffers: [[[0.; 3]; 8]; 2],
+            front: 0,
             len: 0,
         }
     }
+    fn points(&self) -> &[Vec3] {
+        &self.buffers[self.front][..self.len]
+    }
     fn push(&mut self, p: Vec3) -> Result<(), TriangleMeshError3> {
-        if !p.into_iter().all(f64::is_finite) {
+        if !is_finite(p) {
             return Err(TriangleMeshError3::NonFiniteComputation);
         }
-        self.push_finite(p)
-    }
-    fn push_finite(&mut self, p: Vec3) -> Result<(), TriangleMeshError3> {
-        if self.len == self.points.len() {
+        if self.len == 8 {
             return Err(TriangleMeshError3::Capacity);
         }
-        self.points[self.len] = p;
+        self.buffers[self.front][self.len] = p;
         self.len += 1;
         Ok(())
     }
@@ -429,14 +487,28 @@ impl Polygon {
         if self.len == 0 {
             return Ok(());
         }
-        let mut out = Self::empty();
-        let mut a = self.points[0];
+        let [first, second] = &mut self.buffers;
+        let (points, out) = if self.front == 0 {
+            (&*first, second)
+        } else {
+            (&*second, first)
+        };
+        let mut count = 0;
+        let mut emit = |p: Vec3| {
+            if count == out.len() {
+                return Err(TriangleMeshError3::Capacity);
+            }
+            out[count] = p;
+            count += 1;
+            Ok(())
+        };
+        let mut a = points[0];
         let mut da = dot(sub(a, origin), n);
         if !da.is_finite() {
             return Err(TriangleMeshError3::NonFiniteComputation);
         }
         for i in 0..self.len {
-            let b = self.points[if i + 1 == self.len { 0 } else { i + 1 }];
+            let b = points[if i + 1 == self.len { 0 } else { i + 1 }];
             let db = dot(sub(b, origin), n);
             if !db.is_finite() {
                 return Err(TriangleMeshError3::NonFiniteComputation);
@@ -444,7 +516,7 @@ impl Polygon {
             let inside_a = da >= -tolerance;
             let inside_b = db >= -tolerance;
             if inside_a {
-                out.push_finite(a)?;
+                emit(a)?;
             }
             if inside_a != inside_b {
                 // Opposite signs can overflow da-db even when each endpoint
@@ -461,13 +533,18 @@ impl Polygon {
                 // vertex. Avoid duplicates before the next clip (a clipped
                 // quad/triangle has at most seven distinct vertices).
                 if fraction > 0. && fraction < 1. {
-                    out.push(add(scale(a, 1. - fraction), scale(b, fraction)))?;
+                    let p = add(scale(a, 1. - fraction), scale(b, fraction));
+                    if !is_finite(p) {
+                        return Err(TriangleMeshError3::NonFiniteComputation);
+                    }
+                    emit(p)?;
                 }
             }
             a = b;
             da = db;
         }
-        *self = out;
+        self.front = 1 - self.front;
+        self.len = count;
         Ok(())
     }
 }
