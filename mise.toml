@@ -1,0 +1,16 @@
+# Recommended CLI utilities for coding agents and human contributors.
+# Optional: install them with `mise install`; builds and CI keep their existing toolchains.
+# The general utilities deliberately track the latest stable release because they are
+# conveniences, not version-sensitive build inputs. Pin individual tools when
+# reproducibility is required.
+#
+# Valgrind is not in the mise registry; install it from the system package manager
+# (`sudo apt-get install valgrind`). It is required by the Iai-Callgrind sentinels in
+# `scripts/benchmark-smoke.sh` and useful for `valgrind --tool=callgrind` investigations.
+[tools]
+jq = "latest"
+ripgrep = "latest"
+fd = "latest"
+gh = "latest"
+# Must equal the `iai-callgrind` dev-dependency version and the runner CI installs.
+"cargo:iai-callgrind-runner" = "0.16.1"
