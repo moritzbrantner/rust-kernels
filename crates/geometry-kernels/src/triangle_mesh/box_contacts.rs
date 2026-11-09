@@ -72,6 +72,9 @@ impl PreparedTriangleMesh3 {
             let edge_directions = geometry
                 .edge_directions
                 .map(|edge| axes.map(|axis| dot(edge, axis)));
+            let inward_normals = geometry
+                .inward_normals
+                .map(|normal| axes.map(|axis| dot(normal, axis)));
             if !triangle.iter().all(|p| is_finite(*p)) {
                 return Err(TriangleMeshError3::NonFiniteComputation);
             }
@@ -79,12 +82,7 @@ impl PreparedTriangleMesh3 {
                 triangle,
                 normal,
                 edge_directions,
-                // Only a triangle-face manifold clips against the edge planes.
-                || {
-                    geometry
-                        .inward_normals
-                        .map(|normal| axes.map(|axis| dot(normal, axis)))
-                },
+                inward_normals,
                 half_extents,
                 margin,
             )? {
@@ -149,7 +147,7 @@ fn contacts(
     t: [Vec3; 3],
     tn: Vec3,
     edge_directions: [Vec3; 3],
-    inward_normals: impl FnOnce() -> [Vec3; 3],
+    inward_normals: [Vec3; 3],
     h: Vec3,
     margin: f64,
 ) -> Result<Option<TriangleMeshBoxManifold3>, TriangleMeshError3> {
@@ -157,7 +155,7 @@ fn contacts(
     let tn = scale(tn, length(tn).recip());
     // The best axis as (gap, axis code, flipped): 0 is the triangle face,
     // 1..=3 the box faces and 4 + 3j + i the cross of box axis i with edge j.
-    // Scalars keep the update branch-free; the axis is rebuilt after the scan.
+    // The axis itself is rebuilt once after the scan.
     let mut best = (f64::NEG_INFINITY, 0, false);
     let max = |a: f64, b: f64| if b > a { b } else { a };
     // Inputs are finite here, so plain comparisons are f64::min/max.
@@ -178,12 +176,9 @@ fn contacts(
             }
             // Face-first strict tie breaking keeps coplanar patches stable.
             let tie_tolerance = 64. * f64::EPSILON * max(max(radius, lo.abs()), hi.abs());
-            let better = sep > best.0 + tie_tolerance;
-            best = (
-                if better { sep } else { best.0 },
-                if better { code } else { best.1 },
-                if better { flipped } else { best.2 },
-            );
+            if sep > best.0 + tie_tolerance {
+                best = (sep, code, flipped);
+            }
             Ok(true)
         };
     let project = |axis: Vec3| -> Result<(f64, [f64; 3]), TriangleMeshError3> {
@@ -198,11 +193,9 @@ fn contacts(
     if !separated(radius, ds, 0)? {
         return Ok(None);
     }
-    // A box face axis projects the box to its half extent and the (finite)
-    // local triangle to one coordinate; the general projection gives the
-    // same values up to the sign of an exact zero, which no result observes.
-    for i in 0..3 {
-        if !separated(h[i], t.map(|p| p[i]), 1 + i)? {
+    for (i, axis) in BASIS.into_iter().enumerate() {
+        let (radius, ds) = project(axis)?;
+        if !separated(radius, ds, 1 + i)? {
             return Ok(None);
         }
     }
@@ -294,7 +287,6 @@ fn contacts(
                 p[v] = sv * h[v];
                 polygon.push(p)?;
             }
-            let inward_normals = inward_normals();
             for i in 0..3 {
                 polygon.clip(inward_normals[i], t[i], tolerance)?;
             }

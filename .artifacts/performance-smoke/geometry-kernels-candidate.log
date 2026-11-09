@@ -1,0 +1,39 @@
+   Compiling geometry-kernels v0.1.0 (/home/brantner/.cache/claude-work/rk-s/crates/geometry-kernels)
+    Finished `bench` profile [optimized] target(s) in 5.84s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running benches/performance_smoke.rs (target/performance-smoke/candidate/release/deps/performance_smoke-d420a25d202b1bfc)
+performance_smoke::contact_smoke::box_mesh_contacts cave_resting_64:cave_case(false)
+  Baselines:                               |pr_base
+  Instructions:                     2770625|N/A                  (*********)
+  L1 Hits:                          3701886|N/A                  (*********)
+  LL Hits:                             5553|N/A                  (*********)
+  RAM Hits:                             480|N/A                  (*********)
+  Total read+write:                 3707919|N/A                  (*********)
+  Estimated Cycles:                 3746451|N/A                  (*********)
+performance_smoke::contact_smoke::box_mesh_contacts cave_tilted_64:cave_case(true)
+  Baselines:                               |pr_base
+  Instructions:                     2053686|N/A                  (*********)
+  L1 Hits:                          2786733|N/A                  (*********)
+  LL Hits:                             5738|N/A                  (*********)
+  RAM Hits:                             444|N/A                  (*********)
+  Total read+write:                 2792915|N/A                  (*********)
+  Estimated Cycles:                 2830963|N/A                  (*********)
+performance_smoke::contact_smoke::box_hull_fresh_frames tumbling_64:rock_case()
+  Baselines:                               |pr_base
+  Instructions:                     1784595|1791315              (-0.37514%) [-1.00377x]
+  L1 Hits:                          2409444|2419918              (-0.43282%) [-1.00435x]
+  LL Hits:                             6113|5706                 (+7.13284%) [+1.07133x]
+  RAM Hits:                             531|534                  (-0.56180%) [-1.00565x]
+  Total read+write:                 2416088|2426158              (-0.41506%) [-1.00417x]
+  Estimated Cycles:                 2458594|2467138              (-0.34631%) [-1.00348x]
+performance_smoke::contact_smoke::box_hull_reused_frame resting_64:prepared_rock_case()
+  Baselines:                               |pr_base
+  Instructions:                      542702|549442               (-1.22670%) [-1.01242x]
+  L1 Hits:                           739210|749315               (-1.34857%) [-1.01367x]
+  LL Hits:                              152|155                  (-1.93548%) [-1.01974x]
+  RAM Hits:                             144|138                  (+4.34783%) [+1.04348x]
+  Total read+write:                  739506|749608               (-1.34764%) [-1.01366x]
+  Estimated Cycles:                  745010|754920               (-1.31272%) [-1.01330x]
+
+Iai-Callgrind result: Ok. 4 without regressions; 0 regressed; 4 benchmarks finished in 2.36660s
