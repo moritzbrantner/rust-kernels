@@ -3,6 +3,7 @@ pub type Vec3 = [f64; 3];
 pub const NORMALIZE_EPSILON_SQUARED: f64 = 1.0e-24;
 
 #[must_use]
+#[inline]
 pub fn is_finite(vector: Vec3) -> bool {
     vector.into_iter().all(f64::is_finite)
 }

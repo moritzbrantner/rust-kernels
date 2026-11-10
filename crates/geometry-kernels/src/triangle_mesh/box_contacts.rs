@@ -63,18 +63,20 @@ impl PreparedTriangleMesh3 {
         self.visit(bounds, work, |id, work| {
             work.triangles_tested += 1;
             work.normal_reuses += 1;
-            let triangle = self.triangle(id).map(|p| {
-                let d = sub(p, center);
-                axes.map(|axis| dot(d, axis))
-            });
-            let normal = axes.map(|axis| dot(self.normals[id as usize], axis));
+            // Explicit arrays: nested `array::map` calls compile to out-of-line
+            // `try_map` instances here (measured, physics-engine#549 follow-up).
+            let [a, b, c] = self.triangle(id);
+            let triangle = [
+                to_frame(sub(a, center), axes),
+                to_frame(sub(b, center), axes),
+                to_frame(sub(c, center), axes),
+            ];
+            let normal = to_frame(self.normals[id as usize], axes);
             let geometry = &self.box_geometry[id as usize];
-            let edge_directions = geometry
-                .edge_directions
-                .map(|edge| axes.map(|axis| dot(edge, axis)));
-            let inward_normals = geometry
-                .inward_normals
-                .map(|normal| axes.map(|axis| dot(normal, axis)));
+            let [e0, e1, e2] = geometry.edge_directions;
+            let edge_directions = [to_frame(e0, axes), to_frame(e1, axes), to_frame(e2, axes)];
+            let [n0, n1, n2] = geometry.inward_normals;
+            let inward_normals = [to_frame(n0, axes), to_frame(n1, axes), to_frame(n2, axes)];
             if !triangle.iter().all(|p| is_finite(*p)) {
                 return Err(TriangleMeshError3::NonFiniteComputation);
             }
@@ -108,6 +110,11 @@ enum Feature {
     TriangleFace,
     BoxFace(usize),
     Edge(usize, usize),
+}
+/// `v` in the frame whose orthonormal axes are `axes`.
+#[inline(always)]
+fn to_frame(v: Vec3, axes: [Vec3; 3]) -> Vec3 {
+    [dot(v, axes[0]), dot(v, axes[1]), dot(v, axes[2])]
 }
 const BASIS: [Vec3; 3] = [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]];
 
@@ -143,6 +150,7 @@ impl TriangleBoxGeometry {
     }
 }
 
+#[inline(always)]
 fn contacts(
     t: [Vec3; 3],
     tn: Vec3,
@@ -183,7 +191,7 @@ fn contacts(
         };
     let project = |axis: Vec3| -> Result<(f64, [f64; 3]), TriangleMeshError3> {
         let radius = h[0] * axis[0].abs() + h[1] * axis[1].abs() + h[2] * axis[2].abs();
-        let ds = t.map(|p| dot(p, axis));
+        let ds = [dot(t[0], axis), dot(t[1], axis), dot(t[2], axis)];
         if !radius.is_finite() || !ds.into_iter().all(f64::is_finite) {
             return Err(TriangleMeshError3::NonFiniteComputation);
         }
@@ -224,9 +232,12 @@ fn contacts(
     let radii: [f64; 9] = std::array::from_fn(|a| {
         h[0] * axis[0][a].abs() + h[1] * axis[1][a].abs() + h[2] * axis[2][a].abs()
     });
-    let ds: [[f64; 9]; 3] = t.map(|p| {
-        std::array::from_fn(|a| p[0] * axis[0][a] + p[1] * axis[1][a] + p[2] * axis[2][a])
-    });
+    let mut ds = [[0.; 9]; 3];
+    for (d, p) in ds.iter_mut().zip(t) {
+        for (a, d) in d.iter_mut().enumerate() {
+            *d = p[0] * axis[0][a] + p[1] * axis[1][a] + p[2] * axis[2][a];
+        }
+    }
     for (j, e) in edge_directions.into_iter().enumerate() {
         for i in 0..3 {
             // This cross axis already has one zero component. If either other
@@ -236,7 +247,7 @@ fn contacts(
             }
             let a = 3 * j + i;
             if lengths[a] > 64. * f64::EPSILON {
-                let (radius, ds) = (radii[a], ds.map(|d| d[a]));
+                let (radius, ds) = (radii[a], [ds[0][a], ds[1][a], ds[2][a]]);
                 if !radius.is_finite() || !ds.into_iter().all(f64::is_finite) {
                     return Err(TriangleMeshError3::NonFiniteComputation);
                 }
