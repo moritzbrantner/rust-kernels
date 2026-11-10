@@ -239,7 +239,9 @@ impl PreparedTriangleMesh3 {
         self.preparation
     }
     fn triangle(&self, id: u32) -> [Vec3; 3] {
-        self.data.triangles[id as usize].map(|i| self.data.vertices[i as usize])
+        let [a, b, c] = self.data.triangles[id as usize];
+        let v = &self.data.vertices;
+        [v[a as usize], v[b as usize], v[c as usize]]
     }
     fn visit(
         &self,

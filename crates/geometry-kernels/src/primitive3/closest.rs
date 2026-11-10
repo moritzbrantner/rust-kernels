@@ -84,6 +84,7 @@ pub(super) fn closest_point_segment(
 /// range. Parallel segments can have multiple equally close point pairs; the
 /// first segment's start is preferred when it belongs to that set.
 #[must_use]
+#[inline]
 pub fn closest_segment_points(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> Option<(Vec3, Vec3)> {
     if ![p1, q1, p2, q2].iter().all(|p| is_finite(*p)) {
         return None;
