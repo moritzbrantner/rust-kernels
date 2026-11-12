@@ -12,14 +12,14 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "n/a",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "A brute-force oracle independently re-derives every feature point from the public permutation table and scans a provably sufficient 9^N neighbourhood; it matches optimized 2D/3D f1, f2, nearest offset and feature id bit-for-bit across generated negative, boundary-adjacent and large coordinates for several seeds, plus an adversarial lattice-corner scan that requires the exact ring expansion beyond 3^N.",
         "Unit tests pin seeded fixtures, seed sensitivity, f1 <= f2 ordering, zero f1 at feature points, in-cell feature placement, per-period id uniqueness, 256-cell periodicity, large-coordinate locality and non-finite rejection. A dedicated allocation regression executes 4,096 2D and 3D samples, including ring-expansion inputs, with zero allocation or reallocation calls.",
-        "criterion: Allocation-profiled Divan workloads cover scattered and coherent-grid 2D and 3D sampling at multiple sizes."
+        "benchmark: Allocation-profiled Divan workloads cover scattered and coherent-grid 2D and 3D sampling at multiple sizes."
       ]
     }
   ]

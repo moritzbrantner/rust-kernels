@@ -17,9 +17,12 @@ EVIDENCE_FIELDS = (
     "coverage",
     "mutation",
     "deterministicPerformance",
-    "criterion",
+    "benchmark",
     "runtimeProfiler",
 )
+KERNEL_FIELDS = {"id", "crate", "module", "sources", "notes", *EVIDENCE_FIELDS}
+JUSTIFIED_STATES = {"n/a", "planned"}
+MIN_JUSTIFICATION_LENGTH = 20
 
 
 def fail(message: str) -> None:
@@ -133,6 +136,9 @@ if matrix.get("schemaVersion") != 1:
 if matrix.get("issue") != 52:
     fail("issue must be 52")
 
+for policy in ("coveragePolicy", "mutationPolicy", "benchmarkPolicy"):
+    require_string(matrix.get(policy), policy)
+
 status_values = matrix.get("statusValues")
 if not isinstance(status_values, list) or set(status_values) != EXPECTED_STATUS_VALUES:
     fail(f"statusValues must contain exactly {sorted(EXPECTED_STATUS_VALUES)}")
@@ -196,6 +202,10 @@ for index, kernel in enumerate(kernels):
     if not isinstance(kernel, dict):
         fail(f"{context} must be an object")
 
+    unknown_fields = sorted(set(kernel) - KERNEL_FIELDS)
+    if unknown_fields:
+        fail(f"{context} has unknown fields: {', '.join(unknown_fields)}")
+
     kernel_id = require_string(kernel.get("id"), f"{context}.id")
     if kernel_id in kernel_ids:
         fail(f"duplicate kernel id {kernel_id!r}")
@@ -227,16 +237,25 @@ for index, kernel in enumerate(kernels):
         isinstance(note, str) and note for note in notes
     ):
         fail(f"{context}.notes must be an array of non-empty strings")
-    joined_notes = "\n".join(notes)
 
     for field in EVIDENCE_FIELDS:
-        state = require_string(kernel.get(field), f"{context}.{field}")
+        context_field = f"{context}.{field} ({kernel_id})"
+        state = kernel.get(field)
+        if not isinstance(state, str) or not state.strip():
+            fail(f"{context_field} is empty; record its status or an explicit 'n/a' with a reason")
         if state not in EXPECTED_STATUS_VALUES:
-            fail(f"{context}.{field} has unsupported state {state!r}")
-        if state in {"n/a", "planned"} and f"{field}:" not in joined_notes:
-            fail(
-                f"{context}.{field}={state!r} requires a note prefixed with '{field}:'"
-            )
+            fail(f"{context_field} has unsupported state {state!r}")
+        if state in JUSTIFIED_STATES:
+            reasons = [
+                note[len(field) + 1 :].strip()
+                for note in notes
+                if note.startswith(f"{field}:")
+            ]
+            if not any(len(reason) >= MIN_JUSTIFICATION_LENGTH for reason in reasons):
+                fail(
+                    f"{context_field}={state!r} requires a note '{field}: <reason>' "
+                    f"of at least {MIN_JUSTIFICATION_LENGTH} characters"
+                )
 
     if kernel["coverage"] != "present":
         fail(

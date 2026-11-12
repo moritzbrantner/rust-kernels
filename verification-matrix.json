@@ -10,11 +10,6 @@
     "n/a"
   ],
   "coveragePolicy": "cargo llvm-cov line coverage is gated per crate against coverage-baseline.json (1.0 percentage point tolerance) by scripts/coverage_gate.py; see docs/verification.md. Coverage is visibility, not correctness evidence.",
-  "deferred": {
-    "mutation": "issue #52 later slice",
-    "deterministicPerformance": "issue #52 later complexity/performance-invariant slice",
-    "benchmarkExpansion": "issue #52 later benchmark slice"
-  },
   "facades": [
     "crates/bvh-kernels/src/lib.rs",
     "crates/collection-kernels/src/lib.rs",
@@ -24,6 +19,8 @@
     "crates/search-kernels/src/lib.rs",
     "crates/statistics-kernels/src/lib.rs"
   ],
+  "mutationPolicy": "Every kernel's mutants are enumerated on each pull request and executed in full by the weekly advisory mutation-baseline workflow (cargo-mutants 27.1.0, .cargo/mutants.toml); see docs/mutation-testing.md. There is no score threshold or per-kernel triage of survivors yet, so every row records mutation as 'partial'.",
+  "benchmarkPolicy": "'benchmark' means a cargo bench target (Divan, Criterion or Iai-Callgrind) that exercises the kernel; wall-clock results are informational. Deterministic Iai-Callgrind and work/allocation gates are recorded under deterministicPerformance.",
   "kernels": [
     {
       "id": "aabb-primitives",
@@ -35,9 +32,9 @@
       "oracleDifferential": "partial",
       "propertyMetamorphic": "partial",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -51,9 +48,9 @@
       "oracleDifferential": "missing",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -67,9 +64,9 @@
       "oracleDifferential": "partial",
       "propertyMetamorphic": "partial",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -83,12 +80,14 @@
       "oracleDifferential": "n/a",
       "propertyMetamorphic": "partial",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "missing",
-      "runtimeProfiler": "missing",
+      "benchmark": "n/a",
+      "runtimeProfiler": "n/a",
       "notes": [
-        "oracleDifferential: This intentionally simple O(n^2) implementation is the correctness oracle for optimized broad phases."
+        "oracleDifferential: This intentionally simple O(n^2) implementation is the correctness oracle for optimized broad phases.",
+        "benchmark: N/A. This O(n^2) reference is the correctness oracle the optimized broad phases are benchmarked against (bvh-kernels dynamic_pairs, octree boundary_cases); its own speed is not a contract.",
+        "runtimeProfiler: N/A. Reference oracle for the optimized broad phases, not a runtime path consumers profile."
       ]
     },
     {
@@ -101,9 +100,9 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "partial",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -117,9 +116,9 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "partial",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -135,9 +134,9 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "partial",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -154,11 +153,13 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "partial",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "missing",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
-      "notes": []
+      "notes": [
+        "benchmark: bvh-kernels dynamic_pairs and segment_queries (Divan)."
+      ]
     },
     {
       "id": "wide-bvh",
@@ -170,12 +171,13 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "missing",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
-        "Segment and box visits are checked against brute force over the live leaves; segment_queries is a Divan microbenchmark, not a deterministic sentinel."
+        "Segment and box visits are checked against brute force over the live leaves; segment_queries is a Divan microbenchmark, not a deterministic sentinel.",
+        "benchmark: bvh-kernels segment_queries (Divan)."
       ]
     },
     {
@@ -188,9 +190,9 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "partial",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -204,13 +206,13 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "n/a",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "Finite generated scenes check root/child enclosure, exact leaf membership, input-order independence and pair parity with NaiveBroadPhase in tests/boundary_regressions.rs.",
-        "criterion: New Divan boundary_cases benches measure normal/trace allocation cost for 64, 256 and 1024 bodies. The shared boundary evidence runner caps the 256-body control at 239 allocation calls."
+        "benchmark: New Divan boundary_cases benches measure normal/trace allocation cost for 64, 256 and 1024 bodies. The shared boundary evidence runner caps the 256-body control at 239 allocation calls."
       ]
     },
     {
@@ -223,9 +225,9 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "present",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -239,9 +241,9 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -255,11 +257,14 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
-      "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "mutation": "partial",
+      "deterministicPerformance": "present",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
-      "notes": []
+      "notes": [
+        "benchmark: collection-kernels fenwick_tree (Divan).",
+        "deterministicPerformance: a unit test counts AddAssign calls and locks the 64-item linear build to 127 additions (fenwick-linear-build-64 in .performance/contract.json)."
+      ]
     },
     {
       "id": "generational-arena",
@@ -271,9 +276,9 @@
       "oracleDifferential": "missing",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -287,12 +292,13 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
-      "runtimeProfiler": "planned",
+      "benchmark": "present",
+      "runtimeProfiler": "present",
       "notes": [
-        "runtimeProfiler: Open PR #48 proposes a deterministic runtime-profiler LRU workload; it is not evidence on main yet."
+        "benchmark: collection-kernels lru_cache (Criterion).",
+        "runtimeProfiler: profiles/runtime-profiler/lru.json runs examples/profile_lru.rs (scripts/runtime-profile.sh lru)."
       ]
     },
     {
@@ -305,11 +311,13 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
-      "notes": []
+      "notes": [
+        "benchmark: collection-kernels ring_buffer (Criterion)."
+      ]
     },
     {
       "id": "sparse-set",
@@ -321,9 +329,9 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -337,9 +345,9 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -353,11 +361,13 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "partial",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "partial",
       "runtimeProfiler": "missing",
-      "notes": []
+      "notes": [
+        "benchmark: graph-kernels shortest_path (Criterion) measures dijkstra only; astar has no benchmark."
+      ]
     },
     {
       "id": "graph-traversal",
@@ -369,12 +379,12 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
-      "runtimeProfiler": "planned",
+      "benchmark": "missing",
+      "runtimeProfiler": "present",
       "notes": [
-        "runtimeProfiler: Open PR #48 proposes a deterministic breadth/depth traversal runtime-profiler workload; it is not evidence on main yet."
+        "runtimeProfiler: profiles/runtime-profiler/traversal.json runs examples/profile_traversal.rs (scripts/runtime-profile.sh traversal)."
       ]
     },
     {
@@ -387,13 +397,14 @@
       "oracleDifferential": "partial",
       "propertyMetamorphic": "partial",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "partial",
-      "criterion": "missing",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "SCCs: exhaustive four-vertex reachability oracle, deep chain/cycle subprocess on a 64 KiB stack, explicit seed ordering and test-only once-per-edge traversal counters. Topological-sort evidence is unchanged.",
-        "New SCC Divan workloads in benches/boundary_cases.rs cover chains, cycles and disconnected graphs at 64, 512 and 2048 vertices; no claim that heap frames universally improve latency."
+        "New SCC Divan workloads in benches/boundary_cases.rs cover chains, cycles and disconnected graphs at 64, 512 and 2048 vertices; no claim that heap frames universally improve latency.",
+        "benchmark: graph-kernels topology (Criterion) and boundary_cases (Divan, SCC)."
       ]
     },
     {
@@ -406,11 +417,13 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
-      "notes": []
+      "notes": [
+        "benchmark: graph-kernels minimum_spanning (Criterion)."
+      ]
     },
     {
       "id": "selection",
@@ -422,14 +435,16 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
-      "deterministicPerformance": "partial",
-      "criterion": "missing",
-      "runtimeProfiler": "planned",
+      "mutation": "partial",
+      "deterministicPerformance": "present",
+      "benchmark": "present",
+      "runtimeProfiler": "present",
       "notes": [
-        "runtimeProfiler: Open PR #48 proposes a deterministic quickselect runtime-profiler workload; it is not evidence on main yet.",
         "top_k_by: empty/short usize::MAX limits, unknown-length stable sort oracle and zero-limit nonconsumption; defined eight-result descending scans use at most 8n comparisons.",
-        "Divan boundary_cases measures exact/unknown-length streams and ordinary 4096-candidate selection; empty input must allocate zero times."
+        "Divan boundary_cases measures exact/unknown-length streams and ordinary 4096-candidate selection; empty input must allocate zero times.",
+        "benchmark: search-kernels search and boundary_cases (Divan) plus performance_smoke (Iai-Callgrind).",
+        "runtimeProfiler: profiles/runtime-profiler/search.json runs quickselect in examples/profile_search.rs (scripts/runtime-profile.sh search).",
+        "deterministicPerformance: Iai-Callgrind sentinels quickselect-middle-4096, top-k-40-of-4096 and ranked-top-k-40-of-4096 plus the top-k-empty-oversized-limit allocation gate (.performance/contract.json)."
       ]
     },
     {
@@ -442,12 +457,14 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
-      "deterministicPerformance": "missing",
-      "criterion": "missing",
-      "runtimeProfiler": "planned",
+      "mutation": "partial",
+      "deterministicPerformance": "present",
+      "benchmark": "present",
+      "runtimeProfiler": "present",
       "notes": [
-        "runtimeProfiler: Open PR #48 proposes a deterministic radix-sort runtime-profiler workload; it is not evidence on main yet."
+        "benchmark: search-kernels search (Divan) and performance_smoke (Iai-Callgrind).",
+        "runtimeProfiler: profiles/runtime-profiler/search.json runs radix sort in examples/profile_search.rs (scripts/runtime-profile.sh search).",
+        "deterministicPerformance: Iai-Callgrind sentinel radix-sort-4096 in benches/performance_smoke.rs (.performance/contract.json)."
       ]
     },
     {
@@ -460,12 +477,14 @@
       "oracleDifferential": "n/a",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
-      "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "mutation": "partial",
+      "deterministicPerformance": "present",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
-        "oracleDifferential: The probabilistic contract is better expressed as no false negatives; exact false-positive equality is not an oracle contract."
+        "oracleDifferential: The probabilistic contract is better expressed as no false negatives; exact false-positive equality is not an oracle contract.",
+        "benchmark: search-kernels performance_smoke (Iai-Callgrind bloom insert).",
+        "deterministicPerformance: Iai-Callgrind sentinel bloom-insert-4096 in benches/performance_smoke.rs (.performance/contract.json)."
       ]
     },
     {
@@ -478,13 +497,13 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "n/a",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "crates/statistics-kernels/tests/audit_regressions.rs checks finite extreme singleton/chunk merges, partition/reversal invariance and unbalanced counts; an internal test protects representable subnormal m2.",
-        "criterion: New ordinary, extreme and chunk-count workloads use Divan in crates/statistics-kernels/benches/audit_numerics.rs; Cargo-native allocation regression tests and Divan benches reproduces overflow on the audited base.",
+        "benchmark: New ordinary, extreme and chunk-count workloads use Divan in crates/statistics-kernels/benches/audit_numerics.rs; Cargo-native allocation regression tests and Divan benches reproduces overflow on the audited base.",
         "tests/boundary_regressions.rs covers overflow-safe push, continued use after opposite finite extremes, push/merge agreement, non-finite rejection atomicity and bit-identical ordinary evaluation order. Divan boundary_cases compares ordinary/extreme push."
       ]
     },
@@ -498,9 +517,9 @@
       "oracleDifferential": "partial",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -514,13 +533,13 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "n/a",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "Scale-sweep sphere, OBB SAT and planar-adapter tests in crates/geometry-kernels/tests/audit_regressions.rs preserve outcome and trace parity; deterministic easy-sphere cases have an eight-iteration upper bound.",
-        "criterion: New scaled GJK workloads use Divan in crates/geometry-kernels/benches/audit_numerics.rs; Cargo-native allocation regression tests and Divan benches keeps before/after outcomes separate from timings."
+        "benchmark: New scaled GJK workloads use Divan in crates/geometry-kernels/benches/audit_numerics.rs; Cargo-native allocation regression tests and Divan benches keeps before/after outcomes separate from timings."
       ]
     },
     {
@@ -533,14 +552,14 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "n/a",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": [
         "Analytic sphere/sphere and capsule/sphere distances plus diagonal AABB closest-corner distance provide independent oracle evidence.",
         "Swapped-shape symmetry, touching/intersection classification, deterministic replay, and inconclusive-prepass refinement are covered.",
-        "criterion: this is a bounded reusable correctness/reference kernel; dedicated deterministic performance evidence will be added when a consumer workload establishes representative hot-path shapes."
+        "benchmark: gap. No benchmark yet; one should be added once a consumer workload establishes representative hot-path shapes."
       ]
     },
     {
@@ -554,16 +573,16 @@
       "oracleDifferential": "partial",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "partial",
-      "criterion": "n/a",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "Prepared box frames own their immutable hull and match fresh preparation bit-for-bit across translation/margin changes without repeated vertex projections. Box/hull contacts: analytic signed face depths and finite-face witnesses, 512 deterministic rotated box/cube comparisons against the separate primitive SAT path, and the actual Greyhaven crate/panel Rapier oracle cover face/edge SAT and clipping. The contact kernel is not a sweep; Physics Engine still owns speculative response and CCD admission.",
         "Analytic face, edge, corner and diagonal-corner-distance cases use a cube built with QuickHull. A deterministic 400-segment box-distance comparison exercises the physics-engine consumer.",
         "A crossing/touching segment returns None so consumers retain a penetration-capable fallback. Translation invariance, deterministic work counters and AABB feature pruning have Cargo-native regression tests.",
         "The Greyhaven static-rock Rapier oracle checks capsule cast timing and work on the real 32-point authored asset; wall-clock measurements are advisory outside controlled runners.",
-        "criterion: The consumer's end-to-end oracle and deterministic feature-work counters are the representative performance evidence for this narrow static-hull query; a stand-alone microbenchmark is deferred."
+        "benchmark: geometry-kernels segment_hull_box (Divan) and performance_smoke (Iai-Callgrind box/hull contacts); the consumer's end-to-end oracle and deterministic feature-work counters remain the representative performance evidence."
       ]
     },
     {
@@ -576,11 +595,14 @@
       "oracleDifferential": "missing",
       "propertyMetamorphic": "partial",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
-      "runtimeProfiler": "missing",
-      "notes": []
+      "benchmark": "n/a",
+      "runtimeProfiler": "n/a",
+      "notes": [
+        "benchmark: N/A. Inline fixed-size vector helpers with no algorithmic work of their own; their cost is measured inside every geometry benchmark that calls them.",
+        "runtimeProfiler: N/A. Inline vector helpers; a process-level runtime profile would only measure their callers."
+      ]
     },
     {
       "id": "obb3-sat",
@@ -592,9 +614,9 @@
       "oracleDifferential": "partial",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "present",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -608,13 +630,13 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "n/a",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "crates/geometry-kernels/tests/audit_regressions.rs compares segment distance against independent convex one-dimensional minimization and covers scale, swap, reversal, crossing, skew, endpoint and capsule-oracle cases.",
-        "criterion: New segment/capsule workloads use Divan in crates/geometry-kernels/benches/audit_numerics.rs instead of adding another Criterion suite."
+        "benchmark: New segment/capsule workloads use Divan in crates/geometry-kernels/benches/audit_numerics.rs instead of adding another Criterion suite."
       ]
     },
     {
@@ -627,13 +649,13 @@
       "oracleDifferential": "partial",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "n/a",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "crates/geometry-kernels/tests/audit_regressions.rs checks analytic support extrema and positive-direction rescaling from subnormal through overflow-prone finite vectors for spheres and capsules.",
-        "criterion: New ordinary/extreme-direction workloads use Divan in crates/geometry-kernels/benches/audit_numerics.rs."
+        "benchmark: New ordinary/extreme-direction workloads use Divan in crates/geometry-kernels/benches/audit_numerics.rs."
       ]
     },
     {
@@ -650,9 +672,9 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "present",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "BVH contacts, sweeps and rays compared against unpruned triangle traversal; winding/translation, floor/ceiling/edge/initial-overlap/failure cases in triangle_mesh/tests.rs.",

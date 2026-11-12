@@ -12,15 +12,15 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "n/a",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "1500 seeded 3-10 vertex star and 2-opt polygons check every interior triangle edge against a brute-force diagonal oracle, require n-3 distinct diagonals and match a naive exact ear clipper triangle-for-triangle.",
         "300 seeded random polygons in both windings check area preservation, positive orientation, index validity, piece convexity, the Hertel-Mehlhorn 2r+1 bound, diagonal maximality and sampled point-in-polygon coverage; outputs are invariant under rotation and reversal.",
         "Fixtures cover concave, collinear, repeated, nearly-degenerate and convex polygons plus every typed error; warmed reuse allocates zero times and star-polygon ear tests stay within 3n.",
-        "criterion: Divan polygon2 suite only; no Criterion suite is added."
+        "benchmark: Divan polygon2 suite only; no Criterion suite is added."
       ]
     }
   ]

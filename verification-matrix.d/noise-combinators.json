@@ -13,14 +13,14 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "n/a",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "A straightforward loop oracle with an independent powi octave schedule and explicit amplitude-sum normalisation matches 2D/3D fBm, billow and ridged sums over Perlin, Simplex and Worley bases for six schedules, including one octave, zero gain and unit gain.",
         "Unit tests pin typed rejection of zero octaves, too many octaves, invalid lacunarity or gain and overflowing schedules, accepted boundary schedules, single-octave identity, constant-field shape constants and documented output ranges. A dedicated allocation regression samples every combinator 1,024 times with zero allocation or reallocation calls.",
-        "criterion: Allocation-profiled Divan workloads sweep 1, 4 and 8 octaves across 1,024 and 16,384 point batches for scattered and coherent-grid inputs."
+        "benchmark: Allocation-profiled Divan workloads sweep 1, 4 and 8 octaves across 1,024 and 16,384 point batches for scattered and coherent-grid inputs."
       ]
     },
     {
@@ -33,13 +33,13 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "n/a",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "2D/3D warps match manual p + amplitude * offset(p) displacement bit-for-bit, repeat deterministically, sample the base field at the warped position and are linear in the amplitude; zero amplitude is the identity and non-finite amplitudes or warped coordinates are rejected.",
-        "criterion: Allocation-profiled Divan workloads cover 2D and 3D Simplex-warped sampling at two batch sizes."
+        "benchmark: Allocation-profiled Divan workloads cover 2D and 3D Simplex-warped sampling at two batch sizes."
       ]
     },
     {
@@ -52,14 +52,14 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "n/a",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "2D curl of sin(x)cos(y) and 3D curl of an analytic trigonometric vector potential match closed-form curls to second-order central-difference accuracy; linear potentials are differentiated exactly.",
         "Curl fields of Simplex/Perlin potentials have central-difference divergence below 1e-9 in 2D and 3D, while the gradient control field of the same potential exceeds 1. Invalid epsilons return a typed error and an epsilon lost at the sample magnitude panics instead of dividing by zero.",
-        "criterion: Allocation-profiled Divan workloads cover 2D and 3D Simplex curl sampling at two batch sizes."
+        "benchmark: Allocation-profiled Divan workloads cover 2D and 3D Simplex curl sampling at two batch sizes."
       ]
     }
   ]
