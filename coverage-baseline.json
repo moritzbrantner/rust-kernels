@@ -1,0 +1,54 @@
+{
+  "metric": "lines",
+  "tolerancePercentagePoints": 1.0,
+  "crates": {
+    "bvh-kernels": {
+      "percent": 96.34,
+      "lines": 1338
+    },
+    "bvh-trace-kernels": {
+      "percent": 97.87,
+      "lines": 376
+    },
+    "collection-kernels": {
+      "percent": 97.47,
+      "lines": 1742
+    },
+    "geometry-kernels": {
+      "percent": 95.86,
+      "lines": 10857
+    },
+    "graph-kernels": {
+      "percent": 95.42,
+      "lines": 1614
+    },
+    "noise-kernels": {
+      "percent": 97.62,
+      "lines": 1220
+    },
+    "octree-kernels": {
+      "percent": 97.21,
+      "lines": 394
+    },
+    "rust-kernels-web-demo": {
+      "percent": 99.11,
+      "lines": 564
+    },
+    "search-kernels": {
+      "percent": 100.0,
+      "lines": 462
+    },
+    "similarity-kernels": {
+      "percent": 95.96,
+      "lines": 1065
+    },
+    "spatial-kernels": {
+      "percent": 97.83,
+      "lines": 646
+    },
+    "statistics-kernels": {
+      "percent": 95.85,
+      "lines": 193
+    }
+  }
+}
