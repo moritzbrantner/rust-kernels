@@ -9,7 +9,7 @@
     "planned",
     "n/a"
   ],
-  "coveragePolicy": "cargo llvm-cov is report-only in this slice. No coverage percentage or regression threshold is enforced.",
+  "coveragePolicy": "cargo llvm-cov line coverage is gated per crate against coverage-baseline.json (1.0 percentage point tolerance) by scripts/coverage_gate.py; see docs/verification.md. Coverage is visibility, not correctness evidence.",
   "deferred": {
     "mutation": "issue #52 later slice",
     "deterministicPerformance": "issue #52 later complexity/performance-invariant slice",

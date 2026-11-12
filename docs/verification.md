@@ -22,13 +22,22 @@ Production code may not call `unwrap()` or `expect()`: the workspace denies `cli
 
 `python3 scripts/validate_verification_matrix.py` runs as the blocking `verification-matrix` CI job. It checks matrix structure and inventory only. Every `src/**/*.rs` implementation source in every Cargo workspace member must be owned by at least one kernel row or explicitly listed as a facade. Evidence states such as `missing` and `partial` do **not** fail this validation.
 
-Coverage runs in a separate advisory job. It uses `cargo llvm-cov` across the workspace with all features and publishes:
+Coverage runs in the blocking `coverage-baseline` job. It runs `cargo llvm-cov` across the workspace with all features, then `python3 scripts/coverage_gate.py check target/llvm-cov-baseline/summary.json`, and always uploads `summary.json` (per-file summary data), `summary.txt` (the human-readable table), `lcov.info` (raw LCOV) and `gate.md` (the per-crate comparison) as the `llvm-cov-baseline-<sha>` artifact.
 
-- `summary.json`: per-file summary data;
-- `summary.txt`: the human-readable baseline table; and
-- `lcov.info`: the raw LCOV baseline.
+The gate sums line coverage per workspace member and compares it with [`coverage-baseline.json`](../coverage-baseline.json). It fails when a crate falls more than `tolerancePercentagePoints` below its recorded percentage, or when a crate is measured but not recorded (or recorded but no longer measured). Coverage above the baseline never fails; the table only suggests updating it. Coverage is visibility, not proof: raising the percentage is not a goal, and oracle, differential and property tests remain the correctness signal.
 
-The job has `continue-on-error: true`, and there are deliberately no `--fail-under-*` flags or percentage thresholds in this slice. Existing blocking jobs therefore keep their semantics while coverage/tooling failures and low-covered files remain visible.
+The tolerance is 1.0 percentage point. Coverage is deterministic for unchanged code (seeded tests; two `main` runs reproduce each untouched file exactly), so the tolerance does not absorb noise between runs. It absorbs line-mapping drift from the floating `stable` toolchain and lets a change leave a line or two uncovered in the smallest crate (`statistics-kernels`, about 0.5 pp per line), while dropping a meaningful untested path in any crate still fails.
+
+### Updating the coverage baseline
+
+When coverage changes legitimately (code moved between crates, dead code removed, a deliberately untestable path added, a new crate), regenerate the baseline in the same PR and say why in the description:
+
+```sh
+cargo llvm-cov --workspace --all-features --json --summary-only --output-path target/llvm-cov-baseline/summary.json
+python3 scripts/coverage_gate.py update target/llvm-cov-baseline/summary.json
+```
+
+Without a local `cargo-llvm-cov`, download `summary.json` from the PR's `llvm-cov-baseline-<sha>` CI artifact (`gh run download <run-id> -n llvm-cov-baseline-<sha>`) and pass it to `update`; report paths are matched by member directory, so a CI report works on any checkout. `update` keeps the recorded tolerance.
 
 ## Updating the matrix
 
@@ -42,4 +51,4 @@ When adding a public kernel:
 
 Multiple public kernels may share one implementation file and therefore the same source path. Facade-only `src/lib.rs` files are tracked separately so adding a new implementation module cannot silently bypass the matrix.
 
-Mutation testing, complexity gates, coverage-regression thresholds, and broader benchmark/runtime-profiler coverage remain later slices of issue #52.
+Mutation testing, complexity gates, and broader benchmark/runtime-profiler coverage remain later slices of issue #52.
