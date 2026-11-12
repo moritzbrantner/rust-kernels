@@ -12,11 +12,13 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
-      "notes": []
+      "notes": [
+        "benchmark: similarity-kernels set_similarity (Divan, Jaccard); levenshtein runs as the reference in expansion and fuzzy."
+      ]
     },
     {
       "id": "shingling-rolling-hash",
@@ -28,11 +30,13 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
-      "notes": []
+      "notes": [
+        "benchmark: similarity-kernels shingling (Divan)."
+      ]
     },
     {
       "id": "approximate-similarity-fingerprints",
@@ -44,9 +48,9 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": []
     },
@@ -60,11 +64,13 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "missing",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
-      "notes": []
+      "notes": [
+        "benchmark: similarity-kernels fuzzy (Divan)."
+      ]
     },
     {
       "id": "k-way-sorted-merge",
@@ -76,9 +82,9 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": []
     }

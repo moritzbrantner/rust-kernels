@@ -13,9 +13,9 @@
       "oracleDifferential": "partial",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "n/a",
-      "criterion": "n/a",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "Experimental (#189): validated triaxial semiaxes with a separate orthonormal pose; not part of the PrimitiveShape3 pair matrix and not consumed by Physics Engine.",
@@ -23,7 +23,7 @@
         "Radius containment, orientation invariance, positive direction scaling and 1e-150..1e150 scale covariance are metamorphic properties; both rotating-motion displacement certificates bound every sampled material point.",
         "Shared-transform homothetic pair TOI (#190): exact preconditions (bitwise axes, exact double-length proportionality) else explicit Unsupported; 600 seeded pairs (incl. 150 high-speed) agree with an independent GJK/support-plane conservative-advancement reference, every hit witness satisfies both ellipsoid implicit equations with opposite inverse-transpose normals, and analytic head-on, tangent (32 seeded), overlap, stationary, separating, near-zero and 1e-140..1e140 cases are covered. No generic mixed-shape/rotating ellipsoid pair fallback exists.",
         "deterministicPerformance: Every query is a fixed closed-form scalar sequence with no iteration or scratch; Divan cases in benches/primitive3.rs are developer evidence.",
-        "criterion: Developer timings use the existing Divan primitive3 suite (ellipsoid module); no Criterion suite is added."
+        "benchmark: Developer timings use the existing Divan primitive3 suite (ellipsoid module); no Criterion suite is added."
       ]
     }
   ]

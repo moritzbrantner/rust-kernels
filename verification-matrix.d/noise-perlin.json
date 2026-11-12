@@ -13,14 +13,14 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "n/a",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "The integration oracle independently evaluates every lattice corner for generated 2D and 3D fixtures; unit tests also pin seeded fixtures, lattice zeros, 256-cell periodicity, negative coordinates and large finite coordinates.",
         "Permutation construction is seed-controlled and tests prove completeness and repeatability. Sampling borrows fixed-size state and has no allocation path.",
-        "criterion: New developer-facing microbenchmarks use Divan with allocation profiling for scattered and coherent 2D/3D workloads at multiple sizes."
+        "benchmark: New developer-facing microbenchmarks use Divan with allocation profiling for scattered and coherent 2D/3D workloads at multiple sizes."
       ]
     }
   ]

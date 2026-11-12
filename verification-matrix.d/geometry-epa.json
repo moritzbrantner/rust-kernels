@@ -12,16 +12,16 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "present",
-      "criterion": "n/a",
+      "benchmark": "present",
       "runtimeProfiler": "missing",
       "notes": [
         "Tests cover known square penetration depth/normal, swapped-shape symmetry, fail-closed separated input, deterministic trace equality, and result/trace parity.",
         "Regression coverage keeps hull turn tolerances scale-aware, strips synthetic planar-GJK extrusion witnesses from EPA evidence, and marks iteration-capped traces terminal.",
         "Whole-execution test-only counters require zero snapshot creation and zero support-point copies without tracing, including capped/terminal iterations; trace results and snapshot counts are checked separately.",
         "crates/geometry-kernels/tests/audit_regressions.rs compares 4-64-vertex polygon penetration with an independent SAT oracle and verifies every expanded polytope is convex and encloses the origin.",
-        "criterion: New no-trace/trace workloads use Divan allocation profiling in crates/geometry-kernels/benches/audit_numerics.rs; scripts/audit-evidence.py gates the four-allocation no-trace control and reports informational timings."
+        "benchmark: New no-trace/trace workloads use Divan allocation profiling in crates/geometry-kernels/benches/audit_numerics.rs; scripts/audit-evidence.py gates the four-allocation no-trace control and reports informational timings."
       ]
     },
     {
@@ -34,15 +34,15 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "present",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "n/a",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": [
         "Analytic sphere penetration and OBB/SAT cases provide independent depth/reference evidence.",
         "Swapped-shape symmetry, deterministic replay, touching/separated inputs, strict seed enclosure, and bounded iteration-limit behavior are covered.",
         "This is a bounded correctness/reference kernel; production consumers should retain specialized hot paths where deterministic work evidence justifies them.",
-        "criterion: no standalone Criterion/Divan threshold is claimed for this bounded reference kernel; deterministic iteration/status evidence is covered by tests."
+        "benchmark: gap. No benchmark yet for this bounded reference kernel; deterministic iteration/status evidence is covered by tests."
       ]
     }
   ]

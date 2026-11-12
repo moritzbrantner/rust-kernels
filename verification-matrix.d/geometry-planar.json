@@ -12,9 +12,9 @@
       "oracleDifferential": "present",
       "propertyMetamorphic": "missing",
       "coverage": "present",
-      "mutation": "missing",
+      "mutation": "partial",
       "deterministicPerformance": "missing",
-      "criterion": "missing",
+      "benchmark": "missing",
       "runtimeProfiler": "missing",
       "notes": [
         "Tests cover overlapping and separated coplanar convex hulls and require the trace terminal result to match the authoritative planar GJK result."
