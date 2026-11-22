@@ -110,17 +110,27 @@ macro_rules! pair_export {
 
 pair_export!(
     /// Sphere `(cx, cy, cz, r)` vs AABB `(min, max)` overlap flags.
-    shape_sphere_aabb, 4, 6,
-    |sphere, bounds| sphere_aabb(Sphere::new([sphere[0], sphere[1], sphere[2]], sphere[3]), aabb(bounds)).overlaps
+    shape_sphere_aabb,
+    4,
+    6,
+    |sphere, bounds| sphere_aabb(
+        Sphere::new([sphere[0], sphere[1], sphere[2]], sphere[3]),
+        aabb(bounds)
+    )
+    .overlaps
 );
 pair_export!(
     /// AABB `(min, max)` vs AABB overlap flags (touching counts).
-    shape_aabb_aabb, 6, 6,
+    shape_aabb_aabb,
+    6,
+    6,
     |left, right| aabb_aabb(aabb(left), aabb(right)).overlaps
 );
 pair_export!(
     /// OBB `(center, half_extents, rotation_xyz)` vs OBB SAT overlap flags.
-    shape_obb_obb, 9, 9,
+    shape_obb_obb,
+    9,
+    9,
     |left, right| obb3_sat(obb(left), obb(right)).overlaps
 );
 
