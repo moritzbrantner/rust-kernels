@@ -569,9 +569,9 @@ fn build_polytope(points: &[Vec3], simplex: [u32; 4], eps: f64, work: &mut Quick
         }
         work.faces.push(Face::new(points, tri));
     }
-    for face in 0..4 {
+    for face in work.faces.iter_mut().take(4) {
+        let v = face.vertices;
         for edge in 0..3 {
-            let v = work.faces[face].vertices;
             // Edge `(v[edge], v[edge + 1])` lies in exactly one other face: the
             // one that omits this face's third vertex. Faces were pushed
             // opposite `d`, `c`, `b`, `a` in that order, and the simplex
@@ -586,7 +586,7 @@ fn build_polytope(points: &[Vec3], simplex: [u32; 4], eps: f64, work: &mut Quick
             } else {
                 3
             };
-            work.faces[face].neighbors[edge] = neighbor;
+            face.neighbors[edge] = neighbor;
         }
     }
     for index in 0..points.len() as u32 {
