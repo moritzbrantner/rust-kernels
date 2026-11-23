@@ -256,3 +256,71 @@ fn nonfinite_plane_parameter_is_an_error_and_initial_cap_seams_keep_feature_orde
         assert_eq!(hit.normal, [1.0, 0.0, 0.0]);
     }
 }
+
+#[test]
+fn axis_aligned_frames_answer_exactly_as_a_quarter_turned_frame() {
+    // A quarter turn about Z permutes coordinates exactly, so the general frame path and the
+    // axis-aligned shortcut must agree bit for bit, inside and outside, boxes and wedges.
+    let mut seed = 0x2a7_u64;
+    let mut next = || {
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+        (seed >> 32) as f64 / u32::MAX as f64 * 2.0 - 1.0
+    };
+    let turned = [[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 1.0]];
+    let half = [1.0, 2.0, 0.5];
+    for (aligned, local) in [
+        (
+            Shape::cuboid(half),
+            Shape::cuboid([half[1], half[0], half[2]]),
+        ),
+        (Shape::wedge(half), Shape::wedge(half)),
+    ] {
+        let wedge = aligned.kind() == PrimitiveKind3::Wedge;
+        let position = [3.0, -1.0, 0.25];
+        let straight = PrimitiveBody3::axis_aligned(aligned, position, [0.0; 3]);
+        let quarter = PrimitiveBody3::new(local, position, turned, [0.0; 3]);
+        // The wedge's turned twin answers the turned rays: compare it against itself unturned.
+        let reference = if wedge {
+            PrimitiveBody3::axis_aligned(local, [0.0; 3], [0.0; 3])
+        } else {
+            straight
+        };
+        let mut hits = 0;
+        for _ in 0..2048 {
+            // Aim near the shape: most rays hit, some start inside, some pass beside it.
+            let o = [4.0 * next(), 4.0 * next(), 4.0 * next()];
+            let aim = [1.5 * next(), 2.5 * next(), 0.75 * next()];
+            let d = scale(sub(aim, o), 1.0 + next().abs());
+            let (expected, actual) = if wedge {
+                // Local coordinates of the same ray in the turned frame.
+                let local_o = inverse_rotate(turned, sub(add(position, o), position));
+                let local_d = inverse_rotate(turned, d);
+                (
+                    cast(reference, local_o, local_d),
+                    cast(quarter, add(position, o), d),
+                )
+            } else {
+                (
+                    cast(straight, add(position, o), d),
+                    cast(quarter, add(position, o), d),
+                )
+            };
+            match (expected, actual) {
+                (None, None) => {}
+                (Some(e), Some(a)) => {
+                    hits += 1;
+                    assert_eq!(e.fraction.to_bits(), a.fraction.to_bits(), "{o:?} {d:?}");
+                    assert_eq!(e.starts_inside, a.starts_inside);
+                    let normal = if wedge {
+                        rotate_local(turned, e.normal)
+                    } else {
+                        e.normal
+                    };
+                    assert_eq!(normal, a.normal, "{o:?} {d:?}");
+                }
+                (e, a) => panic!("{o:?} {d:?}: {e:?} vs {a:?}"),
+            }
+        }
+        assert!(hits > 512, "{hits}");
+    }
+}

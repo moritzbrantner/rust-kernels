@@ -65,7 +65,7 @@ pub fn try_ray_cast(
         || !is_finite(displacement)
         || displacement == [0.0; 3]
         || !is_finite(body.position)
-        || !valid_axes(body)
+        || !(identity_axes(body) || valid_axes(body))
     {
         return Err(InvalidInput);
     }
@@ -96,6 +96,10 @@ pub fn try_ray_cast(
             }
             curved(o, d, h / magnitude, r / magnitude, body.axes[1], work)
         }
+        // An axis-aligned frame's local coordinates are the world offsets themselves.
+        PrimitiveKind3::Box | PrimitiveKind3::Wedge if identity_axes(body) => {
+            polyhedral(body, o, d, half, work)
+        }
         PrimitiveKind3::Box | PrimitiveKind3::Wedge => polyhedral(
             body,
             inverse_rotate(body.axes, o),
@@ -123,6 +127,10 @@ fn max_abs([x, y, z]: Vec3) -> f64 {
 
 fn divide([x, y, z]: Vec3, divisor: f64) -> Vec3 {
     [x / divisor, y / divisor, z / divisor]
+}
+
+fn identity_axes(body: PrimitiveBody3) -> bool {
+    body.axes == [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 }
 
 fn valid_axes(body: PrimitiveBody3) -> bool {
@@ -307,9 +315,14 @@ fn polyhedral(
     let mut strict = true;
     for (index, &(normal, limit)) in planes.iter().enumerate() {
         work.planes_tested += 1;
-        let projected = dot(normal, o);
+        // A box's local planes are coordinate planes: index / 2 is the axis, odd is positive.
+        let (projected, velocity) = if is_box {
+            let (axis, sign) = (index / 2, if index % 2 == 0 { -1.0 } else { 1.0 });
+            (sign * o[axis], sign * d[axis])
+        } else {
+            (dot(normal, o), dot(normal, d))
+        };
         let start = projected - limit;
-        let velocity = dot(normal, d);
         let band = ROUNDING * projected.abs().max(limit.abs());
         inside &= start <= band;
         strict &= start < -band;
